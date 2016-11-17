@@ -29,7 +29,7 @@ static void  stu_pass_open_filedes(stu_cycle_t *cycle, stu_filedes_t *fds);
 static void  stu_worker_process_cycle(stu_cycle_t *cycle, void *data);
 static void  stu_worker_process_init(stu_cycle_t *cycle, stu_int_t worker);
 static void  stu_filedes_handler(stu_event_t *ev);
-static void *stu_worker_thread_cycle(void *data);
+static stu_thread_value_t stu_worker_thread_cycle(void *data);
 
 
 void

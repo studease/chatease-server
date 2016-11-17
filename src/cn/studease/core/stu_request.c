@@ -18,5 +18,3 @@ stu_http_finalize_request(stu_http_request_t *r) {
 
 }
 
-
-

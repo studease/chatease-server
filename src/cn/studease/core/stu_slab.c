@@ -81,6 +81,10 @@ stu_slab_alloc_locked(stu_slab_pool_t *pool, size_t size) {
 			return NULL;
 		}
 
+		page->shift = STU_SLAB_PAGE_SHIFT;
+		page->bitmap = 1;
+		page->prev = page->next = NULL;
+
 		p = (page - pool->pages) << STU_SLAB_PAGE_SHIFT;
 		p += (uintptr_t) pool->data.start;
 
@@ -315,19 +319,17 @@ stu_slab_free_locked(stu_slab_pool_t *pool, void *p) {
 
 		goto done;
 	} else {
-		c = (u_char *) &page->bitmap;
-
 		m = 1 << j;
-		*c &= ~m;
+		page->bitmap &= ~m;
+
+		if (page->bitmap == 0) {
+			stu_slab_free_page(pool, page);
+			goto done;
+		}
 
 		if (page->prev == NULL) {
 			goto append;
 		}
-
-		if (page->bitmap) {
-			goto done;
-		}
-		stu_slab_free_page(pool, page);
 
 		goto done;
 	}

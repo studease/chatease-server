@@ -31,6 +31,7 @@ struct stu_event_s {
 };
 
 stu_int_t stu_epoll_init();
+
 stu_int_t stu_epoll_add_event(stu_event_t *ev, uint32_t event);
 stu_int_t stu_epoll_del_event(stu_event_t *ev, uint32_t event);
 

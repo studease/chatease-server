@@ -13,7 +13,7 @@ stu_uint_t   stu_ncpu;
 stu_cycle_t *stu_cycle;
 
 
-void stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool);
+static void stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool);
 
 
 void
@@ -36,6 +36,8 @@ stu_cycle_create(stu_config_t *cf) {
 	stu_connection_pool_t *connection_pool;
 	stu_cycle_t           *cycle;
 	stu_shm_t             *shm;
+
+	stu_strerror_init();
 
 	stu_ncpu = sysconf(_SC_NPROCESSORS_ONLN);
 
@@ -92,6 +94,11 @@ stu_cycle_create(stu_config_t *cf) {
 
 	cycle->connection_n = 0;
 
+	if (stu_epoll_init() == STU_ERROR) {
+		stu_log_error(0, "Failed to init epoll.");
+		return NULL;
+	}
+
 	return cycle;
 }
 
@@ -105,7 +112,8 @@ stu_pidfile_delete(stu_str_t *name) {
 	return;
 }
 
-void
+
+static void
 stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool) {
 	dst->daemon = src->daemon;
 	dst->runmode = src->runmode;

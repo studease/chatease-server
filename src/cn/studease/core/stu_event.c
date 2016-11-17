@@ -57,14 +57,14 @@ done:
 
 stu_int_t
 stu_epoll_del_event(stu_event_t *ev, uint32_t event) {
-	stu_connection_t    *c;
-	int                  op;
-	struct epoll_event   ee;
+	stu_connection_t   *c;
+	int                 op;
+	struct epoll_event  ee;
 
 	/*
 	 * when the file descriptor is closed, the epoll automatically deletes
 	 * it from its queue, so we do not need to delete explicitly the event
-	 * before the closing file descriptor
+	 * before closing the file descriptor
 	 */
 	if (ev->type == STU_CLOSE_EVENT) {
 		ev->active = 0;
