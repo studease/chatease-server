@@ -74,6 +74,7 @@ int main(int argc, char **argv) {
 	}
 
 	stu_start_worker_processes(stu_cycle);
+	stu_process_master_cycle(stu_cycle);
 
 	return EXIT_SUCCESS;
 }

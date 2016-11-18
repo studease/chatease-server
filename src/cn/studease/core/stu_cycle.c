@@ -24,6 +24,7 @@ stu_config_default(stu_config_t *cf) {
 	stu_str_null(&cf->hostname);
 	stu_str_null(&cf->origin_addr);
 	cf->origin_port = 80;
+	cf->master_process = FALSE;
 	cf->worker_processes = 2;
 	cf->worker_threads = 2;
 	stu_str_set(&cf->pid, "chatd.pid");
@@ -109,7 +110,7 @@ stu_pidfile_create(stu_str_t *name) {
 
 void
 stu_pidfile_delete(stu_str_t *name) {
-	return;
+
 }
 
 
@@ -133,6 +134,7 @@ stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool) {
 		dst->origin_port = src->origin_port;
 	}
 
+	dst->master_process = src->master_process;
 	dst->worker_processes = src->worker_processes;
 	dst->worker_threads = src->worker_threads;
 

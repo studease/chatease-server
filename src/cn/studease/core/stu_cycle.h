@@ -23,6 +23,7 @@ typedef struct {
 	stu_str_t      origin_addr;
 	uint16_t       origin_port;
 
+	stu_bool_t     master_process;
 	stu_int_t      worker_processes;
 	stu_int_t      worker_threads;
 

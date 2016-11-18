@@ -118,7 +118,7 @@ stu_connection_init(stu_connection_t *c, stu_socket_t s) {
 	c->fd = s;
 	stu_user_init(&c->user);
 
-	c->event = NULL;
+	c->read = c->write = NULL;
 
 	c->error = STU_CONNECTION_ERROR_NONE;
 }

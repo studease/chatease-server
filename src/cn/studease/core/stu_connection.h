@@ -31,7 +31,8 @@ typedef struct {
 	stu_socket_t           fd;
 	stu_user_t             user;
 
-	stu_event_t           *event;
+	stu_event_t           *read;
+	stu_event_t           *write;
 
 	stu_uint_t             error;  // timed out, inner error, destroyed
 } stu_connection_t;

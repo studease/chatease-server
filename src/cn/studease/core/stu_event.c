@@ -103,3 +103,12 @@ done:
 	return STU_OK;
 }
 
+stu_int_t
+stu_epoll_process_events(struct epoll_event *events, int maxevents, int timeout) {
+	stu_int_t  nev;
+
+	nev = epoll_wait(stu_epfd, events, maxevents, timeout);
+
+	return nev;
+}
+

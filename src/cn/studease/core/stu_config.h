@@ -15,6 +15,12 @@
 #include <sys/types.h>
 #include <time.h>
 
+#define stu_signal_helper(n)     SIG##n
+#define stu_signal_value(n)      stu_signal_helper(n)
+
+#define STU_SHUTDOWN_SIGNAL      QUIT
+#define STU_CHANGEBIN_SIGNAL     USR2
+
 typedef signed long         stu_int_t;
 typedef unsigned long       stu_uint_t;
 typedef unsigned char       stu_bool_t;

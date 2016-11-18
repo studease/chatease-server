@@ -14,10 +14,12 @@
 #include "stu_core.h"
 
 stu_pid_t      stu_pid;
+
 stu_int_t      stu_process_slot;
 stu_socket_t   stu_filedes;
-stu_int_t      stu_last_process;
+
 stu_process_t  stu_processes[STU_PROCESSES_MAXIMUM];
+stu_int_t      stu_process_last;
 
 sig_atomic_t   stu_quit;
 sig_atomic_t   stu_restart;
@@ -26,11 +28,49 @@ stu_thread_t   stu_threads[STU_THREADS_MAXIMUM];
 stu_int_t      stu_threads_n;
 
 static void  stu_pass_open_filedes(stu_cycle_t *cycle, stu_filedes_t *fds);
+static void  stu_signal_worker_processes(stu_cycle_t *cycle, int signo);
 static void  stu_worker_process_cycle(stu_cycle_t *cycle, void *data);
 static void  stu_worker_process_init(stu_cycle_t *cycle, stu_int_t worker);
 static void  stu_filedes_handler(stu_event_t *ev);
 static stu_thread_value_t stu_worker_thread_cycle(void *data);
 
+
+void
+stu_process_master_cycle(stu_cycle_t *cycle) {
+	sigset_t  set;
+
+	if (cycle->config.master_process == FALSE) {
+		return;
+	}
+
+	sigemptyset(&set);
+	sigaddset(&set, SIGCHLD);
+	sigaddset(&set, SIGALRM);
+	sigaddset(&set, SIGIO);
+	sigaddset(&set, SIGINT);
+	sigaddset(&set, stu_signal_value(STU_SHUTDOWN_SIGNAL));
+	sigaddset(&set, stu_signal_value(STU_CHANGEBIN_SIGNAL));
+
+	if (sigprocmask(SIG_BLOCK, &set, NULL) == -1) {
+		stu_log_error(stu_errno, "sigprocmask() failed");
+	}
+
+	sigemptyset(&set);
+
+	for ( ;; ) {
+		stu_log_debug(0, "sigsuspend");
+		sigsuspend(&set);
+
+		if (stu_quit) {
+			stu_signal_worker_processes(cycle, stu_signal_value(STU_SHUTDOWN_SIGNAL));
+		}
+
+		if (stu_restart) {
+			stu_log("Restarting server...");
+			// respawn processes
+		}
+	}
+}
 
 void
 stu_start_worker_processes(stu_cycle_t *cycle) {
@@ -51,11 +91,6 @@ stu_start_worker_processes(stu_cycle_t *cycle) {
 
 		stu_pass_open_filedes(cycle, &fds);
 	}
-
-	// main thread of master process, wait for signal
-	for ( ;; ) {
-		sleep(5);
-	}
 }
 
 stu_pid_t
@@ -64,7 +99,7 @@ stu_spawn_process(stu_cycle_t *cycle, stu_spawn_proc_pt proc, void *data, char *
 	stu_pid_t  pid;
 	stu_int_t  s;
 
-	for (s = 0; s < stu_last_process; s++) {
+	for (s = 0; s < stu_process_last; s++) {
 		if (stu_processes[s].state == 0) {
 			break;
 		}
@@ -146,8 +181,8 @@ stu_spawn_process(stu_cycle_t *cycle, stu_spawn_proc_pt proc, void *data, char *
 	stu_processes[s].status = 0;
 	stu_processes[s].state = 1;
 
-	if (s == stu_last_process) {
-		stu_last_process++;
+	if (s == stu_process_last) {
+		stu_process_last++;
 	}
 
 	return pid;
@@ -157,15 +192,57 @@ static void
 stu_pass_open_filedes(stu_cycle_t *cycle, stu_filedes_t *fds) {
 	stu_int_t  i;
 
-	for (i = 0; i < stu_last_process; i++) {
+	for (i = 0; i < stu_process_last; i++) {
 		if (i == stu_process_slot || stu_processes[i].state == 0 || stu_processes[i].filedes[0] == 0) {
 			continue;
 		}
 
-		stu_log_debug(0, "pass filedes s:%d pid:%lu fd:%d to s:%d pid:%lu fd:%d",
+		stu_log_debug(0, "pass filedes: slot=%d, pid=%lu, fd=%d, to slot=%d, pid=%lu, fd=%d.",
 				fds->slot, fds->pid, fds->fd, i, stu_processes[i].pid, stu_processes[i].filedes[0]);
 
 		stu_filedes_write(stu_processes[i].filedes[0], fds, sizeof(stu_filedes_t));
+	}
+}
+
+static void
+stu_signal_worker_processes(stu_cycle_t *cycle, int signo) {
+	stu_filedes_t  fds;
+	stu_int_t      i;
+
+	stu_memzero(&fds, sizeof(stu_channel_t));
+
+	switch (signo) {
+	case stu_signal_value(STU_SHUTDOWN_SIGNAL):
+		fds.command = STU_CMD_QUIT;
+		break;
+	case stu_signal_value(STU_CHANGEBIN_SIGNAL):
+		fds.command = STU_CMD_RESTART;
+		break;
+	default:
+		fds.command = 0;
+		break;
+	}
+
+	fds.fd = -1;
+
+	for (i = 0; i < stu_process_last; i++) {
+		stu_log_debug(0, "stu_processes[%d]: pid=%d, state=%d.", i, stu_processes[i].pid, stu_processes[i].state);
+
+		if (stu_processes[i].pid == STU_INVALID_PID || stu_processes[i].state == 0) {
+			continue;
+		}
+
+		if (fds.command) {
+			if (stu_filedes_write(stu_processes[i].filedes[0], &fds, sizeof(stu_filedes_t)) == STU_OK) {
+				continue;
+			}
+		}
+
+		stu_log_debug(0, "kill (%P, %d)", stu_processes[i].pid, signo);
+
+		if (kill(stu_processes[i].pid, signo) == -1) {
+			stu_log_error(stu_errno, "kill(%d, %d) failed", stu_processes[i].pid, signo);
+		}
 	}
 }
 
@@ -205,7 +282,14 @@ stu_worker_process_cycle(stu_cycle_t *cycle, void *data) {
 
 	// main thread of sub process, wait for signal
 	for ( ;; ) {
-		sleep(5);
+		if (stu_quit) {
+			stu_log("Closing worker process...");
+			break;
+		}
+
+		if (stu_restart) {
+			stu_log("Restarting worker process...");
+		}
 	}
 }
 
@@ -213,7 +297,7 @@ static void
 stu_worker_process_init(stu_cycle_t *cycle, stu_int_t worker) {
 	stu_int_t  n;
 
-	for (n = 0; n < stu_last_process; n++) {
+	for (n = 0; n < stu_process_last; n++) {
 		if (n == stu_process_slot) {
 			continue;
 		}
@@ -293,11 +377,30 @@ stu_filedes_handler(stu_event_t *ev) {
 
 static stu_thread_value_t
 stu_worker_thread_cycle(void *data) {
-	//stu_thread_t  *thr = data;
+	//stu_thread_t     *thr = data;
+	struct epoll_event  events[STU_EPOLL_EVENTS], evs;
+	stu_int_t           nev, i;
+	stu_connection_t   *c;
 
-	// worker thread of sub process, handle connection/request
 	for ( ;; ) {
-		sleep(5);
+		nev = stu_epoll_process_events(events, STU_EPOLL_EVENTS, -1);
+		if (nev <= 0) {
+			stu_log_error(0, "epoll_wait error!");
+			break;
+		}
+
+		for (i = 0; i < nev; i++) {
+			evs = events[i];
+			c = (stu_connection_t *) events[i].data.ptr;
+
+			if ((evs & EPOLLIN) && c->read->active) {
+				c->read->handler(c->read);
+			}
+
+			if ((evs & EPOLLOUT) && c->write->active) {
+				c->write->handler(c->write);
+			}
+		}
 	}
 
 	return NULL;
