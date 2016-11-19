@@ -378,7 +378,7 @@ stu_filedes_handler(stu_event_t *ev) {
 static stu_thread_value_t
 stu_worker_thread_cycle(void *data) {
 	//stu_thread_t     *thr = data;
-	struct epoll_event  events[STU_EPOLL_EVENTS], evs;
+	struct epoll_event  events[STU_EPOLL_EVENTS], *evs;
 	stu_int_t           nev, i;
 	stu_connection_t   *c;
 
@@ -390,14 +390,14 @@ stu_worker_thread_cycle(void *data) {
 		}
 
 		for (i = 0; i < nev; i++) {
-			evs = events[i];
+			evs = &events[i];
 			c = (stu_connection_t *) events[i].data.ptr;
 
-			if ((evs & EPOLLIN) && c->read->active) {
+			if ((evs->events & EPOLLIN) && c->read->active) {
 				c->read->handler(c->read);
 			}
 
-			if ((evs & EPOLLOUT) && c->write->active) {
+			if ((evs->events & EPOLLOUT) && c->write->active) {
 				c->write->handler(c->write);
 			}
 		}

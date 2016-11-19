@@ -133,16 +133,17 @@ stu_filedes_read(stu_socket_t s, stu_filedes_t *fds, size_t size) {
 stu_int_t
 stu_filedes_add_event(stu_fd_t fd, uint32_t event, stu_event_handler_pt handler) {
 	stu_connection_t  *c;
+	stu_event_t       *ev;
 
 	c = stu_connection_get(fd);
 	if (c == NULL) {
 		return STU_ERROR;
 	}
 
-	c->event->type = event;
-	c->event->handler = handler;
+	ev = event == STU_READ_EVENT ? c->read : c->write;
+	ev->handler = handler;
 
-	if (stu_epoll_add_event(c->event, c->event->type) == STU_ERROR) {
+	if (stu_epoll_add_event(ev, event) == STU_ERROR) {
 		stu_connection_free(c);
 		return STU_ERROR;
 	}
