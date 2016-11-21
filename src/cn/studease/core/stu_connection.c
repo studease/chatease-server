@@ -84,6 +84,8 @@ stu_connection_get(stu_socket_t s) {
 		stu_spin_unlock(&pool->lock);
 	}
 
+	c->pool = stu_ram_alloc(stu_cycle->ram_pool);
+
 	return c;
 }
 

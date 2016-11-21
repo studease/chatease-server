@@ -34,6 +34,7 @@ struct stu_cycle_s {
 	stu_pool_t            *pool;
 	stu_slab_pool_t       *slab_pool;
 	stu_connection_pool_t *connection_pool;
+	stu_ram_pool_t        *ram_pool;
 
 	stu_config_t           config;
 	stu_list_t             shared_memory;   //type: stu_shm_t

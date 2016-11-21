@@ -33,6 +33,8 @@ stu_ram_pool_create() {
 	p->slots->bitmap = 0;
 	p->slots->prev = p->slots->next = p->slots;
 
+	c += sizeof(stu_ram_page_t);
+
 	stu_memzero(c, 8 * sizeof(stu_ram_page_t));
 	p->pages = (stu_ram_page_t *) c;
 

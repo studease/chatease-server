@@ -35,6 +35,7 @@ stu_cycle_create(stu_config_t *cf) {
 	stu_pool_t            *pool;
 	stu_slab_pool_t       *slab_pool;
 	stu_connection_pool_t *connection_pool;
+	stu_ram_pool_t        *ram_pool;
 	stu_cycle_t           *cycle;
 	stu_shm_t             *shm;
 
@@ -69,6 +70,13 @@ stu_cycle_create(stu_config_t *cf) {
 	}
 	cycle->connection_pool = connection_pool;
 
+	ram_pool = stu_ram_pool_create();
+	if (ram_pool == NULL) {
+		stu_log_error(0, "Failed to create ram pool.");
+		return NULL;
+	}
+	cycle->ram_pool = ram_pool;
+
 	stu_config_copy(&cycle->config, cf, pool);
 	stu_list_init(&cycle->shared_memory, slab_pool);
 
@@ -83,6 +91,14 @@ stu_cycle_create(stu_config_t *cf) {
 	shm = stu_pcalloc(pool, sizeof(stu_shm_t));
 	shm->addr = (u_char *) slab_pool;
 	shm->size = slab_pool->data.end - (u_char *) slab_pool;
+	if (stu_shm_alloc(shm) == STU_ERROR) {
+		return NULL;
+	}
+	stu_list_push(&cycle->shared_memory, (void *) shm, sizeof(stu_shm_t));
+
+	shm = stu_pcalloc(pool, sizeof(stu_shm_t));
+	shm->addr = (u_char *) ram_pool;
+	shm->size = ram_pool->data.end - (u_char *) ram_pool;
 	if (stu_shm_alloc(shm) == STU_ERROR) {
 		return NULL;
 	}

@@ -17,7 +17,7 @@ C_DEPS += \
 src/%.o: ../src/%.c
 	@echo 'Building file: $<'
 	@echo 'Invoking: GCC C Compiler'
-	gcc -DCONFIG_SMP=1 -I/usr/include -I/usr/lib/gcc/x86_64-redhat-linux/4.8.5/include -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<" -pthread -march=x86-64
+	gcc -DCONFIG_SMP=1 -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<" -pthread -march=x86-64
 	@echo 'Finished building: $<'
 	@echo ' '
 
