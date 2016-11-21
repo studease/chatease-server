@@ -86,6 +86,21 @@ stu_connection_get(stu_socket_t s) {
 
 	c->pool = stu_ram_alloc(stu_cycle->ram_pool);
 
+	stu_spinlock_init(&c->pool->lock);
+	c->pool->data.start = c->pool->data.last = (u_char *) c->pool + sizeof(stu_base_pool_t);
+	c->pool->data.end = (u_char *) c->pool + STU_RAM_BLOCK_SIZE;
+	c->pool->prev = c->pool->next = NULL;
+
+	c->read = (stu_event_t *) c->pool->data.last;
+	c->pool->data.last += sizeof(stu_event_t);
+	c->read->active = FALSE;
+	c->read->data = (void *) c;
+
+	c->write = (stu_event_t *) c->pool->data.last;
+	c->pool->data.last += sizeof(stu_event_t);
+	c->write->active = TRUE;
+	c->write->data = (void *) c;
+
 	return c;
 }
 

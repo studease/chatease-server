@@ -91,32 +91,33 @@ stu_filedes_read(stu_socket_t s, stu_filedes_t *fds, size_t size) {
 
 	if (n == -1) {
 		err = stu_errno;
+		stu_log_error(err, "recvmsg() failed.");
+
 		if (err == EAGAIN) {
 			return STU_AGAIN;
 		}
 
-		stu_log_error(err, "recvmsg() failed");
 		return STU_ERROR;
 	}
 
 	if (n == 0) {
-		stu_log_debug(0, "recvmsg() returned zero");
+		stu_log_debug(0, "recvmsg() returned zero.");
 		return STU_ERROR;
 	}
 
 	if ((size_t) n < sizeof(stu_filedes_t)) {
-		stu_log_error(0, "recvmsg() returned not enough data: %z", n);
+		stu_log_error(0, "recvmsg() returned not enough data: %z.", n);
 		return STU_ERROR;
 	}
 
 	if (fds->command == STU_CMD_OPEN_FILEDES) {
 		if (cmsg.cm.cmsg_len < (socklen_t) CMSG_LEN(sizeof(int))) {
-			stu_log_error(0, "recvmsg() returned too small ancillary data");
+			stu_log_error(0, "recvmsg() returned too small ancillary data.");
 			return STU_ERROR;
 		}
 
 		if (cmsg.cm.cmsg_level != SOL_SOCKET || cmsg.cm.cmsg_type != SCM_RIGHTS) {
-			stu_log_error(0, "recvmsg() returned invalid ancillary data level %d or type %d", cmsg.cm.cmsg_level, cmsg.cm.cmsg_type);
+			stu_log_error(0, "recvmsg() returned invalid ancillary data level %d or type %d.", cmsg.cm.cmsg_level, cmsg.cm.cmsg_type);
 			return STU_ERROR;
 		}
 
@@ -124,7 +125,7 @@ stu_filedes_read(stu_socket_t s, stu_filedes_t *fds, size_t size) {
 	}
 
 	if (msg.msg_flags & (MSG_TRUNC|MSG_CTRUNC)) {
-		stu_log_error(0, "recvmsg() truncated data");
+		stu_log_error(0, "recvmsg() truncated data.");
 	}
 
 	return n;
@@ -141,6 +142,10 @@ stu_filedes_add_event(stu_fd_t fd, uint32_t event, stu_event_handler_pt handler)
 	}
 
 	ev = event == STU_READ_EVENT ? c->read : c->write;
+	if (ev == NULL) {
+		stu_log_error(0, "Failed to add filedes event: fd=%d, ev=%d.", fd, event);
+		return STU_ERROR;
+	}
 	ev->handler = handler;
 
 	if (stu_epoll_add_event(ev, event) == STU_ERROR) {

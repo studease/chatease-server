@@ -49,11 +49,13 @@ stu_websocket_add_listen(stu_config_t *cf) {
 	sa.sin_addr.s_addr = htons(INADDR_ANY);
 	sa.sin_port = htons(cf->port);
 
+	stu_log("Binding sockaddr...");
 	if (bind(fd, (struct sockaddr*)&sa, sizeof(sa))) {
 		stu_log_error(stu_errno, "Failed to bind websocket server fd.");
 		return STU_ERROR;
 	}
 
+	stu_log("Listening on port %d.", cf->port);
 	if (listen(fd, cf->port)) {
 		stu_log_error(stu_errno, "Failed to listen websocket server port %d.\n", cf->port);
 		return STU_ERROR;

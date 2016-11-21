@@ -52,13 +52,13 @@ stu_process_master_cycle(stu_cycle_t *cycle) {
 	sigaddset(&set, stu_signal_value(STU_CHANGEBIN_SIGNAL));
 
 	if (sigprocmask(SIG_BLOCK, &set, NULL) == -1) {
-		stu_log_error(stu_errno, "sigprocmask() failed");
+		stu_log_error(stu_errno, "sigprocmask() failed.");
 	}
 
 	sigemptyset(&set);
 
 	for ( ;; ) {
-		stu_log_debug(0, "sigsuspend");
+		stu_log_debug(0, "sigsuspending...");
 		sigsuspend(&set);
 
 		if (stu_quit) {
@@ -115,7 +115,7 @@ stu_spawn_process(stu_cycle_t *cycle, stu_spawn_proc_pt proc, void *data, char *
 		return STU_INVALID_PID;
 	}
 
-	stu_log_debug(0, "filedes %d:%d", stu_processes[s].filedes[0], stu_processes[s].filedes[1]);
+	stu_log_debug(0, "filedes: %d, %d.", stu_processes[s].filedes[0], stu_processes[s].filedes[1]);
 
 	if (stu_nonblocking(stu_processes[s].filedes[0]) == -1) {
 		stu_log_error(stu_errno, "fcntl(O_NONBLOCK) failed while spawning \"%s\"", name);
@@ -172,7 +172,7 @@ stu_spawn_process(stu_cycle_t *cycle, stu_spawn_proc_pt proc, void *data, char *
 		break;
 	}
 
-	stu_log_debug(0, "start \"%s\", pid: %d", name, pid);
+	stu_log_debug(0, "started \"%s\", pid: %d", name, pid);
 
 	stu_processes[s].pid = pid;
 	stu_processes[s].proc = proc;
@@ -254,28 +254,25 @@ stu_worker_process_cycle(stu_cycle_t *cycle, void *data) {
 
 	stu_worker_process_init(cycle, worker);
 
-	if (stu_init_threads(threads_n, (size_t) -1) == STU_ERROR) {
-		/* fatal */
+	if (stu_init_threads(threads_n, STU_THREADS_DEFAULT_STACKSIZE) == STU_ERROR) {
+		stu_log_error(0, "Failed to init threads.");
 		exit(2);
 	}
 
 	err = stu_thread_key_create(&stu_thread_key);
 	if (err != STU_OK) {
 		stu_log_error(err, "stu_thread_key_create failed");
-		/* fatal */
 		exit(2);
 	}
 
 	for (n = 0; n < threads_n; n++) {
-		err = stu_cond_init(&stu_threads[n].cond);
-		if (err != STU_OK) {
-			stu_log_error(err, "stu_cond_init failed");
-			/* fatal */
+		if (stu_cond_init(&stu_threads[n].cond) == STU_ERROR) {
+			stu_log_error(0, "stu_cond_init failed.");
 			exit(2);
 		}
 
-		if (stu_create_thread((stu_tid_t *) &stu_threads[n].id, stu_worker_thread_cycle, (void *) &stu_threads[n]) != 0) {
-			/* fatal */
+		if (stu_create_thread((stu_tid_t *) &stu_threads[n].id, stu_worker_thread_cycle, (void *) &stu_threads[n]) == STU_ERROR) {
+			stu_log_error(0, "Failed to create thread[%d].", n);
 			exit(2);
 		}
 	}
@@ -332,13 +329,12 @@ stu_filedes_handler(stu_event_t *ev) {
 	stu_connection_t  *c;
 
 	c = ev->data;
-	stu_log_debug(0, "filedes handler");
+	stu_log_debug(0, "filedes handler called.");
 
 	for ( ;; ) {
 		n = stu_filedes_read(c->fd, &ch, sizeof(stu_filedes_t));
-		stu_log_debug(0, "filedes: %i", n);
-
 		if (n == STU_ERROR) {
+			stu_log_error(0, "Failed to read filedes message.");
 			stu_epoll_del_event(ev, STU_READ_EVENT);
 			stu_connection_close(c);
 			return;
@@ -348,7 +344,7 @@ stu_filedes_handler(stu_event_t *ev) {
 			return;
 		}
 
-		stu_log_debug(0, "filedes command: %d", ch.command);
+		stu_log_debug(0, "filedes command: %d.", ch.command);
 
 		switch (ch.command) {
 		case STU_CMD_QUIT:
@@ -358,16 +354,16 @@ stu_filedes_handler(stu_event_t *ev) {
 			stu_restart = 1;
 			break;
 		case STU_CMD_OPEN_FILEDES:
-			stu_log_debug(0, "get filedes s:%i pid:%P fd:%d", ch.slot, ch.pid, ch.fd);
+			stu_log_debug(0, "open filedes: s=%i, pid=%d, fd=%d.", ch.slot, ch.pid, ch.fd);
 
 			stu_processes[ch.slot].pid = ch.pid;
 			stu_processes[ch.slot].filedes[0] = ch.fd;
 			break;
 		case STU_CMD_CLOSE_FILEDES:
-			stu_log_debug(0, "close filedes s:%i pid:%P our:%P fd:%d", ch.slot, ch.pid, stu_processes[ch.slot].pid, stu_processes[ch.slot].filedes[0]);
+			stu_log_debug(0, "close filedes: s=%i, pid=%d, our=%d, fd=%d.", ch.slot, ch.pid, stu_processes[ch.slot].pid, stu_processes[ch.slot].filedes[0]);
 
 			if (close(stu_processes[ch.slot].filedes[0]) == -1) {
-				stu_log_error(stu_errno, "close() filedes failed");
+				stu_log_error(stu_errno, "close() filedes failed.");
 			}
 			stu_processes[ch.slot].filedes[0] = -1;
 			break;
@@ -402,6 +398,8 @@ stu_worker_thread_cycle(void *data) {
 			}
 		}
 	}
+
+	stu_log_error(0, "worker thread exit.");
 
 	return NULL;
 }

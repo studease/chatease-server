@@ -47,13 +47,13 @@ stu_create_thread(stu_tid_t *tid, stu_thread_value_t (*func)(void *arg), void *a
 	err = pthread_create(tid, &thr_attr, func, arg);
 	if (err != 0) {
 		stu_log_error(err, "pthread_create() failed");
-		return err;
+		return STU_ERROR;
 	}
 
-	stu_log_debug(0x001, "thread %p is created: ", tid);
+	stu_log_debug(0, "thread %p is created.", tid);
 	stu_threads_n++;
 
-	return err;
+	return STU_OK;
 }
 
 stu_int_t
@@ -63,7 +63,7 @@ stu_cond_init(stu_cond_t *cond) {
 	err = pthread_cond_init(cond, NULL);
 	if (err != STU_OK) {
 		stu_log_error(err, "pthread_cond_init() failed");
-		return err;
+		return STU_ERROR;
 	}
 
 	return STU_OK;

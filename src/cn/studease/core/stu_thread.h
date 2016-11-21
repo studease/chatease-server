@@ -13,7 +13,9 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
-#define STU_THREADS_MAXIMUM  64
+#define STU_THREADS_MAXIMUM           64
+
+#define STU_THREADS_DEFAULT_STACKSIZE 524288
 
 typedef pthread_t        stu_tid_t;
 typedef pthread_key_t    stu_thread_key_t;
