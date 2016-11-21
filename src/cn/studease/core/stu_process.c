@@ -329,7 +329,7 @@ stu_filedes_handler(stu_event_t *ev) {
 	stu_connection_t  *c;
 
 	c = ev->data;
-	stu_log_debug(0, "filedes handler called.");
+	//stu_log_debug(0, "filedes handler called.");
 
 	for ( ;; ) {
 		n = stu_filedes_read(c->fd, &ch, sizeof(stu_filedes_t));

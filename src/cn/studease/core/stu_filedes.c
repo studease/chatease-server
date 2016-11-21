@@ -91,12 +91,11 @@ stu_filedes_read(stu_socket_t s, stu_filedes_t *fds, size_t size) {
 
 	if (n == -1) {
 		err = stu_errno;
-		stu_log_error(err, "recvmsg() failed.");
-
 		if (err == EAGAIN) {
 			return STU_AGAIN;
 		}
 
+		stu_log_error(err, "recvmsg() failed.");
 		return STU_ERROR;
 	}
 
