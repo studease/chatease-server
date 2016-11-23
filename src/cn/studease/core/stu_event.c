@@ -67,7 +67,7 @@ stu_epoll_del_event(stu_event_t *ev, uint32_t event) {
 	 * before closing the file descriptor
 	 */
 	if (ev->type == STU_CLOSE_EVENT) {
-		ev->active = 0;
+		ev->active = FALSE;
 		return STU_OK;
 	}
 
@@ -98,7 +98,7 @@ stu_epoll_del_event(stu_event_t *ev, uint32_t event) {
 
 done:
 
-	ev->active = 0;
+	ev->active = FALSE;
 
 	return STU_OK;
 }
