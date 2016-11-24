@@ -11,12 +11,13 @@ C_SRCS += \
 ../src/cn/studease/core/stu_event.c \
 ../src/cn/studease/core/stu_filedes.c \
 ../src/cn/studease/core/stu_hash.c \
+../src/cn/studease/core/stu_http.c \
+../src/cn/studease/core/stu_http_request.c \
 ../src/cn/studease/core/stu_list.c \
 ../src/cn/studease/core/stu_log.c \
 ../src/cn/studease/core/stu_palloc.c \
 ../src/cn/studease/core/stu_process.c \
 ../src/cn/studease/core/stu_ram.c \
-../src/cn/studease/core/stu_request.c \
 ../src/cn/studease/core/stu_shmem.c \
 ../src/cn/studease/core/stu_slab.c \
 ../src/cn/studease/core/stu_socket.c \
@@ -25,7 +26,8 @@ C_SRCS += \
 ../src/cn/studease/core/stu_thread.c \
 ../src/cn/studease/core/stu_user.c \
 ../src/cn/studease/core/stu_utils.c \
-../src/cn/studease/core/stu_websocket.c 
+../src/cn/studease/core/stu_websocket.c \
+../src/cn/studease/core/stu_websocket_request.c 
 
 OBJS += \
 ./src/cn/studease/core/stu_alloc.o \
@@ -35,12 +37,13 @@ OBJS += \
 ./src/cn/studease/core/stu_event.o \
 ./src/cn/studease/core/stu_filedes.o \
 ./src/cn/studease/core/stu_hash.o \
+./src/cn/studease/core/stu_http.o \
+./src/cn/studease/core/stu_http_request.o \
 ./src/cn/studease/core/stu_list.o \
 ./src/cn/studease/core/stu_log.o \
 ./src/cn/studease/core/stu_palloc.o \
 ./src/cn/studease/core/stu_process.o \
 ./src/cn/studease/core/stu_ram.o \
-./src/cn/studease/core/stu_request.o \
 ./src/cn/studease/core/stu_shmem.o \
 ./src/cn/studease/core/stu_slab.o \
 ./src/cn/studease/core/stu_socket.o \
@@ -49,7 +52,8 @@ OBJS += \
 ./src/cn/studease/core/stu_thread.o \
 ./src/cn/studease/core/stu_user.o \
 ./src/cn/studease/core/stu_utils.o \
-./src/cn/studease/core/stu_websocket.o 
+./src/cn/studease/core/stu_websocket.o \
+./src/cn/studease/core/stu_websocket_request.o 
 
 C_DEPS += \
 ./src/cn/studease/core/stu_alloc.d \
@@ -59,12 +63,13 @@ C_DEPS += \
 ./src/cn/studease/core/stu_event.d \
 ./src/cn/studease/core/stu_filedes.d \
 ./src/cn/studease/core/stu_hash.d \
+./src/cn/studease/core/stu_http.d \
+./src/cn/studease/core/stu_http_request.d \
 ./src/cn/studease/core/stu_list.d \
 ./src/cn/studease/core/stu_log.d \
 ./src/cn/studease/core/stu_palloc.d \
 ./src/cn/studease/core/stu_process.d \
 ./src/cn/studease/core/stu_ram.d \
-./src/cn/studease/core/stu_request.d \
 ./src/cn/studease/core/stu_shmem.d \
 ./src/cn/studease/core/stu_slab.d \
 ./src/cn/studease/core/stu_socket.d \
@@ -73,7 +78,8 @@ C_DEPS += \
 ./src/cn/studease/core/stu_thread.d \
 ./src/cn/studease/core/stu_user.d \
 ./src/cn/studease/core/stu_utils.d \
-./src/cn/studease/core/stu_websocket.d 
+./src/cn/studease/core/stu_websocket.d \
+./src/cn/studease/core/stu_websocket_request.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes

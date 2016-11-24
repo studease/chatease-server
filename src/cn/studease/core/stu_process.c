@@ -335,8 +335,10 @@ stu_filedes_handler(stu_event_t *ev) {
 		n = stu_filedes_read(c->fd, &ch, sizeof(stu_filedes_t));
 		if (n == STU_ERROR) {
 			stu_log_error(0, "Failed to read filedes message.");
+
 			stu_epoll_del_event(ev, STU_READ_EVENT);
 			stu_connection_close(c);
+
 			return;
 		}
 

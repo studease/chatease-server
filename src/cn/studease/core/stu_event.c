@@ -81,7 +81,7 @@ stu_epoll_del_event(stu_event_t *ev, uint32_t event) {
 
 	if (ev->active) {
 		op = EPOLL_CTL_MOD;
-		ee.events = ev->type;
+		ee.events = ev->type | (event == STU_WRITE_EVENT ? STU_READ_EVENT : 0);
 		ee.data.ptr = (void *) c;
 	} else {
 		op = EPOLL_CTL_DEL;
@@ -98,7 +98,7 @@ stu_epoll_del_event(stu_event_t *ev, uint32_t event) {
 
 done:
 
-	ev->active = FALSE;
+	//ev->active = FALSE;
 
 	return STU_OK;
 }

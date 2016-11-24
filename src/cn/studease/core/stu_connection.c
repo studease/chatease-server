@@ -5,6 +5,7 @@
  *      Author: Tony Lau
  */
 
+#include <unistd.h>
 #include "stu_config.h"
 #include "stu_core.h"
 
@@ -106,9 +107,15 @@ stu_connection_get(stu_socket_t s) {
 
 void
 stu_connection_free(stu_connection_t *c) {
+	stu_spin_lock(&c->page->lock);
+
+	stu_ram_free(stu_cycle->ram_pool, (void *) c->pool);
 	stu_connection_init(c, (stu_socket_t) -1);
+
 	stu_queue_remove(&c->queue);
-	stu_queue_insert_tail(&c->page->connections.queue, &c->queue);
+	stu_queue_insert_tail(&c->page->free.queue, &c->queue);
+
+	stu_spin_unlock(&c->page->lock);
 }
 
 void
@@ -118,9 +125,9 @@ stu_connection_close(stu_connection_t *c) {
 		return;
 	}
 
-	stu_spin_lock(&c->page->lock);
-	stu_connection_free(c);
-	stu_spin_unlock(&c->page->lock);
+	stu_spin_lock(&c->lock);
+	stu_close_socket(c->fd);
+	stu_spin_unlock(&c->lock);
 }
 
 

@@ -12,8 +12,8 @@ src/cn/studease/core/stu_spinlock.d: \
  ../src/cn/studease/core/stu_channel.h ../src/cn/studease/core/stu_user.h \
  ../src/cn/studease/core/stu_connection.h \
  ../src/cn/studease/core/stu_shmem.h ../src/cn/studease/core/stu_thread.h \
- ../src/cn/studease/core/stu_cycle.h \
- ../src/cn/studease/core/stu_request.h \
+ ../src/cn/studease/core/stu_cycle.h ../src/cn/studease/core/stu_http.h \
+ ../src/cn/studease/core/stu_http_request.h \
  ../src/cn/studease/core/stu_websocket.h \
  ../src/cn/studease/core/stu_files.h \
  ../src/cn/studease/core/stu_process.h \
@@ -66,7 +66,9 @@ src/cn/studease/core/stu_spinlock.d: \
 
 ../src/cn/studease/core/stu_cycle.h:
 
-../src/cn/studease/core/stu_request.h:
+../src/cn/studease/core/stu_http.h:
+
+../src/cn/studease/core/stu_http_request.h:
 
 ../src/cn/studease/core/stu_websocket.h:
 
