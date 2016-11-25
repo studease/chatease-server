@@ -68,7 +68,7 @@ int main(int argc, char **argv) {
 		return EXIT_FAILURE;
 	}
 
-	if (stu_websocket_add_listen(&stu_cycle->config) == STU_ERROR) {
+	if (stu_http_add_listen(&stu_cycle->config) == STU_ERROR) {
 		stu_log_error(0, "Failed to add websocket listen.");
 		return EXIT_FAILURE;
 	}

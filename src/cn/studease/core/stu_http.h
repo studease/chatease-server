@@ -16,5 +16,8 @@ typedef struct stu_http_request_s stu_http_request_t;
 typedef stu_int_t (*stu_http_header_handler_pt)(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 
 #include "stu_http_request.h"
+#include "stu_websocket_request.h"
+
+stu_int_t stu_http_add_listen(stu_config_t *cf);
 
 #endif /* STU_HTTP_H_ */

@@ -38,7 +38,7 @@ typedef struct {
 } stu_http_header_out_t;
 
 typedef struct {
-	stu_uint_t       status;
+	stu_int_t        status;
 	stu_buf_t        status_line;
 
 	stu_table_elt_t *host;
@@ -73,5 +73,19 @@ struct stu_http_request_s {
 	stu_http_headers_t  headers_out;
 	stu_buf_t          *response_body;
 };
+
+void stu_http_wait_request_handler(stu_event_t *rev);
+
+stu_http_request_t *stu_http_create_request(stu_connection_t *c);
+void stu_http_process_request(stu_http_request_t *r);
+
+void stu_http_finalize_request(stu_http_request_t *r, stu_int_t rc);
+
+void stu_http_close_request(stu_http_request_t *r, stu_int_t rc);
+void stu_http_free_request(stu_http_request_t *r, stu_int_t rc);
+void stu_http_close_connection(stu_connection_t *c);
+
+void stu_http_empty_handler(stu_event_t *wev);
+void stu_http_request_empty_handler(stu_http_request_t *r);
 
 #endif /* STU_HTTP_REQUEST_H_ */

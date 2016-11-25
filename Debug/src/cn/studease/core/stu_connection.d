@@ -14,7 +14,7 @@ src/cn/studease/core/stu_connection.d: \
  ../src/cn/studease/core/stu_shmem.h ../src/cn/studease/core/stu_thread.h \
  ../src/cn/studease/core/stu_cycle.h ../src/cn/studease/core/stu_http.h \
  ../src/cn/studease/core/stu_http_request.h \
- ../src/cn/studease/core/stu_websocket.h \
+ ../src/cn/studease/core/stu_websocket_request.h \
  ../src/cn/studease/core/stu_files.h \
  ../src/cn/studease/core/stu_process.h \
  ../src/cn/studease/core/stu_filedes.h \
@@ -70,7 +70,7 @@ src/cn/studease/core/stu_connection.d: \
 
 ../src/cn/studease/core/stu_http_request.h:
 
-../src/cn/studease/core/stu_websocket.h:
+../src/cn/studease/core/stu_websocket_request.h:
 
 ../src/cn/studease/core/stu_files.h:
 

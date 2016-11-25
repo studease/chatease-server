@@ -125,9 +125,8 @@ stu_connection_close(stu_connection_t *c) {
 		return;
 	}
 
-	stu_spin_lock(&c->lock);
 	stu_close_socket(c->fd);
-	stu_spin_unlock(&c->lock);
+	stu_connection_free(c);
 }
 
 
@@ -136,7 +135,6 @@ stu_connection_init(stu_connection_t *c, stu_socket_t s) {
 	stu_queue_init(&c->queue);
 	stu_spinlock_init(&c->lock);
 
-	c->page = NULL;
 	c->pool = NULL;
 
 	c->fd = s;

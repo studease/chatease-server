@@ -31,4 +31,19 @@ typedef struct {
 	stu_websocket_frame_t *frame;
 } stu_websocket_request_t;
 
+void stu_websocket_wait_request_handler(stu_event_t *rev);
+void stu_websocket_request_handler(stu_event_t *wev);
+
+stu_websocket_request_t *stu_websocket_create_request(stu_connection_t *c);
+void stu_websocket_process_request(stu_websocket_request_t *r);
+
+void stu_websocket_finalize_request(stu_websocket_request_t *r, stu_int_t rc);
+
+void stu_websocket_close_request(stu_websocket_request_t *r, stu_int_t rc);
+void stu_websocket_free_request(stu_websocket_request_t *r, stu_int_t rc);
+void stu_websocket_close_connection(stu_connection_t *c);
+
+void stu_websocket_empty_handler(stu_event_t *wev);
+void stu_websocket_request_empty_handler(stu_websocket_request_t *r);
+
 #endif /* STU_WEBSOCKET_REQUEST_H_ */

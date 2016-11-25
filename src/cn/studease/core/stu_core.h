@@ -56,7 +56,6 @@ typedef enum {
 #include "stu_thread.h"
 #include "stu_cycle.h"
 #include "stu_http.h"
-#include "stu_websocket.h"
 #include "stu_files.h"
 #include "stu_process.h"
 #include "stu_filedes.h"

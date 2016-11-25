@@ -26,7 +26,6 @@ C_SRCS += \
 ../src/cn/studease/core/stu_thread.c \
 ../src/cn/studease/core/stu_user.c \
 ../src/cn/studease/core/stu_utils.c \
-../src/cn/studease/core/stu_websocket.c \
 ../src/cn/studease/core/stu_websocket_request.c 
 
 OBJS += \
@@ -52,7 +51,6 @@ OBJS += \
 ./src/cn/studease/core/stu_thread.o \
 ./src/cn/studease/core/stu_user.o \
 ./src/cn/studease/core/stu_utils.o \
-./src/cn/studease/core/stu_websocket.o \
 ./src/cn/studease/core/stu_websocket_request.o 
 
 C_DEPS += \
@@ -78,7 +76,6 @@ C_DEPS += \
 ./src/cn/studease/core/stu_thread.d \
 ./src/cn/studease/core/stu_user.d \
 ./src/cn/studease/core/stu_utils.d \
-./src/cn/studease/core/stu_websocket.d \
 ./src/cn/studease/core/stu_websocket_request.d 
 
 
