@@ -6,6 +6,7 @@
  */
 
 #include <unistd.h>
+#include <sys/socket.h>
 #include "stu_config.h"
 #include "stu_core.h"
 
@@ -110,7 +111,9 @@ stu_connection_free(stu_connection_t *c) {
 	stu_spin_lock(&c->page->lock);
 
 	stu_ram_free(stu_cycle->ram_pool, (void *) c->pool);
-	stu_connection_init(c, (stu_socket_t) -1);
+
+	c->fd = (stu_socket_t) -1;
+	c->read = c->write = NULL;
 
 	stu_queue_remove(&c->queue);
 	stu_queue_insert_tail(&c->page->free.queue, &c->queue);

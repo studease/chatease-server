@@ -21,23 +21,31 @@ stu_http_wait_request_handler(stu_event_t *rev) {
 	stu_int_t         n;
 
 	c = (stu_connection_t *) rev->data;
+
+	stu_spin_lock(&c->lock);
+	if (c->fd == (stu_socket_t) -1) {
+		goto done;
+	}
+
 	stu_memzero(buf, 2048);
 
 	n = recv(c->fd, buf, 2048, 0);
 	if (n == -1) {
 		if (stu_errno == EAGAIN) {
-			return;
+			goto done;
 		}
 
 		stu_log_debug(0, "Failed to recv data: fd=%d.", c->fd);
 		stu_connection_free(c);
-		return;
+		goto done;
 	}
 
 	if (n == 0) {
-		stu_log_debug(0, "Remote client has closed connection.");
+		stu_log_debug(0, "Remote client has closed connection: fd=%d.", c->fd);
+		c->read->active = FALSE;
+		stu_epoll_del_event(c->read, STU_READ_EVENT);
 		stu_http_close_connection(c);
-		return;
+		goto done;
 	}
 
 	stu_log_debug(0, "recv: fd=%d, bytes=%d, str=\n%s", c->fd, n, buf);
@@ -45,10 +53,14 @@ stu_http_wait_request_handler(stu_event_t *rev) {
 	c->data = (void *) stu_http_create_request(c);
 	if (c->data == NULL) {
 		stu_log_error(0, "Failed to create http request.");
-		return;
+		goto done;
 	}
 
 	stu_http_process_request((stu_http_request_t *) c->data);
+
+done:
+
+	stu_spin_unlock(&c->lock);
 }
 
 
@@ -122,16 +134,22 @@ stu_http_request_handler(stu_event_t *wev) {
 	stu_int_t           n;
 
 	c = (stu_connection_t *) wev->data;
+
+	stu_spin_lock(&c->lock);
+	if (c->fd == (stu_socket_t) -1) {
+		goto done;
+	}
+
 	stu_epoll_del_event(c->write, STU_WRITE_EVENT);
 
 	r = (stu_http_request_t *) c->data;
 
-	buf = (u_char *) "HTTP/1.0 200 OK\r\nServer:Chatease/Beta\r\nContent-type:text/html\r\nContent-length:6\r\n\r\nHello!";
+	buf = (u_char *) "HTTP/1.0 200 OK\r\nServer:Chatease/Beta\r\nContent-type:text/html\r\nContent-length:7\r\n\r\nHello!\n";
 
 	n = send(c->fd, buf, stu_strlen(buf), 0);
 	if (n == -1) {
 		stu_log_debug(0, "Failed to send data: fd=%d.", c->fd);
-		return;
+		goto done;
 	}
 
 	stu_log_debug(0, "sent: fd=%d, bytes=%d, str=\n%s", c->fd, n, buf);
@@ -140,6 +158,10 @@ stu_http_request_handler(stu_event_t *wev) {
 		c->read->handler = stu_websocket_wait_request_handler;
 		c->write->handler = stu_websocket_request_handler;
 	}
+
+done:
+
+	stu_spin_unlock(&c->lock);
 }
 
 

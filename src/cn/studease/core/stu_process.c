@@ -390,6 +390,9 @@ stu_worker_thread_cycle(void *data) {
 		for (i = 0; i < nev; i++) {
 			ev = &events[i];
 			c = (stu_connection_t *) events[i].data.ptr;
+			if (c == NULL || c->fd == (stu_socket_t) -1) {
+				continue;
+			}
 
 			if ((ev->events & EPOLLIN) && c->read->active) {
 				c->read->handler(c->read);
