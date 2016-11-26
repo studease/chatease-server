@@ -382,10 +382,6 @@ stu_worker_thread_cycle(void *data) {
 
 	for ( ;; ) {
 		nev = stu_epoll_process_events(events, STU_EPOLL_EVENTS, -1);
-		if (nev <= 0) {
-			stu_log_error(0, "epoll_wait error!");
-			break;
-		}
 
 		for (i = 0; i < nev; i++) {
 			ev = &events[i];

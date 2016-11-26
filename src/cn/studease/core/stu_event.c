@@ -108,6 +108,10 @@ stu_epoll_process_events(struct epoll_event *events, int maxevents, int timeout)
 	stu_int_t  nev;
 
 	nev = epoll_wait(stu_epfd, events, maxevents, timeout);
+	if (nev <= 0) {
+		stu_log_error(stu_errno, "epoll_wait error: nev=%d.", nev);
+		return 0;
+	}
 
 	return nev;
 }

@@ -171,7 +171,7 @@ stu_ram_free_locked(stu_ram_pool_t *pool, void *p) {
 		*b &= ~(1 << i);
 	}
 
-	m = 1 << (j % 8);
+	m = 1 << k;
 	*c &= ~m;
 
 	if (page->prev == NULL) {

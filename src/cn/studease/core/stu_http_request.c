@@ -120,7 +120,7 @@ stu_http_finalize_request(stu_http_request_t *r, stu_int_t rc) {
 	c = r->connection;
 
 	c->write->handler = stu_http_request_handler;
-	if (stu_epoll_add_event(c->write, STU_WRITE_EVENT) == STU_ERROR) {
+	if (stu_epoll_add_event(c->write, STU_WRITE_EVENT|EPOLLET) == STU_ERROR) {
 		stu_log_error(0, "Failed to add http client write event.");
 		return;
 	}

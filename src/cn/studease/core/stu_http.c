@@ -18,7 +18,7 @@ static void stu_http_server_handler(stu_event_t *ev);
 
 stu_int_t
 stu_http_add_listen(stu_config_t *cf) {
-	int                 reuseaddr;
+	//int                 reuseaddr;
 	stu_connection_t   *c;
 	struct sockaddr_in  sa;
 
@@ -28,11 +28,11 @@ stu_http_add_listen(stu_config_t *cf) {
 		return STU_ERROR;
 	}
 
-	reuseaddr = 1;
+	/*reuseaddr = 1;
 	if (setsockopt(stu_httpfd, SOL_SOCKET, SO_REUSEADDR, (const void *) &reuseaddr, sizeof(int)) == -1) {
 		stu_log_error(stu_errno, "setsockopt(SO_REUSEADDR) failed while setting http server fd.");
 		return STU_ERROR;
-	}
+	}*/
 
 	if (stu_nonblocking(stu_httpfd) == -1) {
 		stu_log_error(stu_errno, "fcntl(O_NONBLOCK) failed while setting http server fd.");
