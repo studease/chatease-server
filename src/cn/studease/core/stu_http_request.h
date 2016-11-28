@@ -11,6 +11,16 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
+#define STU_HTTP_REQUEST_DEFAULT_SIZE      2048
+#define STU_HTTP_LC_HEADER_LEN             32
+
+#define STU_HTTP_VERSION_10                10
+#define STU_HTTP_VERSION_11                11
+
+#define STU_HTTP_UNKNOWN                   0x0001
+#define STU_HTTP_GET                       0x0002
+#define STU_HTTP_POST                      0x0008
+
 #define STU_HTTP_SWITCHING_PROTOCOLS       101
 #define STU_HTTP_OK                        200
 #define STU_HTTP_MOVED_TEMPORARILY         302
@@ -26,6 +36,10 @@
 #define STU_HTTP_NOT_IMPLEMENTED           501
 #define STU_HTTP_SERVICE_UNAVAILABLE       503
 
+#define STU_HTTP_CONNECTION_CLOSE          1
+#define STU_HTTP_CONNECTION_KEEP_ALIVE     2
+#define STU_HTTP_CONNECTION_UPGRADE        4
+
 typedef struct {
 	stu_str_t                   name;
 	stu_uint_t                  offset;
@@ -38,11 +52,9 @@ typedef struct {
 } stu_http_header_out_t;
 
 typedef struct {
-	stu_int_t        status;
-	stu_buf_t        status_line;
+	stu_list_t       headers;
 
 	stu_table_elt_t *host;
-	stu_table_elt_t *server;
 	stu_table_elt_t *user_agent;
 
 	stu_table_elt_t *accept;
@@ -52,26 +64,62 @@ typedef struct {
 	stu_table_elt_t *content_type;
 	stu_table_elt_t *content_length;
 
-	stu_table_elt_t *origin;
-	stu_table_elt_t *sec_websocket_extensions;
 	stu_table_elt_t *sec_websocket_key;
-	stu_table_elt_t *sec_websocket_accept;
 	stu_table_elt_t *sec_websocket_version;
+	stu_table_elt_t *sec_websocket_extensions;
 	stu_table_elt_t *upgrade;
+
 	stu_table_elt_t *connection;
 
+	u_char           connection_type;
+} stu_http_headers_in_t;
+
+typedef struct {
+	stu_uint_t       status;
+	stu_str_t        status_line;
+
+	stu_table_elt_t *server;
+
+	stu_table_elt_t *content_type;
+	stu_table_elt_t *content_length;
+	stu_table_elt_t *content_encoding;
+
+	stu_table_elt_t *sec_websocket_accept;
+	stu_table_elt_t *sec_websocket_extensions;
+	stu_table_elt_t *upgrade;
+
+	stu_table_elt_t *connection;
 	stu_table_elt_t *date;
-} stu_http_headers_t;
+} stu_http_headers_out_t;
 
 struct stu_http_request_s {
-	stu_connection_t   *connection;
+	stu_connection_t       *connection;
 
-	stu_buf_t           header;
-	stu_buf_t          *request_body;
+	stu_uint_t              method;
+	stu_uint_t              http_version;
 
-	stu_http_headers_t  headers_in;
-	stu_http_headers_t  headers_out;
-	stu_buf_t          *response_body;
+	stu_str_t               request_line;
+	stu_str_t               uri;
+	stu_str_t               args;
+
+	stu_buf_t              *header_in;
+	stu_buf_t              *request_body;
+
+	stu_http_headers_in_t   headers_in;
+	stu_http_headers_out_t  headers_out;
+	stu_buf_t              *response_body;
+
+	stu_uint_t              state;
+	stu_uint_t              header_hash;
+	stu_uint_t              lowcase_index;
+	u_char                  lowcase_header[STU_HTTP_LC_HEADER_LEN];
+
+	u_char                  invalid_header;
+
+	u_char                 *header_name_start;
+	u_char                 *header_name_end;
+	u_char                 *header_start;
+	u_char                 *header_end;
 };
 
 void stu_http_wait_request_handler(stu_event_t *rev);

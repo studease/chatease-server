@@ -32,9 +32,14 @@ void stu_strlow(u_char *dst, u_char *src, size_t n);
 u_char *stu_strlchr(u_char *p, u_char *last, u_char c);
 void *stu_memzero(void *block, size_t n);
 
+#define stu_strncmp(s1, s2, n)  strncmp((const char *) s1, (const char *) s2, n)
+#define stu_strcmp(s1, s2)  strcmp((const char *) s1, (const char *) s2)
+
 #define stu_memcpy(dst, src, n) (((u_char *) memcpy(dst, src, n)) + (n))
 
 u_char *stu_strncpy(u_char *dst, u_char *src, size_t n);
+
+u_char *stu_strnstr(u_char *s1, char *s2, size_t n);
 
 stu_int_t stu_printf(const char *fmt, ...);
 u_char *stu_sprintf(u_char *s, const char *fmt, ...);

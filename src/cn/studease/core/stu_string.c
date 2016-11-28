@@ -10,7 +10,7 @@
 #include "stu_core.h"
 
 void
-ngx_strlow(u_char *dst, u_char *src, size_t n) {
+stu_strlow(u_char *dst, u_char *src, size_t n) {
     while (n) {
         *dst = stu_tolower(*src);
         dst++;
@@ -55,6 +55,35 @@ stu_strncpy(u_char *dst, u_char *src, size_t n) {
 	*dst = '\0';
 
 	return dst;
+}
+
+u_char *
+stu_strnstr(u_char *s1, char *s2, size_t len) {
+	u_char  c1, c2;
+	size_t  n;
+
+	c2 = *(u_char *) s2++;
+	n = stu_strlen(s2);
+
+	do {
+		do {
+			if (len-- == 0) {
+				return NULL;
+			}
+
+			c1 = *s1++;
+
+			if (c1 == 0) {
+				return NULL;
+			}
+		} while (c1 != c2);
+
+		if (n > len) {
+			return NULL;
+		}
+	} while (stu_strncmp(s1, (u_char *) s2, n) != 0);
+
+	return --s1;
 }
 
 

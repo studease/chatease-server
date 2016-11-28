@@ -12,6 +12,7 @@ C_SRCS += \
 ../src/cn/studease/core/stu_filedes.c \
 ../src/cn/studease/core/stu_hash.c \
 ../src/cn/studease/core/stu_http.c \
+../src/cn/studease/core/stu_http_parse.c \
 ../src/cn/studease/core/stu_http_request.c \
 ../src/cn/studease/core/stu_list.c \
 ../src/cn/studease/core/stu_log.c \
@@ -37,6 +38,7 @@ OBJS += \
 ./src/cn/studease/core/stu_filedes.o \
 ./src/cn/studease/core/stu_hash.o \
 ./src/cn/studease/core/stu_http.o \
+./src/cn/studease/core/stu_http_parse.o \
 ./src/cn/studease/core/stu_http_request.o \
 ./src/cn/studease/core/stu_list.o \
 ./src/cn/studease/core/stu_log.o \
@@ -62,6 +64,7 @@ C_DEPS += \
 ./src/cn/studease/core/stu_filedes.d \
 ./src/cn/studease/core/stu_hash.d \
 ./src/cn/studease/core/stu_http.d \
+./src/cn/studease/core/stu_http_parse.d \
 ./src/cn/studease/core/stu_http_request.d \
 ./src/cn/studease/core/stu_list.d \
 ./src/cn/studease/core/stu_log.d \

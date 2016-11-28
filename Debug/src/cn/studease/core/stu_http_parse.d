@@ -1,4 +1,5 @@
-src/cn/studease/core/stu_shmem.d: ../src/cn/studease/core/stu_shmem.c \
+src/cn/studease/core/stu_http_parse.d: \
+ ../src/cn/studease/core/stu_http_parse.c \
  ../src/cn/studease/core/stu_config.h ../src/cn/studease/core/stu_core.h \
  ../src/cn/studease/core/stu_sha1.h ../src/cn/studease/core/stu_string.h \
  ../src/cn/studease/core/stu_buf.h ../src/cn/studease/core/stu_errno.h \

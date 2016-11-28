@@ -38,6 +38,7 @@ stu_cycle_create(stu_config_t *cf) {
 	stu_ram_pool_t        *ram_pool;
 	stu_cycle_t           *cycle;
 	stu_shm_t             *shm;
+	stu_list_elt_t        *elt;
 
 	stu_strerror_init();
 
@@ -86,7 +87,10 @@ stu_cycle_create(stu_config_t *cf) {
 	if (stu_shm_alloc(shm) == STU_ERROR) {
 		return NULL;
 	}
-	stu_list_push(&cycle->shared_memory, (void *) shm, sizeof(stu_shm_t));
+	elt = stu_pcalloc(pool, sizeof(stu_list_elt_t));
+	elt->obj = (void *) shm;
+	elt->size = sizeof(stu_shm_t);
+	stu_list_push(&cycle->shared_memory, elt);
 
 	shm = stu_pcalloc(pool, sizeof(stu_shm_t));
 	shm->addr = (u_char *) slab_pool;
@@ -94,7 +98,10 @@ stu_cycle_create(stu_config_t *cf) {
 	if (stu_shm_alloc(shm) == STU_ERROR) {
 		return NULL;
 	}
-	stu_list_push(&cycle->shared_memory, (void *) shm, sizeof(stu_shm_t));
+	elt = stu_pcalloc(pool, sizeof(stu_list_elt_t));
+	elt->obj = (void *) shm;
+	elt->size = sizeof(stu_shm_t);
+	stu_list_push(&cycle->shared_memory, elt);
 
 	shm = stu_pcalloc(pool, sizeof(stu_shm_t));
 	shm->addr = (u_char *) ram_pool;
@@ -102,7 +109,10 @@ stu_cycle_create(stu_config_t *cf) {
 	if (stu_shm_alloc(shm) == STU_ERROR) {
 		return NULL;
 	}
-	stu_list_push(&cycle->shared_memory, (void *) shm, sizeof(stu_shm_t));
+	elt = stu_pcalloc(pool, sizeof(stu_list_elt_t));
+	elt->obj = (void *) shm;
+	elt->size = sizeof(stu_shm_t);
+	stu_list_push(&cycle->shared_memory, elt);
 
 	if (stu_hash_init(&cycle->channels, STU_MAX_CHANNEL_N, slab_pool) == STU_ERROR) {
 		stu_log_error(0, "Failed to init channels hash.");

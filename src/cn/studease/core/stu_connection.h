@@ -31,6 +31,7 @@ typedef struct {
 	stu_socket_t           fd;
 	stu_user_t             user;
 
+	stu_buf_t              buffer;
 	void                  *data;
 	stu_event_t           *read;
 	stu_event_t           *write;

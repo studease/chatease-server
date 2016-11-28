@@ -50,4 +50,7 @@ void stu_pool_reset(stu_pool_t *pool);
 void *stu_palloc(stu_pool_t *pool, size_t size);
 void *stu_pcalloc(stu_pool_t *pool, size_t size);
 
+void *stu_base_palloc(stu_base_pool_t *pool, size_t size);
+void *stu_base_pcalloc(stu_base_pool_t *pool, size_t size);
+
 #endif /* STU_PALLOC_H_ */

@@ -50,22 +50,9 @@ stu_list_destroy(stu_list_t *list) {
 }
 
 
-stu_list_elt_t *
-stu_list_push(stu_list_t *list, void *obj, size_t size) {
-	stu_list_elt_t *elt;
-
-	elt = stu_slab_alloc(list->pool, sizeof(stu_list_elt_t));
-	if (elt == NULL) {
-		stu_log_error(0, "Failed to alloc list elt.");
-		return NULL;
-	}
-
-	elt->obj = obj;
-	elt->size = size;
-
+void
+stu_list_push(stu_list_t *list, stu_list_elt_t *elt) {
 	stu_queue_insert_tail(&list->elts.queue, &elt->queue);
-
-	return elt;
 }
 
 void

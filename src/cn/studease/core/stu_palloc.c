@@ -112,6 +112,33 @@ stu_pcalloc(stu_pool_t *pool, size_t size) {
 	return p;
 }
 
+
+void *
+stu_base_palloc(stu_base_pool_t *pool, size_t size) {
+	u_char     *m;
+
+	m = pool->data.last;
+	if ((size_t) (pool->data.end - m) >= size) {
+		pool->data.last += size;
+		return m;
+	}
+
+	return NULL;
+}
+
+void *
+stu_base_pcalloc(stu_base_pool_t *pool, size_t size) {
+	void *p;
+
+	p = stu_base_palloc(pool, size);
+	if (p) {
+		stu_memzero(p, size);
+	}
+
+	return p;
+}
+
+
 static void *
 stu_palloc_next(stu_pool_t *pool, size_t size) {
 	u_char     *m;

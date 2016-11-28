@@ -15,6 +15,8 @@
 #include <sys/types.h>
 #include <time.h>
 
+#define STU_HAVE_OPENSSL_SHA1_H  1
+
 #define stu_signal_helper(n)     SIG##n
 #define stu_signal_value(n)      stu_signal_helper(n)
 

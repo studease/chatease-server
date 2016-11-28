@@ -13,6 +13,7 @@
 
 typedef struct {
 	u_char *start;
+	u_char *last;
 	u_char *end;
 } stu_buf_t;
 

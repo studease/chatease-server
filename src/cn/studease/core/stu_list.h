@@ -30,7 +30,7 @@ stu_list_t *stu_list_create(stu_slab_pool_t *pool);
 void stu_list_init(stu_list_t *list, stu_slab_pool_t *pool);
 void stu_list_destroy(stu_list_t *list);
 
-stu_list_elt_t *stu_list_push(stu_list_t *list, void *obj, size_t size);
+void stu_list_push(stu_list_t *list, stu_list_elt_t *elt);
 void stu_list_remove(stu_list_t *list, stu_list_elt_t *elt);
 
 #endif /* STU_LIST_H_ */
