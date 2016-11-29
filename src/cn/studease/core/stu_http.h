@@ -11,6 +11,8 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
+#define STU_HTTP_HEADERS_MAX_SIZE  512
+
 typedef struct stu_http_request_s stu_http_request_t;
 
 typedef stu_int_t (*stu_http_header_handler_pt)(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);

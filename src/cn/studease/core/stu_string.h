@@ -38,8 +38,8 @@ void *stu_memzero(void *block, size_t n);
 #define stu_memcpy(dst, src, n) (((u_char *) memcpy(dst, src, n)) + (n))
 
 u_char *stu_strncpy(u_char *dst, u_char *src, size_t n);
-
 u_char *stu_strnstr(u_char *s1, char *s2, size_t n);
+stu_int_t stu_strncasecmp(u_char *s1, u_char *s2, size_t n);
 
 stu_int_t stu_printf(const char *fmt, ...);
 u_char *stu_sprintf(u_char *s, const char *fmt, ...);

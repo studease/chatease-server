@@ -114,7 +114,8 @@ stu_cycle_create(stu_config_t *cf) {
 	elt->size = sizeof(stu_shm_t);
 	stu_list_push(&cycle->shared_memory, elt);
 
-	if (stu_hash_init(&cycle->channels, STU_MAX_CHANNEL_N, slab_pool) == STU_ERROR) {
+	if (stu_hash_init(&cycle->channels, NULL, STU_MAX_CHANNEL_N, slab_pool,
+			(stu_hash_palloc_pt) stu_slab_alloc, (stu_hash_free_pt) stu_slab_free) == STU_ERROR) {
 		stu_log_error(0, "Failed to init channels hash.");
 		return NULL;
 	}

@@ -9,6 +9,8 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
+extern stu_hash_t  stu_http_headers_in_hash;
+
 static void stu_http_request_handler(stu_event_t *wev);
 
 static stu_int_t stu_http_process_request_headers(stu_http_request_t *r);
@@ -55,7 +57,7 @@ stu_http_wait_request_handler(stu_event_t *rev) {
 	}
 
 	if (c->buffer.start == NULL) {
-		c->buffer.start = (u_char *) stu_base_palloc(c->pool, STU_HTTP_REQUEST_DEFAULT_SIZE);
+		c->buffer.start = c->buffer.last = (u_char *) stu_base_palloc(c->pool, STU_HTTP_REQUEST_DEFAULT_SIZE);
 		c->buffer.end = c->buffer.start + STU_HTTP_REQUEST_DEFAULT_SIZE;
 	}
 	stu_memzero(c->buffer.start, STU_HTTP_REQUEST_DEFAULT_SIZE);
@@ -107,21 +109,23 @@ stu_http_create_request(stu_connection_t *c) {
 
 	r->connection = c;
 	r->header_in = &c->buffer;
+	stu_queue_init(&r->headers_in.headers.elts.queue);
 
 	return r;
 }
 
 void
 stu_http_process_request(stu_http_request_t *r) {
-	if (stu_http_process_request_headers(r) == STU_ERROR) {
-		stu_log_error(0, "Failed to process request header.");
-		stu_http_finalize_request(r, STU_HTTP_BAD_REQUEST);
-		return;
-	}
+	stu_int_t  rc;
 
-	if (r->headers_in.upgrade == NULL) {
-		stu_log_error(0, "Request not implemented.");
-		stu_http_finalize_request(r, STU_HTTP_NOT_IMPLEMENTED);
+	rc = stu_http_process_request_headers(r);
+	if (rc != STU_OK) {
+		if (rc < 0) {
+			rc = STU_HTTP_BAD_REQUEST;
+		}
+
+		stu_log_error(0, "Failed to process request header.");
+		stu_http_finalize_request(r, rc);
 		return;
 	}
 
@@ -129,19 +133,21 @@ stu_http_process_request(stu_http_request_t *r) {
 }
 
 
-static void
+static stu_int_t
 stu_http_process_request_headers(stu_http_request_t *r) {
-	stu_int_t        rc;
-	stu_list_elt_t  *elt;
-	stu_table_elt_t *h;
+	stu_int_t          rc;
+	stu_uint_t         hk;
+	stu_list_elt_t    *elt;
+	stu_table_elt_t   *h;
+	stu_http_header_t *hh;
 
 	if (stu_http_parse_request_line(r, r->header_in) == STU_ERROR) {
 		stu_log_error(0, "Failed to parse http request line.");
-		return;
+		return STU_ERROR;
 	}
 
 	for ( ;; ) {
-		rc = stu_http_parse_header_line(r, r->header_in, 0);
+		rc = stu_http_parse_header_line(r, r->header_in, 1);
 
 		if (rc == STU_OK) {
 			if (r->invalid_header) {
@@ -152,8 +158,7 @@ stu_http_process_request_headers(stu_http_request_t *r) {
 			/* a header line has been parsed successfully */
 			h = stu_base_pcalloc(r->connection->pool, sizeof(stu_table_elt_t));
 			if (h == NULL) {
-				stu_http_close_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
-				return;
+				return STU_HTTP_INTERNAL_SERVER_ERROR;
 			}
 
 			h->hash = r->header_hash;
@@ -168,8 +173,7 @@ stu_http_process_request_headers(stu_http_request_t *r) {
 
 			h->lowcase_key = stu_base_pcalloc(r->connection->pool, h->key.len);
 			if (h->lowcase_key == NULL) {
-				stu_http_close_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
-				return;
+				return STU_HTTP_INTERNAL_SERVER_ERROR;
 			}
 
 			if (h->key.len == r->lowcase_index) {
@@ -180,49 +184,44 @@ stu_http_process_request_headers(stu_http_request_t *r) {
 
 			elt = stu_base_pcalloc(r->connection->pool, sizeof(stu_list_elt_t));
 			if (elt == NULL) {
-				stu_http_close_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
-				return;
+				return STU_HTTP_INTERNAL_SERVER_ERROR;
 			}
 			elt->obj = h;
 			elt->size = sizeof(stu_table_elt_t);
 			stu_list_push(&r->headers_in.headers, elt);
 
-			hh = stu_hash_find(&cmcf->headers_in_hash, h->hash, h->lowcase_key, h->key.len);
-			if (hh && hh->handler(r, h, hh->offset) != STU_OK) {
-				return;
+			hk = stu_hash_key_lc(h->lowcase_key, h->key.len);
+			hh = stu_hash_find(&stu_http_headers_in_hash, hk, h->lowcase_key, h->key.len);
+			if (hh) {
+				rc = hh->handler(r, h, hh->offset);
+				if (rc != STU_OK) {
+					return rc;
+				}
 			}
 
-			stu_log_debug(0, "http header => \"%s: %s\"", &h->key, &h->value);
+			stu_log_debug(0, "http header => \"%s: %s\"", h->key.data, h->value.data);
 
 			continue;
 		}
 
 		if (rc == STU_DONE) {
-			/* a whole header has been parsed successfully */
-			stu_log_debug(0, "http header done.");
-
-			rc = stu_http_process_request_header(r);
-			if (rc != STU_OK) {
-				return;
-			}
-
-			stu_http_process_request(r);
-
-			return;
+			stu_log_debug(0, "the whole header has been parsed successfully.");
+			return STU_OK;
 		}
 
 		if (rc == STU_AGAIN) {
-			/* a header line parsing is still not complete */
+			stu_log_debug(0, "a header line parsing is still not complete.");
 			continue;
 		}
 
-		/* rc == STU_HTTP_PARSE_INVALID_HEADER: "\r" is not followed by "\n" */
-		stu_log_error(0, "client sent invalid header line: \"%s\\r...\"", r->header_name_start);
+		stu_log_error(0, "client sent invalid header line: \"%s\"", r->header_name_start);
 
-		stu_http_finalize_request(r, STU_HTTP_BAD_REQUEST);
-
-		return;
+		return STU_ERROR;
 	}
+
+	stu_log_error(0, "Unexpected error while processing request headers.");
+
+	return STU_ERROR;
 }
 
 
@@ -267,7 +266,7 @@ stu_http_process_unique_header_line(stu_http_request_t *r, stu_table_elt_t *h, s
 	}
 
 	stu_log_error(0, "client sent duplicate header line = > \"%s: %s\", "
-			"previous value => \"%s: %s\"", &h->key, &h->value, &(*ph)->key, &(*ph)->value);
+			"previous value => \"%s: %s\"", h->key.data, h->value.data, &(*ph)->key.data, &(*ph)->value.data);
 
 	stu_http_finalize_request(r, STU_HTTP_BAD_REQUEST);
 
@@ -307,7 +306,7 @@ stu_http_request_handler(stu_event_t *wev) {
 
 	r = (stu_http_request_t *) c->data;
 
-	buf = (u_char *) "HTTP/1.0 200 OK\r\nServer:Chatease/Beta\r\nContent-type:text/html\r\nContent-length:7\r\n\r\nHello!\n";
+	buf = (u_char *) "HTTP/1.0 200 OK\r\nServer: Chatease-Server/Beta\r\nContent-type: text/html\r\nContent-length: 7\r\n\r\nHello!\n";
 
 	n = send(c->fd, buf, stu_strlen(buf), 0);
 	if (n == -1) {

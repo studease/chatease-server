@@ -198,7 +198,9 @@ stu_palloc_large(stu_pool_t *pool, size_t size) {
 
 	l->prev = NULL;
 	l->next = pool->large;
-	pool->large->prev = l;
+	if (pool->large) {
+		pool->large->prev = l;
+	}
 	pool->large = l;
 
 	return m;

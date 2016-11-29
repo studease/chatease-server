@@ -37,7 +37,7 @@ stu_http_parse_request_line(stu_http_request_t *r, stu_buf_t *b) {
 			if (ch == ' ') {
 				s = r->request_line.data;
 
-				switch (r->request_line.len) {
+				switch (p - s) {
 				case 3:
 					if (stu_strncmp(s, "GET", 3) == 0) {
 						r->method = STU_HTTP_GET;
@@ -53,13 +53,14 @@ stu_http_parse_request_line(stu_http_request_t *r, stu_buf_t *b) {
 				}
 
 				state = sw_spaces_before_uri;
+				break;
 			}
 			if (ch < 'A' || ch > 'Z') {
 				return STU_ERROR;
 			}
 			break;
 		case sw_spaces_before_uri:
-			r->uri.data = p + 1;
+			r->uri.data = p;
 			state = sw_uri;
 			break;
 		case sw_uri:
@@ -90,11 +91,13 @@ stu_http_parse_request_line(stu_http_request_t *r, stu_buf_t *b) {
 			if (ch == CR) {
 				if (stu_strncmp(v, "HTTP/1.1", 8) == 0) {
 					r->http_version = STU_HTTP_VERSION_11;
+					r->request_line.len = p - r->request_line.data;
 					state = sw_almost_done;
 					break;
 				}
 				if (stu_strncmp(v, "HTTP/1.0", 8) == 0) {
 					r->http_version = STU_HTTP_VERSION_10;
+					r->request_line.len = p - r->request_line.data;
 					state = sw_almost_done;
 					break;
 				}
@@ -102,7 +105,6 @@ stu_http_parse_request_line(stu_http_request_t *r, stu_buf_t *b) {
 			}
 			break;
 		case sw_almost_done:
-			r->request_line.len = p - r->request_line.data;
 			switch (ch) {
 			case LF:
 				goto done;
