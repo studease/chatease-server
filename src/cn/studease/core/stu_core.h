@@ -34,7 +34,6 @@ typedef enum {
 #define CR     (u_char) '\r'
 #define CRLF   "\r\n"
 
-#include "stu_sha1.h"
 #include "stu_string.h"
 #include "stu_buf.h"
 #include "stu_errno.h"
@@ -56,6 +55,8 @@ typedef enum {
 #include "stu_shmem.h"
 #include "stu_thread.h"
 #include "stu_cycle.h"
+#include "stu_base64.h"
+#include "stu_sha1.h"
 #include "stu_http.h"
 #include "stu_files.h"
 #include "stu_process.h"

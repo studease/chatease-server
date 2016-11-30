@@ -17,9 +17,7 @@
 #include <sha.h>
 #endif
 
-
 typedef SHA_CTX  stu_sha1_t;
-
 
 #define stu_sha1_init    SHA1_Init
 #define stu_sha1_update  SHA1_Update

@@ -1,4 +1,4 @@
-src/cn/studease/core/stu_http.d: ../src/cn/studease/core/stu_http.c \
+src/cn/studease/core/stu_base64.d: ../src/cn/studease/core/stu_base64.c \
  ../src/cn/studease/core/stu_config.h ../src/cn/studease/core/stu_core.h \
  ../src/cn/studease/core/stu_string.h ../src/cn/studease/core/stu_buf.h \
  ../src/cn/studease/core/stu_errno.h ../src/cn/studease/core/stu_log.h \

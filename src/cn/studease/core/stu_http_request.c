@@ -17,6 +17,7 @@ static stu_int_t stu_http_process_request_headers(stu_http_request_t *r);
 
 static stu_int_t stu_http_process_host(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 static stu_int_t stu_http_process_connection(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
+static stu_int_t stu_http_process_sec_websocket_key(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 
 static stu_int_t stu_http_process_header_line(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 static stu_int_t stu_http_process_unique_header_line(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
@@ -33,7 +34,7 @@ stu_http_header_t  stu_http_headers_in[] = {
 	{ stu_string("Content-Length"), offsetof(stu_http_headers_in_t, content_length), stu_http_process_unique_header_line },
 	{ stu_string("Content-Type"), offsetof(stu_http_headers_in_t, content_type), stu_http_process_header_line },
 
-	{ stu_string("sec_websocket_key"), offsetof(stu_http_headers_in_t, sec_websocket_key), stu_http_process_unique_header_line },
+	{ stu_string("sec_websocket_key"), offsetof(stu_http_headers_in_t, sec_websocket_key), stu_http_process_sec_websocket_key },
 	{ stu_string("sec_websocket_version"), offsetof(stu_http_headers_in_t, sec_websocket_version), stu_http_process_unique_header_line },
 	{ stu_string("sec_websocket_extensions"), offsetof(stu_http_headers_in_t, sec_websocket_extensions), stu_http_process_unique_header_line },
 	{ stu_string("Upgrade"), offsetof(stu_http_headers_in_t, upgrade), stu_http_process_unique_header_line },
@@ -42,6 +43,8 @@ stu_http_header_t  stu_http_headers_in[] = {
 
 	{ stu_null_string, 0, NULL }
 };
+
+static const stu_str_t STU_HTTP_HEADER_SEC_WEBSOCKET_ACCEPT = stu_string("Sec-WebSocket-Accept");
 
 
 void
@@ -124,7 +127,7 @@ stu_http_process_request(stu_http_request_t *r) {
 			rc = STU_HTTP_BAD_REQUEST;
 		}
 
-		stu_log_error(0, "Failed to process request header.");
+		stu_log_error(0, "Failed to process request headers.");
 		stu_http_finalize_request(r, rc);
 		return;
 	}
@@ -235,8 +238,30 @@ stu_http_process_connection(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_
 	if (stu_strnstr(h->value.data, "Upgrade", 7)) {
 		r->headers_in.connection_type = STU_HTTP_CONNECTION_UPGRADE;
 	} else {
-		return STU_ERROR;
+		return STU_HTTP_NOT_IMPLEMENTED;
 	}
+
+	return STU_OK;
+}
+
+static stu_int_t
+stu_http_process_sec_websocket_key(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset) {
+	stu_table_elt_t *out;
+
+	out = stu_base_pcalloc(r->connection->pool, sizeof(stu_table_elt_t));
+	if (out == NULL) {
+		return STU_HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	out->key.data = STU_HTTP_HEADER_SEC_WEBSOCKET_ACCEPT.data;
+	out->key.len = STU_HTTP_HEADER_SEC_WEBSOCKET_ACCEPT.len;
+
+	out->value.data = stu_base_pcalloc(r->connection->pool, h->value.len + 1);
+	if (out->value.data == NULL) {
+		return STU_HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	out->value.len = stu_base64_decode(out->value.data, h->value.data, h->value.len);
 
 	return STU_OK;
 }
@@ -268,9 +293,7 @@ stu_http_process_unique_header_line(stu_http_request_t *r, stu_table_elt_t *h, s
 	stu_log_error(0, "client sent duplicate header line = > \"%s: %s\", "
 			"previous value => \"%s: %s\"", h->key.data, h->value.data, &(*ph)->key.data, &(*ph)->value.data);
 
-	stu_http_finalize_request(r, STU_HTTP_BAD_REQUEST);
-
-	return STU_ERROR;
+	return STU_HTTP_BAD_REQUEST;
 }
 
 
@@ -305,6 +328,10 @@ stu_http_request_handler(stu_event_t *wev) {
 	stu_epoll_del_event(c->write, STU_WRITE_EVENT);
 
 	r = (stu_http_request_t *) c->data;
+
+	if (r->headers_out.status == STU_HTTP_SWITCHING_PROTOCOLS) {
+
+	}
 
 	buf = (u_char *) "HTTP/1.0 200 OK\r\nServer: Chatease-Server/Beta\r\nContent-type: text/html\r\nContent-length: 7\r\n\r\nHello!\n";
 
