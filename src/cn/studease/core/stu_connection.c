@@ -141,6 +141,8 @@ stu_connection_init(stu_connection_t *c, stu_socket_t s) {
 	c->fd = s;
 	stu_user_init(&c->user);
 
+	c->buffer.start = c->buffer.last = c->buffer.end = NULL;
+	c->data = NULL;
 	c->read = c->write = NULL;
 
 	c->error = STU_CONNECTION_ERROR_NONE;

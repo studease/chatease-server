@@ -75,6 +75,8 @@ typedef struct {
 } stu_http_headers_in_t;
 
 typedef struct {
+	stu_list_t       headers;
+
 	stu_uint_t       status;
 	stu_str_t        status_line;
 

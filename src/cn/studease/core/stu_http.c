@@ -118,6 +118,7 @@ static stu_int_t
 stu_http_init_headers_in_hash(stu_config_t *cf) {
 	stu_http_header_t *header;
 	stu_str_t          lc;
+	u_char             data[STU_HTTP_LC_HEADER_LEN];
 
 	if (stu_hash_init(&stu_http_headers_in_hash, NULL, STU_HTTP_HEADERS_MAX_SIZE, stu_cycle->pool,
 			(stu_hash_palloc_pt) stu_pcalloc, NULL) == STU_ERROR) {
@@ -125,7 +126,10 @@ stu_http_init_headers_in_hash(stu_config_t *cf) {
 	}
 
 	for (header = stu_http_headers_in; header->name.len; header++) {
-		stu_str_set(&lc, header->name.data);
+		stu_strlow(data, header->name.data, header->name.len);
+
+		lc.data = data;
+		lc.len = header->name.len;
 
 		if (stu_hash_insert(&stu_http_headers_in_hash, &lc, header) == STU_ERROR) {
 			return STU_ERROR;

@@ -34,9 +34,9 @@ stu_http_header_t  stu_http_headers_in[] = {
 	{ stu_string("Content-Length"), offsetof(stu_http_headers_in_t, content_length), stu_http_process_unique_header_line },
 	{ stu_string("Content-Type"), offsetof(stu_http_headers_in_t, content_type), stu_http_process_header_line },
 
-	{ stu_string("sec_websocket_key"), offsetof(stu_http_headers_in_t, sec_websocket_key), stu_http_process_sec_websocket_key },
-	{ stu_string("sec_websocket_version"), offsetof(stu_http_headers_in_t, sec_websocket_version), stu_http_process_unique_header_line },
-	{ stu_string("sec_websocket_extensions"), offsetof(stu_http_headers_in_t, sec_websocket_extensions), stu_http_process_unique_header_line },
+	{ stu_string("Sec-Websocket-Key"), offsetof(stu_http_headers_in_t, sec_websocket_key), stu_http_process_sec_websocket_key },
+	{ stu_string("Sec-Websocket-Version"), offsetof(stu_http_headers_in_t, sec_websocket_version), stu_http_process_unique_header_line },
+	{ stu_string("Sec-Websocket-Extensions"), offsetof(stu_http_headers_in_t, sec_websocket_extensions), stu_http_process_unique_header_line },
 	{ stu_string("Upgrade"), offsetof(stu_http_headers_in_t, upgrade), stu_http_process_unique_header_line },
 
 	{ stu_string("Connection"), offsetof(stu_http_headers_in_t, connection), stu_http_process_connection },
@@ -45,6 +45,8 @@ stu_http_header_t  stu_http_headers_in[] = {
 };
 
 static const stu_str_t STU_HTTP_HEADER_SEC_WEBSOCKET_ACCEPT = stu_string("Sec-WebSocket-Accept");
+
+static const stu_str_t STU_HTTP_WEBSOCKET_SIGN_KEY = stu_string("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
 
 
 void
@@ -60,9 +62,10 @@ stu_http_wait_request_handler(stu_event_t *rev) {
 	}
 
 	if (c->buffer.start == NULL) {
-		c->buffer.start = c->buffer.last = (u_char *) stu_base_palloc(c->pool, STU_HTTP_REQUEST_DEFAULT_SIZE);
+		c->buffer.start = (u_char *) stu_base_palloc(c->pool, STU_HTTP_REQUEST_DEFAULT_SIZE);
 		c->buffer.end = c->buffer.start + STU_HTTP_REQUEST_DEFAULT_SIZE;
 	}
+	c->buffer.last = c->buffer.start;
 	stu_memzero(c->buffer.start, STU_HTTP_REQUEST_DEFAULT_SIZE);
 
 	n = recv(c->fd, c->buffer.start, STU_HTTP_REQUEST_DEFAULT_SIZE, 0);
@@ -113,6 +116,7 @@ stu_http_create_request(stu_connection_t *c) {
 	r->connection = c;
 	r->header_in = &c->buffer;
 	stu_queue_init(&r->headers_in.headers.elts.queue);
+	stu_queue_init(&r->headers_out.headers.elts.queue);
 
 	return r;
 }
@@ -132,7 +136,11 @@ stu_http_process_request(stu_http_request_t *r) {
 		return;
 	}
 
-	stu_http_finalize_request(r, STU_HTTP_SWITCHING_PROTOCOLS);
+	if (r->headers_in.upgrade) {
+		rc = STU_HTTP_SWITCHING_PROTOCOLS;
+	}
+
+	stu_http_finalize_request(r, rc);
 }
 
 
@@ -193,7 +201,7 @@ stu_http_process_request_headers(stu_http_request_t *r) {
 			elt->size = sizeof(stu_table_elt_t);
 			stu_list_push(&r->headers_in.headers, elt);
 
-			hk = stu_hash_key_lc(h->lowcase_key, h->key.len);
+			hk = stu_hash_key(h->lowcase_key, h->key.len);
 			hh = stu_hash_find(&stu_http_headers_in_hash, hk, h->lowcase_key, h->key.len);
 			if (hh) {
 				rc = hh->handler(r, h, hh->offset);
@@ -246,22 +254,45 @@ stu_http_process_connection(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_
 
 static stu_int_t
 stu_http_process_sec_websocket_key(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset) {
-	stu_table_elt_t *out;
+	stu_table_elt_t *e;
+	stu_list_elt_t  *elt;
+	stu_sha1_t       sha1;
+	stu_str_t        sha1_signed;
 
-	out = stu_base_pcalloc(r->connection->pool, sizeof(stu_table_elt_t));
-	if (out == NULL) {
+	e = stu_base_pcalloc(r->connection->pool, sizeof(stu_table_elt_t));
+	if (e == NULL) {
 		return STU_HTTP_INTERNAL_SERVER_ERROR;
 	}
 
-	out->key.data = STU_HTTP_HEADER_SEC_WEBSOCKET_ACCEPT.data;
-	out->key.len = STU_HTTP_HEADER_SEC_WEBSOCKET_ACCEPT.len;
+	e->key.data = STU_HTTP_HEADER_SEC_WEBSOCKET_ACCEPT.data;
+	e->key.len = STU_HTTP_HEADER_SEC_WEBSOCKET_ACCEPT.len;
 
-	out->value.data = stu_base_pcalloc(r->connection->pool, h->value.len + 1);
-	if (out->value.data == NULL) {
+	sha1_signed.len = SHA_DIGEST_LENGTH;
+	sha1_signed.data = stu_base_pcalloc(r->connection->pool, sha1_signed.len + 1);
+
+	e->value.len = stu_base64_encoded_length(SHA_DIGEST_LENGTH);
+	e->value.data = stu_base_pcalloc(r->connection->pool, e->value.len + 1);
+
+	if (sha1_signed.data == NULL || e->value.data == NULL) {
 		return STU_HTTP_INTERNAL_SERVER_ERROR;
 	}
 
-	out->value.len = stu_base64_decode(out->value.data, h->value.data, h->value.len);
+	stu_sha1_init(&sha1);
+	stu_sha1_update(&sha1, h->value.data, h->value.len);
+	stu_sha1_update(&sha1, STU_HTTP_WEBSOCKET_SIGN_KEY.data, STU_HTTP_WEBSOCKET_SIGN_KEY.len);
+	stu_sha1_final(sha1_signed.data, &sha1);
+
+	stu_base64_encode(&e->value, &sha1_signed);
+
+	r->headers_out.sec_websocket_accept = e;
+
+	elt = stu_base_pcalloc(r->connection->pool, sizeof(stu_list_elt_t));
+	if (elt == NULL) {
+		return STU_HTTP_INTERNAL_SERVER_ERROR;
+	}
+	elt->obj = h;
+	elt->size = sizeof(stu_table_elt_t);
+	stu_list_push(&r->headers_out.headers, elt);
 
 	return STU_OK;
 }
@@ -315,7 +346,7 @@ static void
 stu_http_request_handler(stu_event_t *wev) {
 	stu_http_request_t *r;
 	stu_connection_t   *c;
-	u_char             *buf;
+	stu_buf_t          *buf;
 	stu_int_t           n;
 
 	c = (stu_connection_t *) wev->data;
@@ -327,21 +358,31 @@ stu_http_request_handler(stu_event_t *wev) {
 
 	stu_epoll_del_event(c->write, STU_WRITE_EVENT);
 
+	buf = &c->buffer;
+	buf->last = buf->start;
+	stu_memzero(buf->start, buf->end - buf->start);
+
 	r = (stu_http_request_t *) c->data;
-
 	if (r->headers_out.status == STU_HTTP_SWITCHING_PROTOCOLS) {
-
+		buf->last = stu_memcpy(buf->last, "HTTP/1.1 101 Switching Protocols\r\n", 34);
+		buf->last = stu_memcpy(buf->last, "Server: Chatease-Server/Beta\r\n", 30);
+		buf->last = stu_memcpy(buf->last, "Upgrade: websocket\r\n", 20);
+		buf->last = stu_memcpy(buf->last, "Connection: upgrade\r\n", 21);
+		buf->last = stu_memcpy(buf->last, r->headers_out.sec_websocket_accept->key.data, r->headers_out.sec_websocket_accept->key.len);
+		buf->last = stu_memcpy(buf->last, ": ", 2);
+		buf->last = stu_memcpy(buf->last, r->headers_out.sec_websocket_accept->value.data, r->headers_out.sec_websocket_accept->value.len);
+		buf->last = stu_memcpy(buf->last, "\r\n\r\n", 4);
+	} else {
+		buf->start = (u_char *) "HTTP/1.1 400 Bad Request\r\nServer: Chatease-Server/Beta\r\nContent-type: text/html\r\nContent-length: 21\r\n\r\nChatease-Server/Beta\n";
 	}
 
-	buf = (u_char *) "HTTP/1.0 200 OK\r\nServer: Chatease-Server/Beta\r\nContent-type: text/html\r\nContent-length: 7\r\n\r\nHello!\n";
-
-	n = send(c->fd, buf, stu_strlen(buf), 0);
+	n = send(c->fd, buf->start, stu_strlen(buf->start), 0);
 	if (n == -1) {
 		stu_log_debug(0, "Failed to send data: fd=%d.", c->fd);
 		goto done;
 	}
 
-	stu_log_debug(0, "sent: fd=%d, bytes=%d, str=\n%s", c->fd, n, buf);
+	stu_log_debug(0, "sent: fd=%d, bytes=%d, str=\n%s", c->fd, n, buf->start);
 
 	if (r->headers_out.status == STU_HTTP_SWITCHING_PROTOCOLS) {
 		c->read->handler = stu_websocket_wait_request_handler;
