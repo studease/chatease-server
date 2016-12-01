@@ -111,6 +111,7 @@ struct stu_http_request_s {
 	stu_http_headers_out_t  headers_out;
 	stu_buf_t              *response_body;
 
+	// used for parsing request.
 	stu_uint_t              state;
 	stu_uint_t              header_hash;
 	stu_uint_t              lowcase_index;
@@ -135,7 +136,7 @@ void stu_http_close_request(stu_http_request_t *r, stu_int_t rc);
 void stu_http_free_request(stu_http_request_t *r, stu_int_t rc);
 void stu_http_close_connection(stu_connection_t *c);
 
-void stu_http_empty_handler(stu_event_t *wev);
+void stu_http_empty_handler(stu_event_t *ev);
 void stu_http_request_empty_handler(stu_http_request_t *r);
 
 #endif /* STU_HTTP_REQUEST_H_ */

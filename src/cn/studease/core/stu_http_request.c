@@ -12,6 +12,7 @@
 extern stu_hash_t  stu_http_headers_in_hash;
 
 static void stu_http_request_handler(stu_event_t *wev);
+static stu_int_t stu_http_switch_protocol(stu_http_request_t *r);
 
 static stu_int_t stu_http_process_request_headers(stu_http_request_t *r);
 
@@ -52,7 +53,7 @@ static const stu_str_t STU_HTTP_WEBSOCKET_SIGN_KEY = stu_string("258EAFA5-E914-4
 void
 stu_http_wait_request_handler(stu_event_t *rev) {
 	stu_connection_t *c;
-	stu_int_t         n;
+	stu_int_t         n, err;
 
 	c = (stu_connection_t *) rev->data;
 
@@ -70,23 +71,19 @@ stu_http_wait_request_handler(stu_event_t *rev) {
 
 	n = recv(c->fd, c->buffer.start, STU_HTTP_REQUEST_DEFAULT_SIZE, 0);
 	if (n == -1) {
-		if (stu_errno == EAGAIN) {
+		err = stu_errno;
+		if (err == EAGAIN) {
 			goto done;
 		}
 
-		stu_log_debug(0, "Failed to recv data: fd=%d.", c->fd);
+		stu_log_error(err, "Failed to recv data: fd=%d.", c->fd);
 		stu_connection_free(c);
 		goto done;
 	}
 
 	if (n == 0) {
 		stu_log_debug(0, "Remote client has closed connection: fd=%d.", c->fd);
-
-		c->read->active = FALSE;
-		stu_epoll_del_event(c->read, STU_READ_EVENT);
-
-		stu_http_close_connection(c);
-		goto done;
+		goto failed;
 	}
 
 	stu_log_debug(0, "recv: fd=%d, bytes=%d, str=\n%s", c->fd, n, c->buffer.start);
@@ -94,24 +91,36 @@ stu_http_wait_request_handler(stu_event_t *rev) {
 	c->data = (void *) stu_http_create_request(c);
 	if (c->data == NULL) {
 		stu_log_error(0, "Failed to create http request.");
-		goto done;
+		goto failed;
 	}
 
-	stu_http_process_request((stu_http_request_t *) c->data);
+	stu_http_process_request(c->data);
+
+	goto done;
+
+failed:
+
+	c->read->active = FALSE;
+	stu_epoll_del_event(c->read, STU_READ_EVENT);
+
+	stu_http_close_connection(c);
 
 done:
 
 	stu_spin_unlock(&c->lock);
 }
 
-
 stu_http_request_t *
 stu_http_create_request(stu_connection_t *c) {
 	stu_http_request_t *r;
 
-	stu_spin_lock(&c->pool->lock);
-	r = (stu_http_request_t *) stu_base_pcalloc(c->pool, sizeof(stu_http_request_t));
-	stu_spin_unlock(&c->pool->lock);
+	if (c->data == NULL) {
+		stu_spin_lock(&c->pool->lock);
+		r = stu_base_pcalloc(c->pool, sizeof(stu_http_request_t));
+		stu_spin_unlock(&c->pool->lock);
+	} else {
+		r = c->data;
+	}
 
 	r->connection = c;
 	r->header_in = &c->buffer;
@@ -373,25 +382,58 @@ stu_http_request_handler(stu_event_t *wev) {
 		buf->last = stu_memcpy(buf->last, r->headers_out.sec_websocket_accept->value.data, r->headers_out.sec_websocket_accept->value.len);
 		buf->last = stu_memcpy(buf->last, "\r\n\r\n", 4);
 	} else {
-		buf->start = (u_char *) "HTTP/1.1 400 Bad Request\r\nServer: Chatease-Server/Beta\r\nContent-type: text/html\r\nContent-length: 21\r\n\r\nChatease-Server/Beta\n";
+		buf->last = stu_memcpy(buf->last, "HTTP/1.1 400 Bad Request\r\nServer: Chatease-Server/Beta\r\nContent-type: text/html\r\nContent-length: 21\r\n\r\nChatease-Server/Beta\n", 124);
 	}
 
 	n = send(c->fd, buf->start, stu_strlen(buf->start), 0);
 	if (n == -1) {
 		stu_log_debug(0, "Failed to send data: fd=%d.", c->fd);
-		goto done;
+		goto failed;
 	}
 
 	stu_log_debug(0, "sent: fd=%d, bytes=%d, str=\n%s", c->fd, n, buf->start);
 
 	if (r->headers_out.status == STU_HTTP_SWITCHING_PROTOCOLS) {
-		c->read->handler = stu_websocket_wait_request_handler;
-		c->write->handler = stu_websocket_request_handler;
+		if (stu_http_switch_protocol(r) == STU_ERROR) {
+			stu_log_error(0, "Failed to switch protocol: fd=%d.", c->fd);
+			goto failed;
+		}
 	}
+
+	goto done;
+
+failed:
+
+	c->read->active = FALSE;
+	stu_epoll_del_event(c->read, STU_READ_EVENT);
+
+	stu_http_close_connection(c);
 
 done:
 
 	stu_spin_unlock(&c->lock);
+}
+
+static stu_int_t
+stu_http_switch_protocol(stu_http_request_t *r) {
+	stu_connection_t *c;
+
+	c = r->connection;
+
+	stu_base_pool_reset(c->pool);
+
+	c->buffer.start = c->buffer.last =c->buffer.end = NULL;
+	c->data = NULL;
+
+	c->read->handler = stu_websocket_wait_request_handler;
+	c->write->handler = stu_websocket_request_handler;
+
+	if (stu_epoll_add_event(c->read, STU_READ_EVENT|EPOLLET) == STU_ERROR) {
+		stu_log_error(0, "Failed to add http client read event.");
+		return STU_ERROR;
+	}
+
+	return STU_OK;
 }
 
 
@@ -417,7 +459,7 @@ stu_http_close_connection(stu_connection_t *c) {
 
 
 void
-stu_http_empty_handler(stu_event_t *wev) {
+stu_http_empty_handler(stu_event_t *ev) {
 
 }
 

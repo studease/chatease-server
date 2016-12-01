@@ -44,8 +44,10 @@ struct stu_pool_s {
 };
 
 stu_pool_t *stu_pool_create(size_t size);
-void stu_pool_destroy(stu_pool_t *pool);
-void stu_pool_reset(stu_pool_t *pool);
+void  stu_pool_destroy(stu_pool_t *pool);
+
+void  stu_pool_reset(stu_pool_t *pool);
+void  stu_base_pool_reset(stu_base_pool_t *pool);
 
 void *stu_palloc(stu_pool_t *pool, size_t size);
 void *stu_pcalloc(stu_pool_t *pool, size_t size);

@@ -77,6 +77,15 @@ stu_pool_reset(stu_pool_t *pool) {
 	}
 }
 
+void
+stu_base_pool_reset(stu_base_pool_t *pool) {
+	stu_base_pool_t *p;
+
+	for (p = pool; p; p = p->next) {
+		p->data.last = p->data.start;
+	}
+}
+
 void *
 stu_palloc(stu_pool_t *pool, size_t size) {
 	u_char     *m;

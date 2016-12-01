@@ -101,6 +101,9 @@ stu_connection_get(stu_socket_t s) {
 	c->write->data = (void *) c;
 	c->write->active = TRUE;
 
+	// protect events from resetting pool.
+	c->pool->data.start = c->pool->data.last;
+
 	return c;
 }
 
