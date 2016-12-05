@@ -11,7 +11,7 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
-#define STU_HTTP_REQUEST_DEFAULT_SIZE      2048
+#define STU_HTTP_REQUEST_DEFAULT_SIZE      1024
 #define STU_HTTP_LC_HEADER_LEN             32
 
 #define STU_HTTP_VERSION_10                10

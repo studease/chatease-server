@@ -17,6 +17,7 @@ src/chatease-server.d: ../src/chatease-server.c \
  ../src/cn/studease/core/stu_http_request.h \
  ../src/cn/studease/core/stu_http_parse.h \
  ../src/cn/studease/core/stu_websocket_request.h \
+ ../src/cn/studease/core/stu_websocket_parse.h \
  ../src/cn/studease/core/stu_files.h \
  ../src/cn/studease/core/stu_process.h \
  ../src/cn/studease/core/stu_filedes.h \
@@ -83,6 +84,8 @@ src/chatease-server.d: ../src/chatease-server.c \
 ../src/cn/studease/core/stu_http_parse.h:
 
 ../src/cn/studease/core/stu_websocket_request.h:
+
+../src/cn/studease/core/stu_websocket_parse.h:
 
 ../src/cn/studease/core/stu_files.h:
 

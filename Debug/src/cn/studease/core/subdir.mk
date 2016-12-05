@@ -6,6 +6,7 @@
 C_SRCS += \
 ../src/cn/studease/core/stu_alloc.c \
 ../src/cn/studease/core/stu_base64.c \
+../src/cn/studease/core/stu_channel.c \
 ../src/cn/studease/core/stu_connection.c \
 ../src/cn/studease/core/stu_cycle.c \
 ../src/cn/studease/core/stu_errno.c \
@@ -28,11 +29,13 @@ C_SRCS += \
 ../src/cn/studease/core/stu_thread.c \
 ../src/cn/studease/core/stu_user.c \
 ../src/cn/studease/core/stu_utils.c \
+../src/cn/studease/core/stu_websocket_parse.c \
 ../src/cn/studease/core/stu_websocket_request.c 
 
 OBJS += \
 ./src/cn/studease/core/stu_alloc.o \
 ./src/cn/studease/core/stu_base64.o \
+./src/cn/studease/core/stu_channel.o \
 ./src/cn/studease/core/stu_connection.o \
 ./src/cn/studease/core/stu_cycle.o \
 ./src/cn/studease/core/stu_errno.o \
@@ -55,11 +58,13 @@ OBJS += \
 ./src/cn/studease/core/stu_thread.o \
 ./src/cn/studease/core/stu_user.o \
 ./src/cn/studease/core/stu_utils.o \
+./src/cn/studease/core/stu_websocket_parse.o \
 ./src/cn/studease/core/stu_websocket_request.o 
 
 C_DEPS += \
 ./src/cn/studease/core/stu_alloc.d \
 ./src/cn/studease/core/stu_base64.d \
+./src/cn/studease/core/stu_channel.d \
 ./src/cn/studease/core/stu_connection.d \
 ./src/cn/studease/core/stu_cycle.d \
 ./src/cn/studease/core/stu_errno.d \
@@ -82,6 +87,7 @@ C_DEPS += \
 ./src/cn/studease/core/stu_thread.d \
 ./src/cn/studease/core/stu_user.d \
 ./src/cn/studease/core/stu_utils.d \
+./src/cn/studease/core/stu_websocket_parse.d \
 ./src/cn/studease/core/stu_websocket_request.d 
 
 

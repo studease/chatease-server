@@ -9,12 +9,8 @@
 #include "stu_core.h"
 
 stu_int_t
-stu_user_init(stu_user_t *user) {
-	stu_memzero(user, sizeof(stu_user_t));
-
-	if (user->properties) {
-		stu_queue_init(&user->properties->queue);
-	}
+stu_user_init(stu_user_t *u) {
+	stu_memzero(u, sizeof(stu_user_t));
 
 	return STU_OK;
 }

@@ -11,21 +11,29 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
+typedef struct stu_userinfo_s stu_userinfo_t;
+
 typedef struct {
-	stu_queue_t          queue;
+	u_char               id;
+	stu_str_t           *explain;
+} stu_error_t;
 
-	stu_uint_t           id;       // channel ID
-	stu_int_t            role;
-	stu_uint_t           rights;
+struct stu_userinfo_s {
+	stu_int_t            id; // channel ID
+	u_char               role;
+	u_char               rights;
 
-	stu_message_t       *lastsent;
-} stu_user_property_t;
+	stu_message_t       *last;
+	time_t               time;
+
+	stu_userinfo_t      *next;
+};
 
 typedef struct {
 	stu_int_t            id;
 	stu_str_t            name;
-	stu_user_property_t *properties; // properties in channels
-	time_t               time;       // last posting time
+
+	stu_userinfo_t      *info;
 } stu_user_t;
 
 

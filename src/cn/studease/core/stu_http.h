@@ -20,6 +20,7 @@ typedef stu_int_t (*stu_http_header_handler_pt)(stu_http_request_t *r, stu_table
 #include "stu_http_request.h"
 #include "stu_http_parse.h"
 #include "stu_websocket_request.h"
+#include "stu_websocket_parse.h"
 
 stu_int_t stu_http_add_listen(stu_config_t *cf);
 

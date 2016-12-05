@@ -24,6 +24,10 @@ static stu_int_t stu_http_process_header_line(stu_http_request_t *r, stu_table_e
 static stu_int_t stu_http_process_unique_header_line(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 
 
+static const stu_str_t  STU_HTTP_HEADER_SEC_WEBSOCKET_ACCEPT = stu_string("Sec-WebSocket-Accept");
+static const stu_str_t  STU_HTTP_WEBSOCKET_SIGN_KEY = stu_string("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
+
+
 stu_http_header_t  stu_http_headers_in[] = {
 	{ stu_string("Host"), offsetof(stu_http_headers_in_t, host), stu_http_process_host },
 	{ stu_string("User-Agent"), offsetof(stu_http_headers_in_t, user_agent),  stu_http_process_header_line },
@@ -44,10 +48,6 @@ stu_http_header_t  stu_http_headers_in[] = {
 
 	{ stu_null_string, 0, NULL }
 };
-
-static const stu_str_t STU_HTTP_HEADER_SEC_WEBSOCKET_ACCEPT = stu_string("Sec-WebSocket-Accept");
-
-static const stu_str_t STU_HTTP_WEBSOCKET_SIGN_KEY = stu_string("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
 
 
 void
@@ -252,7 +252,7 @@ stu_http_process_host(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offs
 
 static stu_int_t
 stu_http_process_connection(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset) {
-	if (stu_strnstr(h->value.data, "Upgrade", 7)) {
+	if (stu_strnstr(h->value.data, "Upgrade", h->value.len)) {
 		r->headers_in.connection_type = STU_HTTP_CONNECTION_UPGRADE;
 	} else {
 		return STU_HTTP_NOT_IMPLEMENTED;
