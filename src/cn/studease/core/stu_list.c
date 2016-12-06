@@ -37,15 +37,6 @@ stu_list_init(stu_list_t *list, stu_slab_pool_t *pool) {
 
 void
 stu_list_destroy(stu_list_t *list) {
-	stu_list_elt_t *elt;
-	stu_queue_t    *q;
-
-	q = stu_queue_head(&list->elts.queue);
-	for (; q != stu_queue_sentinel(&list->elts.queue); q = q->next) {
-		elt = stu_queue_data(q, stu_list_elt_t, queue);
-		stu_slab_free(list->pool, (void *) elt);
-	}
-
 	stu_slab_free(list->pool, (void *) list);
 }
 
@@ -58,7 +49,5 @@ stu_list_push(stu_list_t *list, stu_list_elt_t *elt) {
 void
 stu_list_remove(stu_list_t *list, stu_list_elt_t *elt) {
 	stu_queue_remove(&elt->queue);
-
-	stu_slab_free(list->pool, (void *) elt);
 }
 

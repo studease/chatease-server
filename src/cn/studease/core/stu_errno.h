@@ -18,6 +18,11 @@
 #define stu_errno           errno
 #define stu_set_errno(err)  errno = err
 
+typedef struct {
+	u_char     id;
+	stu_str_t *explain;
+} stu_error_t;
+
 u_char *stu_strerror(stu_int_t err, u_char *errstr, size_t size);
 stu_int_t stu_strerror_init(void);
 

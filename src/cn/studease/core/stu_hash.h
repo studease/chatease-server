@@ -21,6 +21,7 @@ typedef struct stu_hash_elt_s stu_hash_elt_t;
 
 struct stu_hash_elt_s {
 	stu_queue_t         queue;
+	stu_queue_t         q;
 
 	stu_str_t           key;
 	stu_uint_t          key_hash;

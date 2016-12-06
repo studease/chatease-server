@@ -74,6 +74,10 @@ stu_websocket_parse_frame(stu_websocket_request_t *r, stu_buf_t *b) {
 				break;
 			case STU_WEBSOCKET_OPCODE_CLOSE:
 				break;
+			case STU_WEBSOCKET_OPCODE_PING:
+				break;
+			case STU_WEBSOCKET_OPCODE_PONG:
+				break;
 			default:
 				break;
 			}
@@ -85,9 +89,8 @@ stu_websocket_parse_frame(stu_websocket_request_t *r, stu_buf_t *b) {
 					p = buf->end;
 					if (r->frame->fin) {
 						goto frame_done;
-					} else {
-						goto done;
 					}
+					goto done;
 				}
 				goto again;
 			}

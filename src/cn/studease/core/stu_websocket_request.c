@@ -10,7 +10,6 @@
 #include "stu_core.h"
 
 static stu_int_t stu_websocket_process_request_frames(stu_websocket_request_t *r);
-static stu_int_t stu_websocket_send(stu_socket_t fd, stu_buf_t *buf);
 
 
 void
@@ -96,115 +95,63 @@ void
 stu_websocket_process_request(stu_websocket_request_t *r) {
 	stu_int_t         rc;
 	stu_connection_t *c;
-	u_char            raw;
-	stu_message_t     msg;
-	stu_channel_t     ch;
-	stu_userinfo_t   *info;
-	stu_error_t       err;
+	stu_channel_t    *ch;
 
 	rc = stu_websocket_process_request_frames(r);
-	if (rc == STU_ERROR || rc == STU_AGAIN) {
+	if (rc != STU_DONE) {
 		return;
 	}
 
 	c = r->connection;
+	ch = c->user.channel;
 
-	msg.data.start = (u_char *) "hello all!";
-	msg.type = (stu_str_t *) &STU_MESSAGE_TYPE_MULTI;
-	ch.id = 1;
-	ch.state = 3;
-
-	switch (r->command) {
-	case STU_WEBSOCKET_CMD_JOIN:
-		c->user.id = 1;
-		c->user.name.data = stu_base_pcalloc(c->pool, sizeof("Tony") + 1);
-		c->user.name.len = 4;
-		memcpy(c->user.name.data, "Tony", 4);
-		info = stu_base_pcalloc(c->pool, sizeof(stu_userinfo_t));
-		if (info == NULL) {
-			stu_log_error(0, "Failed to alloc userinfo.");
-			return;
-		}
-		info->id = 1;
-		info->role = 8;
-		c->user.info = info;
-		raw = STU_WEBSOCKET_RAW_IDENTITY;
-		break;
-	case STU_WEBSOCKET_CMD_LEFT:
-		break;
-	case STU_WEBSOCKET_CMD_UNI_DATA:
-		break;
-	case STU_WEBSOCKET_CMD_DATA:
-		info = c->user.info;
-		raw = STU_WEBSOCKET_RAW_MESSAGE;
-		break;
-
-	case STU_WEBSOCKET_CMD_MUTE:
-		break;
-	case STU_WEBSOCKET_CMD_UNMUTE:
-		break;
-	case STU_WEBSOCKET_CMD_FORBID:
-		break;
-	case STU_WEBSOCKET_CMD_RELIVE:
-		break;
-
-	case STU_WEBSOCKET_CMD_UPGRADE:
-		break;
-	case STU_WEBSOCKET_CMD_DEMOTE:
-		break;
-
-	case STU_WEBSOCKET_CMD_DISMISS:
-		break;
-	case STU_WEBSOCKET_CMD_ACTIVE:
-		break;
-	default:
-		err.id = 0xFF;
-		err.explain = (stu_str_t *) &STU_ERR_EXP_BAD_REQUEST;
-		raw = STU_WEBSOCKET_RAW_ERROR;
-		break;
+	if (ch == NULL || c->user.channel_id != ch->id) {
+		stu_log_error(0, "Failed to process request: %d.", STU_HTTP_INTERNAL_SERVER_ERROR);
+		stu_websocket_close_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
+		return;
 	}
 
-	stu_websocket_finalize_request(r, raw, &msg, &ch, info, &err);
+	stu_websocket_finalize_request(r, ch);
 }
 
 static stu_int_t
 stu_websocket_process_request_frames(stu_websocket_request_t *r) {
 	stu_int_t              rc;
 	stu_websocket_frame_t *new;
-	stu_connection_t      *c;
-
-	c = r->connection;
 
 	do {
 		rc = stu_websocket_parse_frame(r, r->frame_in);
 		if (rc == STU_OK) {
-			new = stu_base_pcalloc(r->connection->pool, sizeof(stu_websocket_frame_t));
-			if (new == NULL) {
-				stu_log_error(0, "Failed to alloc new websocket frame.");
-				return STU_ERROR;
+			if (r->frame->next == NULL) {
+				new = stu_base_pcalloc(r->connection->pool, sizeof(stu_websocket_frame_t));
+				if (new == NULL) {
+					stu_log_error(0, "Failed to alloc new websocket frame.");
+					return STU_ERROR;
+				}
+
+				r->frame->next = new;
+			} else {
+				new  = r->frame->next;
 			}
 
-			r->frame->next = new;
 			r->frame = new;
 		}
 	} while (rc == STU_OK);
-
-	if (rc == STU_DONE) {
-		if (c->user.info == NULL) {
-			r->command = STU_WEBSOCKET_CMD_JOIN;
-		} else {
-			r->command = STU_WEBSOCKET_CMD_DATA;
-		}
-	}
 
 	return rc;
 }
 
 void
-stu_websocket_finalize_request(stu_websocket_request_t *r, u_char raw, stu_message_t *msg, stu_channel_t *ch, stu_userinfo_t *info, stu_error_t *err) {
-	stu_connection_t *c;
-	stu_buf_t        *buf;
-	stu_str_t        *rd;
+stu_websocket_finalize_request(stu_websocket_request_t *r, stu_channel_t *ch) {
+	stu_connection_t      *c, *t;
+	stu_websocket_frame_t *f;
+	stu_buf_t              buf;
+	u_char                 temp[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE], *data;
+	stu_int_t              s, extened, n;
+	uint64_t               size;
+	stu_list_elt_t        *elts;
+	stu_hash_elt_t        *e;
+	stu_queue_t           *q;
 
 	c = r->connection;
 
@@ -214,49 +161,66 @@ stu_websocket_finalize_request(stu_websocket_request_t *r, u_char raw, stu_messa
 		return;
 	}*/
 
-	switch (raw) {
-	case STU_WEBSOCKET_RAW_MESSAGE:
-		rd = (stu_str_t *) &STU_RAW_DATA_MESSAGE;
-		break;
-	case STU_WEBSOCKET_RAW_IDENTITY:
-		rd = (stu_str_t *) &STU_RAW_DATA_IDENTITY;
-		break;
-	case STU_WEBSOCKET_RAW_JOIN:
-		rd = (stu_str_t *) &STU_RAW_DATA_JOIN;
-		break;
-	case STU_WEBSOCKET_RAW_LEFT:
-		rd = (stu_str_t *) &STU_RAW_DATA_LEFT;
-		break;
-	case STU_WEBSOCKET_RAW_ERROR:
-		rd = (stu_str_t *) &STU_RAW_DATA_ERROR;
-		break;
-	default:
-		break;
+	stu_memzero(temp, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
+
+	buf.start = temp;
+	buf.last = buf.start + 10;
+
+	for (f = &r->frames_in; f; f = f->next) {
+		s = f->payload_data.end - f->payload_data.start;
+		if (s == 0) {
+			continue;
+		}
+
+		buf.last = stu_memcpy(buf.last, f->payload_data.start, s);
+
+		f->payload_data.end = f->payload_data.start;
 	}
 
-	buf = &c->buffer;
-	buf->last = buf->start + 4;
-	stu_memzero(buf->start, buf->end - buf->start);
+	size = buf.last - buf.start - 10;
+	data = buf.start;
+	if (size < 126) {
+		data += 8;
+		data[0] = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
+		data[1] = size;
+		extened = 0;
+	} else if (size < 65536) {
+		data += 6;
+		data[0] = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
+		data[1] = 0x7E;
+		data[2] = size >> 8;
+		data[3] = size;
+		extened = 2;
+	} else {
+		data[0] = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
+		data[1] = 0x7F;
+		data[2] = size >> 56;
+		data[3] = size >> 48;
+		data[4] = size >> 40;
+		data[5] = size >> 32;
+		data[6] = size >> 24;
+		data[7] = size >> 16;
+		data[8] = size >> 8;
+		data[9] = size;
+		extened = 8;
+	}
 
-	*buf->last++ = '{';
-	buf->last = stu_sprintf(buf->last, (const char *) STU_MESSAGE_TEMPLATE_RAW.data, rd->data);
-	if (raw == STU_WEBSOCKET_RAW_MESSAGE && msg) {
-		*buf->last++ = ',';
-		buf->last = stu_sprintf(buf->last, (const char *) STU_MESSAGE_TEMPLATE_DATA.data, msg->data.start, msg->type->data);
-	}
-	if (ch) {
-		*buf->last++ = ',';
-		buf->last = stu_sprintf(buf->last, (const char *) STU_MESSAGE_TEMPLATE_CHANNEL.data, ch->id, ch->state, info->role);
-		*buf->last++ = ',';
-		buf->last = stu_sprintf(buf->last, (const char *) STU_MESSAGE_TEMPLATE_USER.data, c->user.id, c->user.name.data);
-	}
-	if (raw == STU_WEBSOCKET_RAW_ERROR && err) {
-		*buf->last++ = ',';
-		buf->last = stu_sprintf(buf->last, (const char *) STU_MESSAGE_TEMPLATE_ERROR.data, err->id, err->explain->data);
-	}
-	*buf->last++ = '}';
+	stu_log_debug(0, "sent: %d %d %d %d %d %d %d %d %d %d",
+			buf.start[0], buf.start[1], buf.start[2], buf.start[3], buf.start[4],
+			buf.start[5], buf.start[6], buf.start[7], buf.start[8], buf.start[9]);
 
-	stu_websocket_send(c->fd, buf);
+	elts = &ch->userlist.keys.elts;
+	for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
+		e = stu_queue_data(q, stu_hash_elt_t, q);
+		t = (stu_connection_t *) e->value;
+
+		n = send(t->fd, data, size + 2 + extened, 0);
+		if (n == -1) {
+			stu_log_error(0, "Failed to send data: fd=%d.", t->fd);
+		}
+	}
+
+	stu_log_debug(0, "sent: fd=%d, bytes=%d, str=\n%s", c->fd, n, buf.start + 10);
 }
 
 
@@ -309,42 +273,6 @@ failed:
 done:
 
 	stu_spin_unlock(&c->lock);
-}
-
-
-static stu_int_t
-stu_websocket_send(stu_socket_t fd, stu_buf_t *buf) {
-	size_t            size;
-	u_char           *data;
-	uint16_t         *s16;
-	stu_int_t         n;
-
-	size = buf->last - buf->start - 4;
-	data = buf->start;
-	if (size < 126) {
-		data += 2;
-		data[0] = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
-		data[1] = size;
-	} else if (size < 65536) {
-		data[0] = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
-		data[1] = 0x7E;
-		s16 = (uint16_t *) &buf->start[2];
-		*s16 = size;
-	} else {
-		stu_log_error(0, "message too long.");
-		return STU_ERROR;
-	}
-
-	n = send(fd, data, size + (size < 126 ? 2 : 4), 0);
-	if (n == -1) {
-		stu_log_debug(0, "Failed to send data: fd=%d.", fd);
-		return STU_ERROR;
-	}
-
-	stu_log_debug(0, "s[0]=%d, s[1]=%d, s[2]=%d, s[3]=%d", buf->start[0], buf->start[1], buf->start[2], buf->start[3]);
-	stu_log_debug(0, "sent: fd=%d, bytes=%d, str=\n%s", fd, n, data + (size < 126 ? 2 : 4));
-
-	return STU_OK;
 }
 
 

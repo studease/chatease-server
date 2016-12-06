@@ -99,6 +99,8 @@ stu_hash_insert(stu_hash_t *hash, stu_str_t *key, void *value) {
 	elt->key_hash = kh;
 	elt->value = value;
 
+	stu_queue_insert_tail(&hash->keys.elts.queue, &elt->q);
+
 	return STU_OK;
 }
 
@@ -153,6 +155,8 @@ stu_hash_remove(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t len) {
 				hash->free(hash->pool, e->key.data);
 				hash->free(hash->pool, e);
 			}
+			stu_queue_remove(&e->queue);
+			stu_queue_remove(&e->q);
 			break;
 		}
 	}
