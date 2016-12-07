@@ -9,7 +9,8 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
-extern stu_hash_t  stu_http_headers_in_hash;
+extern stu_cycle_t *stu_cycle;
+extern stu_hash_t   stu_http_headers_in_hash;
 
 static void stu_http_request_handler(stu_event_t *wev);
 static stu_int_t stu_http_switch_protocol(stu_http_request_t *r);
@@ -132,7 +133,12 @@ stu_http_create_request(stu_connection_t *c) {
 
 void
 stu_http_process_request(stu_http_request_t *r) {
-	stu_int_t  rc;
+	stu_int_t         rc;
+	stu_connection_t *c;
+	stu_str_t         channel_id;
+	stu_uint_t        kh;
+	u_char           *last;
+	stu_channel_t    *ch;
 
 	rc = stu_http_process_request_headers(r);
 	if (rc != STU_OK) {
@@ -145,11 +151,69 @@ stu_http_process_request(stu_http_request_t *r) {
 		return;
 	}
 
+	c = r->connection;
+
 	if (r->headers_in.upgrade) {
+		last = r->uri.data + r->uri.len;
+
+		channel_id.data = stu_strrchr(r->uri.data, last, '/');
+		if (channel_id.data == NULL) {
+			channel_id.data = r->uri.data;
+		} else {
+			channel_id.data++;
+		}
+		channel_id.len = last - channel_id.data;
+
+		kh = stu_hash_key_lc(channel_id.data, channel_id.len);
+		ch = stu_hash_find(&stu_cycle->channels, kh, channel_id.data, channel_id.len);
+		if (ch == NULL) {
+			ch = stu_slab_calloc(stu_cycle->slab_pool, sizeof(stu_channel_t) + channel_id.len + 1);
+			if (ch == NULL) {
+				stu_log_error(0, "Failed to alloc new channel.");
+				goto failed;
+			}
+
+			if (stu_channel_init(ch, &channel_id) == STU_ERROR) {
+				stu_log_error(0, "Failed to init channel.");
+				goto failed;
+			}
+
+			if (stu_hash_init(&ch->userlist, NULL, STU_MAX_USER_N, stu_cycle->slab_pool,
+					(stu_hash_palloc_pt) stu_slab_alloc, (stu_hash_free_pt) stu_slab_free) == STU_ERROR) {
+				stu_log_error(0, "Failed to init userlist.");
+				goto failed;
+			}
+
+			stu_spin_lock(&stu_cycle->channels.lock);
+			if (stu_hash_insert(&stu_cycle->channels, &channel_id, ch, STU_HASH_LOWCASE_KEY) == STU_ERROR) {
+				stu_log_error(0, "Failed to insert channel.");
+				stu_spin_unlock(&stu_cycle->channels.lock);
+				goto failed;
+			}
+			stu_log_debug(0, "new channel(\"%s\"): kh=%lu, total=%lu.", ch->id.data, kh, stu_cycle->channels.length);
+			stu_spin_unlock(&stu_cycle->channels.lock);
+		}
+
+		c->user.channel = ch;
+
+		stu_spin_lock(&ch->userlist.lock);
+		if (stu_hash_insert(&ch->userlist, &c->user.strid, c, STU_HASH_LOWCASE_KEY) == STU_ERROR) {
+			stu_log_error(0, "Failed to add user.");
+			stu_spin_unlock(&ch->userlist.lock);
+			goto failed;
+		}
+		stu_log_debug(0, "new user(\"%s\"), total=%lu.", c->user.strid.data, ch->userlist.length);
+		stu_spin_unlock(&ch->userlist.lock);
+
 		rc = STU_HTTP_SWITCHING_PROTOCOLS;
 	}
 
 	stu_http_finalize_request(r, rc);
+	return;
+
+failed:
+
+	stu_http_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
 }
 
 

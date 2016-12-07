@@ -11,23 +11,33 @@
 
 void
 stu_strlow(u_char *dst, u_char *src, size_t n) {
-    while (n) {
-        *dst = stu_tolower(*src);
-        dst++;
-        src++;
-        n--;
-    }
+	while (n) {
+		*dst = stu_tolower(*src);
+		dst++;
+		src++;
+		n--;
+	}
 }
 
 u_char *
 stu_strlchr(u_char *p, u_char *last, u_char c) {
-    while (p < last) {
-        if (*p == c) {
-            return p;
-        }
-        p++;
-    }
-    return NULL;
+	while (p < last) {
+		if (*p == c) {
+			return p;
+		}
+		p++;
+	}
+	return NULL;
+}
+
+u_char *
+stu_strrchr(u_char *p, u_char *last, u_char c) {
+	while (p < last--) {
+		if (*last == c) {
+			return last;
+		}
+	}
+	return NULL;
 }
 
 void *

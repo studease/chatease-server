@@ -86,6 +86,9 @@ stu_connection_get(stu_socket_t s) {
 		stu_spin_unlock(&pool->lock);
 	}
 
+	// should use atomic operation here.
+	stu_cycle->connection_n++;
+
 	c->pool = stu_ram_alloc(stu_cycle->ram_pool);
 
 	stu_spinlock_init(&c->pool->lock);
@@ -112,6 +115,9 @@ stu_connection_free(stu_connection_t *c) {
 	stu_spin_lock(&c->page->lock);
 
 	stu_ram_free(stu_cycle->ram_pool, (void *) c->pool);
+
+	// should use atomic operation here.
+	stu_cycle->connection_n--;
 
 	c->fd = (stu_socket_t) -1;
 	c->read = c->write = NULL;
@@ -142,7 +148,7 @@ stu_connection_init(stu_connection_t *c, stu_socket_t s) {
 	c->pool = NULL;
 
 	c->fd = s;
-	stu_user_init(&c->user);
+	stu_user_init(&c->user, c->fd, NULL, c->pool);
 
 	c->buffer.start = c->buffer.last = c->buffer.end = NULL;
 	c->data = NULL;

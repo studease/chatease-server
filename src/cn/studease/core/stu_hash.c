@@ -63,17 +63,25 @@ stu_hash_init(stu_hash_t *hash, stu_hash_elt_t **buckets, stu_uint_t size, void 
 }
 
 stu_int_t
-stu_hash_insert(stu_hash_t *hash, stu_str_t *key, void *value) {
+stu_hash_insert(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t flags) {
 	stu_uint_t      kh, k;
 	stu_hash_elt_t *elts, *e, *elt;
 	stu_queue_t    *q;
 
-	kh = stu_hash_key(key->data, key->len);
+	if (flags) {
+		kh = stu_hash_key_lc(key->data, key->len);
+	} else {
+		kh = stu_hash_key(key->data, key->len);
+	}
 	k = kh % hash->size;
 
 	elts = hash->buckets[k];
 	if (elts == NULL) {
 		elts = hash->palloc(hash->pool, sizeof(stu_hash_elt_t));
+		if (elts == NULL) {
+			return STU_ERROR;
+		}
+
 		stu_queue_init(&elts->queue);
 		hash->buckets[k] = elts;
 	}
@@ -90,9 +98,17 @@ stu_hash_insert(stu_hash_t *hash, stu_str_t *key, void *value) {
 	}
 
 	elt = hash->palloc(hash->pool, sizeof(stu_hash_elt_t));
+	if (elt == NULL) {
+		return STU_ERROR;
+	}
 	stu_queue_insert_tail(&elts->queue, &elt->queue);
+	hash->length++;
 
 	elt->key.data = hash->palloc(hash->pool, key->len + 1);
+	if (elt->key.data == NULL) {
+		return STU_ERROR;
+	}
+
 	stu_strncpy(elt->key.data, key->data, key->len);
 	elt->key.len = key->len;
 
@@ -136,13 +152,11 @@ stu_hash_remove(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t len) {
 	stu_hash_elt_t *elts, *e;
 	stu_queue_t    *q;
 
-	stu_spin_lock(&hash->lock);
-
 	i = key % hash->size;
 
 	elts = hash->buckets[i];
 	if (elts == NULL) {
-		goto done;
+		return;
 	}
 
 	for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
@@ -157,13 +171,10 @@ stu_hash_remove(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t len) {
 			}
 			stu_queue_remove(&e->queue);
 			stu_queue_remove(&e->q);
+			hash->length--;
 			break;
 		}
 	}
-
-done:
-
-	stu_spin_unlock(&hash->lock);
 }
 
 void

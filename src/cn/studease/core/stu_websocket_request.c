@@ -105,8 +105,8 @@ stu_websocket_process_request(stu_websocket_request_t *r) {
 	c = r->connection;
 	ch = c->user.channel;
 
-	if (ch == NULL || c->user.channel_id != ch->id) {
-		stu_log_error(0, "Failed to process request: %d.", STU_HTTP_INTERNAL_SERVER_ERROR);
+	if (ch == NULL) {
+		stu_log_error(0, "Failed to process request: %d, channel not found.", STU_HTTP_INTERNAL_SERVER_ERROR);
 		stu_websocket_close_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
 		return;
 	}
@@ -167,6 +167,10 @@ stu_websocket_finalize_request(stu_websocket_request_t *r, stu_channel_t *ch) {
 	buf.last = buf.start + 10;
 
 	for (f = &r->frames_in; f; f = f->next) {
+		if (f->opcode != STU_WEBSOCKET_OPCODE_TEXT) {
+			continue;
+		}
+
 		s = f->payload_data.end - f->payload_data.start;
 		if (s == 0) {
 			continue;
@@ -178,6 +182,10 @@ stu_websocket_finalize_request(stu_websocket_request_t *r, stu_channel_t *ch) {
 	}
 
 	size = buf.last - buf.start - 10;
+	if (size == 0) {
+		return;
+	}
+
 	data = buf.start;
 	if (size < 126) {
 		data += 8;
@@ -205,10 +213,11 @@ stu_websocket_finalize_request(stu_websocket_request_t *r, stu_channel_t *ch) {
 		extened = 8;
 	}
 
-	stu_log_debug(0, "sent: %d %d %d %d %d %d %d %d %d %d",
+	stu_log_debug(0, "frame header: %d %d %d %d %d %d %d %d %d %d",
 			buf.start[0], buf.start[1], buf.start[2], buf.start[3], buf.start[4],
 			buf.start[5], buf.start[6], buf.start[7], buf.start[8], buf.start[9]);
 
+	stu_spin_lock(&ch->userlist.lock);
 	elts = &ch->userlist.keys.elts;
 	for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
 		e = stu_queue_data(q, stu_hash_elt_t, q);
@@ -219,6 +228,7 @@ stu_websocket_finalize_request(stu_websocket_request_t *r, stu_channel_t *ch) {
 			stu_log_error(0, "Failed to send data: fd=%d.", t->fd);
 		}
 	}
+	stu_spin_unlock(&ch->userlist.lock);
 
 	stu_log_debug(0, "sent: fd=%d, bytes=%d, str=\n%s", c->fd, n, buf.start + 10);
 }
@@ -293,6 +303,21 @@ stu_websocket_free_request(stu_websocket_request_t *r, stu_int_t rc) {
 
 void
 stu_websocket_close_connection(stu_connection_t *c) {
+	stu_channel_t *ch;
+	stu_uint_t     kh;
+	stu_str_t     *key;
+
+	ch = c->user.channel;
+	if (ch) {
+		key = &c->user.strid;
+		kh = stu_hash_key_lc(key->data, key->len);
+
+		stu_spin_lock(&ch->userlist.lock);
+		stu_hash_remove(&ch->userlist, kh, key->data, key->len);
+		stu_log_debug(0, "removed user(\"%s\"), total=%lu.", key->data, ch->userlist.length);
+		stu_spin_unlock(&ch->userlist.lock);
+	}
+
 	stu_connection_close(c);
 }
 

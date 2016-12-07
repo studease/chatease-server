@@ -11,11 +11,11 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
-extern stu_cycle_t *stu_cycle;
+extern stu_cycle_t       *stu_cycle;
 extern stu_http_header_t  stu_http_headers_in[];
 
-stu_hash_t  stu_http_headers_in_hash;
-static stu_socket_t  stu_httpfd;
+stu_hash_t                stu_http_headers_in_hash;
+static stu_socket_t       stu_httpfd;
 
 static stu_int_t stu_http_init_headers_in_hash(stu_config_t *cf);
 static void stu_http_server_handler(stu_event_t *ev);
@@ -131,7 +131,7 @@ stu_http_init_headers_in_hash(stu_config_t *cf) {
 		lc.data = data;
 		lc.len = header->name.len;
 
-		if (stu_hash_insert(&stu_http_headers_in_hash, &lc, header) == STU_ERROR) {
+		if (stu_hash_insert(&stu_http_headers_in_hash, &lc, header, STU_HASH_LOWCASE_KEY) == STU_ERROR) {
 			return STU_ERROR;
 		}
 	}

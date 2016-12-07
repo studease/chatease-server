@@ -30,6 +30,7 @@ typedef struct {
 
 void stu_strlow(u_char *dst, u_char *src, size_t n);
 u_char *stu_strlchr(u_char *p, u_char *last, u_char c);
+u_char *stu_strrchr(u_char *p, u_char *last, u_char c);
 void *stu_memzero(void *block, size_t n);
 
 #define stu_strncmp(s1, s2, n)  strncmp((const char *) s1, (const char *) s2, n)

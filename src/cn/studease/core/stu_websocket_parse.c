@@ -73,27 +73,28 @@ stu_websocket_parse_frame(stu_websocket_request_t *r, stu_buf_t *b) {
 				}
 				break;
 			case STU_WEBSOCKET_OPCODE_CLOSE:
+				stu_log_debug(0, "close frame.");
 				break;
 			case STU_WEBSOCKET_OPCODE_PING:
+				stu_log_debug(0, "ping frame.");
 				break;
 			case STU_WEBSOCKET_OPCODE_PONG:
+				stu_log_debug(0, "pong frame.");
 				break;
 			default:
 				break;
 			}
 
-			if (r->frame->extended) {
-				buf->start = buf->last = p;
-				if (b->end - p >= r->frame->extended) {
-					buf->end = p + r->frame->extended;
-					p = buf->end;
-					if (r->frame->fin) {
-						goto frame_done;
-					}
-					goto done;
+			buf->start = buf->last = p;
+			if (b->end - p >= r->frame->extended) {
+				buf->end = p + r->frame->extended;
+				p = buf->end;
+				if (r->frame->fin) {
+					goto frame_done;
 				}
-				goto again;
+				goto done;
 			}
+			goto again;
 			break;
 		}
 	}

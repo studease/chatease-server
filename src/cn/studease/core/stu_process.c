@@ -287,12 +287,21 @@ stu_worker_process_cycle(stu_cycle_t *cycle, void *data) {
 		if (stu_restart) {
 			stu_log("Restarting worker process...");
 		}
+
+		sleep(-1);
 	}
 }
 
 static void
 stu_worker_process_init(stu_cycle_t *cycle, stu_int_t worker) {
+	sigset_t   set;
 	stu_int_t  n;
+
+	sigemptyset(&set);
+
+	if (sigprocmask(SIG_SETMASK, &set, NULL) == -1) {
+		stu_log_error(stu_errno, "sigprocmask() failed");
+	}
 
 	for (n = 0; n < stu_process_last; n++) {
 		if (n == stu_process_slot) {
@@ -375,10 +384,18 @@ stu_filedes_handler(stu_event_t *ev) {
 
 static stu_thread_value_t
 stu_worker_thread_cycle(void *data) {
+	sigset_t            set;
 	//stu_thread_t     *thr = data;
 	struct epoll_event  events[STU_EPOLL_EVENTS], *ev;
 	stu_int_t           nev, i;
 	stu_connection_t   *c;
+
+	sigemptyset(&set);
+	sigaddset(&set, SIGPIPE);
+
+	if (sigprocmask(SIG_BLOCK, &set, NULL) == -1) {
+		stu_log_error(stu_errno, "sigprocmask() failed");
+	}
 
 	for ( ;; ) {
 		nev = stu_epoll_process_events(events, STU_EPOLL_EVENTS, -1);
@@ -390,11 +407,11 @@ stu_worker_thread_cycle(void *data) {
 				continue;
 			}
 
-			if ((ev->events & EPOLLIN) && c->read->active) {
+			if ((ev->events & EPOLLIN) && c->read && c->read->active) {
 				c->read->handler(c->read);
 			}
 
-			if ((ev->events & EPOLLOUT) && c->write->active) {
+			if ((ev->events & EPOLLOUT) && c->write && c->write->active) {
 				c->write->handler(c->write);
 			}
 		}

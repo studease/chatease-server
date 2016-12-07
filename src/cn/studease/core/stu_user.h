@@ -15,10 +15,12 @@ typedef struct {
 	stu_int_t            id;
 	stu_str_t            name;
 
-	stu_int_t            channel_id;
+	stu_str_t            strid;
+	u_char               idstr[8];
+
 	stu_channel_t       *channel;
 } stu_user_t;
 
-stu_int_t stu_user_init(stu_user_t *user);
+stu_int_t stu_user_init(stu_user_t *usr, stu_int_t id, stu_str_t *name, stu_base_pool_t *pool);
 
 #endif /* STU_USER_H_ */
