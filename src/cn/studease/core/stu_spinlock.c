@@ -10,14 +10,14 @@
 
 void
 stu_spinlock_init(stu_spinlock_t *lock) {
-	stu_atomic_set(&lock->rlock, 0);
+	stu_atomic_release(&lock->rlock);
 }
 
 void
 stu_spin_lock(stu_spinlock_t *lock) {
 	stu_uint_t  ticket;
 
-	ticket = stu_atomic_add(0x00010000, &lock->rlock) >> 16;
+	ticket = stu_atomic_fetch_add(&lock->rlock, STU_SPINLOCK_TICKET_UNIT) >> 16;
 	for ( ; ticket != (stu_atomic_read(&lock->rlock) & STU_SPINLOCK_OWNER_MASK); ) {
 		/* void */
 	}
@@ -25,6 +25,6 @@ stu_spin_lock(stu_spinlock_t *lock) {
 
 void
 stu_spin_unlock(stu_spinlock_t *lock) {
-	stu_atomic_add(0x00000001, &lock->rlock);
+	stu_atomic_fetch_add(&lock->rlock, 1);
 }
 

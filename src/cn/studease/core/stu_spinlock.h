@@ -11,7 +11,8 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
-#define STU_SPINLOCK_OWNER_MASK 0X0000FFFF
+#define STU_SPINLOCK_TICKET_UNIT 0x00010000
+#define STU_SPINLOCK_OWNER_MASK  0x0000FFFF
 
 typedef struct {
 	stu_atomic_t  rlock;
