@@ -86,6 +86,8 @@ stu_ram_alloc_locked(stu_ram_pool_t *pool) {
 		sentinel->prev = sentinel->next = page;
 	}
 
+alloc:
+
 	do {
 		bitmap = (uint64_t *) ((u_char *)page->bitmap + 1);
 		for (i = 0; i < 8; i++, bitmap++) {
@@ -122,6 +124,20 @@ stu_ram_alloc_locked(stu_ram_pool_t *pool) {
 
 		page = page->next;
 	} while (page != sentinel);
+
+	page = stu_ram_alloc_page(pool);
+	if (page == NULL) {
+		return NULL;
+	}
+
+	stu_memzero((void *) page->bitmap, 1 + 64);
+
+	page->prev = sentinel;
+	page->next = sentinel->next;
+	page->next->prev = page;
+	sentinel->next = page;
+
+	goto alloc;
 
 full:
 

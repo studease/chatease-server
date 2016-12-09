@@ -26,7 +26,7 @@ stu_config_default(stu_config_t *cf) {
 	cf->origin_port = 80;
 	cf->master_process = TRUE;
 	cf->worker_processes = 1;
-	cf->worker_threads = 1;
+	cf->worker_threads = 4;
 	stu_str_set(&cf->pid, "chatd.pid");
 }
 
