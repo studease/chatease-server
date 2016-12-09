@@ -61,9 +61,12 @@ stu_uint_t stu_hash_key_lc(u_char *data, size_t len);
 
 stu_int_t stu_hash_init(stu_hash_t *hash, stu_hash_elt_t **buckets, stu_uint_t size, void *pool, stu_hash_palloc_pt palloc, stu_hash_free_pt free);
 stu_int_t stu_hash_insert(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t flags);
+stu_int_t stu_hash_insert_locked(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t flags);
 
 void *stu_hash_find(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t len);
+void *stu_hash_find_locked(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t len);
 void  stu_hash_remove(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t len);
+void  stu_hash_remove_locked(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t len);
 
 void  stu_hash_foreach(stu_hash_t *hash, stu_hash_foreach_pt cb);
 

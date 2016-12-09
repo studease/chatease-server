@@ -26,43 +26,33 @@ typedef struct {
 //#define stu_memory_barrier() __asm__ __volatile__ ("": : :"memory")
 #define stu_memory_barrier() __sync_synchronize()
 
-#define stu_atomic_release(lock)                   \
-	__sync_lock_release(&(lock)->counter)
+#if ( __i386__ || __i386 || __amd64__ || __amd64 )
+#define stu_cpu_pause()      __asm__ ("pause")
+#else
+#define stu_cpu_pause()
+#endif
 
-#define stu_atomic_test_set(lock, set)             \
-	__sync_lock_test_and_set(&(lock)->counter, set)
+#define stu_atomic_release(ptr)                   \
+	__sync_lock_release(ptr)
 
-#define stu_atomic_cmp_set(lock, old, set)         \
-	__sync_bool_compare_and_swap(&(lock)->counter, old, set)
+#define stu_atomic_test_set(ptr, val)             \
+	__sync_lock_test_and_set(ptr, val)
 
-#define stu_atomic_fetch_add(lock, add)            \
-	__sync_fetch_and_add(&(lock)->counter, add)
+#define stu_atomic_cmp_set(ptr, old, val)         \
+	__sync_bool_compare_and_swap(ptr, old, val)
 
-/*
-static inline void
-stu_atomic_set(stu_atomic_t *v, stu_int_t i) {
-	stu_atomic_test_set(v, i);
-	//v->counter = i;
-}
+#define stu_atomic_fetch_add(ptr, val)            \
+	__sync_fetch_and_add(ptr, val)
 
-static inline stu_int_t
-stu_atomic_add(stu_int_t i, stu_atomic_t *v) {
-	stu_int_t  c;
+#define stu_atomic_fetch_sub(ptr, val)            \
+	__sync_fetch_and_sub(ptr, val)
 
-	//asm volatile(STU_LOCK_PREFIX "addl %k2,%k0"
-	//		 : "+m" (v->counter), "=qm" (c)
-	//		 : "ir" (i) : "memory");
-
-	c = v->counter;
-	v->counter += i;
-
-	return c;
-}
-*/
+#define stu_atomic_read(ptr)                      \
+		stu_atomic_read_long((const long *) ptr)
 
 static inline stu_int_t
-stu_atomic_read(const stu_atomic_t *v) {
-	return (*(volatile stu_uint_t *)&(v)->counter);
+stu_atomic_read_long(const stu_int_t *v) {
+	return (*(volatile stu_int_t *)v);
 }
 
 #endif /* STU_ATOMIC_H_ */

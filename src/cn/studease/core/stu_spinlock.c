@@ -10,21 +10,29 @@
 
 void
 stu_spinlock_init(stu_spinlock_t *lock) {
-	stu_atomic_release(&lock->rlock);
+	stu_atomic_release(&lock->rlock.counter);
 }
 
 void
 stu_spin_lock(stu_spinlock_t *lock) {
 	stu_uint_t  ticket;
+	time_t      start, now;
 
-	ticket = stu_atomic_fetch_add(&lock->rlock, STU_SPINLOCK_TICKET_UNIT) >> 16;
-	for ( ; ticket != (stu_atomic_read(&lock->rlock) & STU_SPINLOCK_OWNER_MASK); ) {
-		/* void */
+	ticket = stu_atomic_fetch_add(&lock->rlock.counter, STU_SPINLOCK_TICKET_UNIT) >> 16;
+	for (start = time(NULL); ticket != (stu_atomic_read(&lock->rlock.counter) & STU_SPINLOCK_OWNER_MASK); ) {
+		now = time(NULL);
+
+		if (now - start > 5000) {
+			stu_log_error(0, "stu_sched_yield()");
+			stu_sched_yield();
+		}
+
+		stu_cpu_pause();
 	}
 }
 
 void
 stu_spin_unlock(stu_spinlock_t *lock) {
-	stu_atomic_fetch_add(&lock->rlock, 1);
+	stu_atomic_fetch_add(&lock->rlock.counter, 1);
 }
 

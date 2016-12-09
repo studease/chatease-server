@@ -39,7 +39,12 @@ typedef struct {
 #define stu_getpid         getpid
 
 #include <sched.h>
+
+#if (_SCHED_H)
 #define stu_sched_yield()  sched_yield()
+#else
+#define stu_sched_yield()  usleep(1)
+#endif
 
 void stu_process_master_cycle(stu_cycle_t *cycle);
 

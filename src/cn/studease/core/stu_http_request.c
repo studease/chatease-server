@@ -54,7 +54,7 @@ stu_http_header_t  stu_http_headers_in[] = {
 void
 stu_http_wait_request_handler(stu_event_t *rev) {
 	stu_connection_t *c;
-	stu_int_t         n, err;
+	stu_int_t         n, err, retried;
 
 	c = (stu_connection_t *) rev->data;
 
@@ -70,16 +70,27 @@ stu_http_wait_request_handler(stu_event_t *rev) {
 	c->buffer.last = c->buffer.start;
 	stu_memzero(c->buffer.start, STU_HTTP_REQUEST_DEFAULT_SIZE);
 
+	retried = 0;
+
+again:
+
 	n = recv(c->fd, c->buffer.start, STU_HTTP_REQUEST_DEFAULT_SIZE, 0);
 	if (n == -1) {
 		err = stu_errno;
-		if (err == EAGAIN) {
-			goto done;
+		if (err == EAGAIN || err == EINTR) {
+			if (retried++ >= 1) {
+				stu_log_error(0, "recv aborted: fd=%d, err=%d.", c->fd, err);
+				goto done;
+			}
+
+			stu_log_debug(0, "recv trying again: fd=%d, err=%d.", c->fd, err);
+			goto again;
 		}
 
 		stu_log_error(err, "Failed to recv data: fd=%d.", c->fd);
 		stu_connection_free(c);
-		goto done;
+
+		goto failed;
 	}
 
 	if (n == 0) {
@@ -87,7 +98,7 @@ stu_http_wait_request_handler(stu_event_t *rev) {
 		goto failed;
 	}
 
-	stu_log_debug(0, "recv: fd=%d, bytes=%d, str=\n%s", c->fd, n, c->buffer.start);
+	stu_log_debug(0, "recv: fd=%d, bytes=%d.", c->fd, n);//str=\n%s, c->buffer.start
 
 	c->data = (void *) stu_http_create_request(c);
 	if (c->data == NULL) {
@@ -184,31 +195,25 @@ stu_http_process_request(stu_http_request_t *r) {
 				goto failed;
 			}
 
-			stu_spin_lock(&stu_cycle->channels.lock);
 			if (stu_hash_insert(&stu_cycle->channels, &channel_id, ch, STU_HASH_LOWCASE_KEY) == STU_ERROR) {
 				stu_log_error(0, "Failed to insert channel.");
-				stu_spin_unlock(&stu_cycle->channels.lock);
 				goto failed;
 			}
-			stu_log_debug(0, "new channel(\"%s\"): kh=%lu, total=%lu.", ch->id.data, kh, stu_cycle->channels.length);
-			stu_spin_unlock(&stu_cycle->channels.lock);
+			stu_log_debug(0, "new channel(\"%s\"): kh=%lu, total=%lu.", ch->id.data,
+					kh, stu_atomic_read(&stu_cycle->channels.length));
 		}
 
 		c->user.channel = ch;
 
-		stu_spin_lock(&ch->userlist.lock);
-		if (stu_hash_insert(&ch->userlist, &c->user.strid, c, STU_HASH_LOWCASE_KEY) == STU_ERROR) {
-			stu_log_error(0, "Failed to add user.");
-			stu_spin_unlock(&ch->userlist.lock);
+		if (stu_channel_insert(ch , c) == STU_ERROR) {
 			goto failed;
 		}
-		stu_log_debug(0, "new user(\"%s\"), total=%lu.", c->user.strid.data, ch->userlist.length);
-		stu_spin_unlock(&ch->userlist.lock);
 
 		rc = STU_HTTP_SWITCHING_PROTOCOLS;
 	}
 
 	stu_http_finalize_request(r, rc);
+
 	return;
 
 failed:
@@ -283,7 +288,7 @@ stu_http_process_request_headers(stu_http_request_t *r) {
 				}
 			}
 
-			stu_log_debug(0, "http header => \"%s: %s\"", h->key.data, h->value.data);
+			//stu_log_debug(0, "http header => \"%s: %s\"", h->key.data, h->value.data);
 
 			continue;
 		}
@@ -455,7 +460,7 @@ stu_http_request_handler(stu_event_t *wev) {
 		goto failed;
 	}
 
-	stu_log_debug(0, "sent: fd=%d, bytes=%d, str=\n%s", c->fd, n, buf->start);
+	stu_log_debug(0, "sent: fd=%d, bytes=%d.", c->fd, n);//str=\n%s, buf->start
 
 	if (r->headers_out.status == STU_HTTP_SWITCHING_PROTOCOLS) {
 		if (stu_http_switch_protocol(r) == STU_ERROR) {

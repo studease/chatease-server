@@ -15,8 +15,8 @@ u_char *stu_log_errno(u_char *buf, u_char *last, stu_int_t err);
 
 void
 stu_log(const char *fmt, ...) {
-	u_char  temp[STU_LOG_RECORD_MAX_LEN];
-	u_char *p, *last = temp + STU_LOG_RECORD_MAX_LEN;
+	u_char   temp[STU_LOG_RECORD_MAX_LEN];
+	u_char  *p, *last = temp + STU_LOG_RECORD_MAX_LEN;
 	va_list  args;
 
 	p = stu_log_prefix(temp, STU_LOG_PREFIX);
@@ -34,8 +34,8 @@ stu_log(const char *fmt, ...) {
 
 void
 stu_log_debug(stu_int_t level, const char *fmt, ...) {
-	u_char  temp[STU_LOG_RECORD_MAX_LEN];
-	u_char *p, *last = temp + STU_LOG_RECORD_MAX_LEN;
+	u_char   temp[STU_LOG_RECORD_MAX_LEN];
+	u_char  *p, *last = temp + STU_LOG_RECORD_MAX_LEN;
 	va_list  args;
 
 	p = stu_log_prefix(temp, STU_DEBUG_PREFIX);
@@ -54,8 +54,8 @@ stu_log_debug(stu_int_t level, const char *fmt, ...) {
 
 void
 stu_log_error(stu_int_t err, const char *fmt, ...) {
-	u_char  temp[STU_LOG_RECORD_MAX_LEN];
-	u_char *p, *last = temp + STU_LOG_RECORD_MAX_LEN;
+	u_char   temp[STU_LOG_RECORD_MAX_LEN];
+	u_char  *p, *last = temp + STU_LOG_RECORD_MAX_LEN;
 	va_list  args;
 
 	p = stu_log_prefix(temp, STU_ERROR_PREFIX);
@@ -100,6 +100,8 @@ stu_log_errno(u_char *buf, u_char *last, stu_int_t err) {
 	if (buf < last) {
 		*buf++ = ')';
 	}
+
+	*buf = '\0';
 
 	return buf;
 }

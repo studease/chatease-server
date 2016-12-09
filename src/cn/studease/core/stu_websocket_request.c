@@ -16,7 +16,7 @@ void
 stu_websocket_wait_request_handler(stu_event_t *rev) {
 	stu_connection_t *c;
 	stu_channel_t    *ch;
-	stu_int_t         n, err;
+	stu_int_t         n, err, retried;
 
 	c = (stu_connection_t *) rev->data;
 
@@ -32,12 +32,21 @@ stu_websocket_wait_request_handler(stu_event_t *rev) {
 	c->buffer.last = c->buffer.start;
 	stu_memzero(c->buffer.start, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
 
+	retried = 0;
+
+again:
+
 	n = recv(c->fd, c->buffer.start, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE, 0);
 	if (n == -1) {
 		err = stu_errno;
-		if (err == EAGAIN) {
-			stu_log_error(err, "Failed to recv data: fd=%d.", c->fd);
-			goto done;
+		if (err == EAGAIN || err == EINTR) {
+			if (retried++ >= 1) {
+				stu_log_error(0, "recv aborted: fd=%d, err=%d.", c->fd, err);
+				goto done;
+			}
+
+			stu_log_debug(0, "recv trying again: fd=%d, err=%d.", c->fd, err);
+			goto again;
 		}
 
 		stu_log_error(err, "Failed to recv data: fd=%d.", c->fd);
@@ -67,9 +76,8 @@ failed:
 	stu_epoll_del_event(c->read, STU_READ_EVENT);
 
 	ch = c->user.channel;
-	stu_spin_lock(&ch->userlist.lock);
+	stu_channel_remove(ch, c);
 	stu_websocket_close_connection(c);
-	stu_spin_lock(&ch->userlist.lock);
 
 done:
 
@@ -112,9 +120,7 @@ stu_websocket_process_request(stu_websocket_request_t *r) {
 	if (ch == NULL) {
 		stu_log_error(0, "Failed to process request: %d, channel not found.", STU_HTTP_INTERNAL_SERVER_ERROR);
 
-		stu_spin_lock(&ch->userlist.lock);
 		stu_websocket_close_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
-		stu_spin_lock(&ch->userlist.lock);
 
 		return;
 	}
@@ -233,8 +239,11 @@ stu_websocket_finalize_request(stu_websocket_request_t *r, stu_channel_t *ch) {
 
 		n = send(t->fd, data, size + 2 + extened, 0);
 		if (n == -1) {
-			stu_log_error(0, "Failed to send data: from=%d, to=%d.", c->fd, t->fd);
+			stu_log_error(stu_errno, "Failed to send data: from=%d, to=%d.", c->fd, t->fd);
+
+			stu_channel_remove_locked(ch, t);
 			stu_websocket_close_connection(t);
+
 			continue;
 		}
 
@@ -292,9 +301,8 @@ failed:
 	stu_epoll_del_event(c->read, STU_READ_EVENT);
 
 	ch = c->user.channel;
-	stu_spin_lock(&ch->userlist.lock);
+	stu_channel_remove(ch, c);
 	stu_websocket_close_connection(c);
-	stu_spin_lock(&ch->userlist.lock);
 
 done:
 
@@ -305,10 +313,14 @@ done:
 void
 stu_websocket_close_request(stu_websocket_request_t *r, stu_int_t rc) {
 	stu_connection_t *c;
-
-	c = r->connection;
+	stu_channel_t    *ch;
 
 	stu_websocket_free_request(r, rc);
+
+	c = r->connection;
+	ch = c->user.channel;
+
+	stu_channel_remove(ch, c);
 	stu_websocket_close_connection(c);
 }
 
@@ -319,17 +331,6 @@ stu_websocket_free_request(stu_websocket_request_t *r, stu_int_t rc) {
 
 void
 stu_websocket_close_connection(stu_connection_t *c) {
-	stu_channel_t *ch;
-	stu_uint_t     kh;
-	stu_str_t     *key;
-
-	ch = c->user.channel;
-
-	key = &c->user.strid;
-	kh = stu_hash_key_lc(key->data, key->len);
-	stu_hash_remove(&ch->userlist, kh, key->data, key->len);
-	stu_log_debug(0, "removed user(\"%s\"), total=%lu.", key->data, ch->userlist.length);
-
 	stu_connection_close(c);
 }
 

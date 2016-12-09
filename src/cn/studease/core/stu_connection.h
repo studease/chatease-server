@@ -61,4 +61,10 @@ stu_connection_t *stu_connection_get(stu_socket_t s);
 void stu_connection_free(stu_connection_t *c);
 void stu_connection_close(stu_connection_t *c);
 
+stu_int_t stu_channel_insert(stu_channel_t *ch, stu_connection_t *c);
+stu_int_t stu_channel_insert_locked(stu_channel_t *ch, stu_connection_t *c);
+
+void stu_channel_remove(stu_channel_t *ch, stu_connection_t *c);
+void stu_channel_remove_locked(stu_channel_t *ch, stu_connection_t *c);
+
 #endif /* STU_CONNECTION_H_ */

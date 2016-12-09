@@ -64,6 +64,17 @@ stu_hash_init(stu_hash_t *hash, stu_hash_elt_t **buckets, stu_uint_t size, void 
 
 stu_int_t
 stu_hash_insert(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t flags) {
+	stu_int_t  rc;
+
+	stu_spin_lock(&hash->lock);
+	rc = stu_hash_insert_locked(hash, key, value, flags);
+	stu_spin_unlock(&hash->lock);
+
+	return rc;
+}
+
+stu_int_t
+stu_hash_insert_locked(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t flags) {
 	stu_uint_t      kh, k;
 	stu_hash_elt_t *elts, *e, *elt;
 	stu_queue_t    *q;
@@ -115,6 +126,7 @@ stu_hash_insert(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t flags)
 	elt->key_hash = kh;
 	elt->value = value;
 
+	stu_queue_init(&elt->q);
 	stu_queue_insert_tail(&hash->keys.elts.queue, &elt->q);
 
 	return STU_OK;
@@ -122,6 +134,17 @@ stu_hash_insert(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t flags)
 
 void *
 stu_hash_find(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t len) {
+	void *v;
+
+	stu_spin_lock(&hash->lock);
+	v = stu_hash_find_locked(hash, key, name, len);
+	stu_spin_unlock(&hash->lock);
+
+	return v;
+}
+
+void *
+stu_hash_find_locked(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t len) {
 	stu_uint_t      i;
 	stu_hash_elt_t *elts, *e;
 	stu_queue_t    *q;
@@ -148,6 +171,13 @@ stu_hash_find(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t len) {
 
 void
 stu_hash_remove(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t len) {
+	stu_spin_lock(&hash->lock);
+	stu_hash_remove_locked(hash, key, name, len);
+	stu_spin_unlock(&hash->lock);
+}
+
+void
+stu_hash_remove_locked(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t len) {
 	stu_uint_t      i;
 	stu_hash_elt_t *elts, *e;
 	stu_queue_t    *q;
