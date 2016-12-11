@@ -28,7 +28,7 @@
 #define STU_SLAB_BUSY64     0xFFFFFFFFFFFFFFFF
 #define STU_SLAB_BUSY8      0xFF
 
-#define STU_SLAB_POOL_DEFAULT_SIZE 65536
+#define STU_SLAB_POOL_DEFAULT_SIZE  8388608
 
 
 typedef struct stu_slab_page_s stu_slab_page_t;

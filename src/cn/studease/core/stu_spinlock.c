@@ -22,7 +22,7 @@ stu_spin_lock(stu_spinlock_t *lock) {
 	for (start = time(NULL); ticket != (stu_atomic_read(&lock->rlock.counter) & STU_SPINLOCK_OWNER_MASK); ) {
 		now = time(NULL);
 
-		if (now - start > 5000) {
+		if (now - start > 5) {
 			stu_log_error(0, "stu_sched_yield()");
 			stu_sched_yield();
 		}

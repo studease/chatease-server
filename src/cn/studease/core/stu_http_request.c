@@ -199,12 +199,14 @@ stu_http_process_request(stu_http_request_t *r) {
 				stu_log_error(0, "Failed to insert channel.");
 				goto failed;
 			}
-			stu_log_debug(0, "new channel(\"%s\"): kh=%lu, total=%lu.", ch->id.data,
-					kh, stu_atomic_read(&stu_cycle->channels.length));
+
+			stu_log_debug(0, "new channel(\"%s\"): kh=%lu, total=%lu.",
+					ch->id.data, kh, stu_atomic_read(&stu_cycle->channels.length));
 		}
 
 		c->user.channel = ch;
 
+		stu_log_debug(0, "inserting: %lu.", stu_atomic_read(&ch->userlist.lock.rlock.counter));
 		if (stu_channel_insert(ch , c) == STU_ERROR) {
 			goto failed;
 		}

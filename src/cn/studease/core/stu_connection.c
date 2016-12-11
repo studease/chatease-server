@@ -88,10 +88,6 @@ stu_connection_get(stu_socket_t s) {
 
 	stu_atomic_fetch_add(&stu_cycle->connection_n, 1);
 
-	if (stu_cycle->connection_n >= 62) {
-		stu_log_debug(0, "debug");
-	}
-
 	c->pool = stu_ram_alloc(stu_cycle->ram_pool);
 
 	stu_spinlock_init(&c->pool->lock);

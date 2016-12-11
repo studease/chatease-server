@@ -8,6 +8,9 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
+extern stu_cycle_t *stu_cycle;
+
+
 stu_int_t
 stu_channel_init(stu_channel_t *ch, stu_str_t *id) {
 	ch->id.data = (u_char *) ch  + sizeof(stu_channel_t);
@@ -60,6 +63,23 @@ stu_channel_remove_locked(stu_channel_t *ch, stu_connection_t *c) {
 	kh = stu_hash_key_lc(key->data, key->len);
 
 	stu_hash_remove_locked(&ch->userlist, kh, key->data, key->len);
+
 	stu_log_debug(0, "removed user(\"%s\") from channel(\"%s\"), total=%lu.", key->data, ch->id.data, ch->userlist.length);
+
+	if (ch->userlist.length == 0) {
+		if (ch->userlist.free) {
+			ch->userlist.free(ch->userlist.pool, ch->userlist.buckets);
+		}
+		ch->userlist.buckets = NULL;
+
+		key = &ch->id;
+		kh = stu_hash_key_lc(key->data, key->len);
+
+		stu_hash_remove(&stu_cycle->channels, kh, key->data, key->len);
+
+		stu_slab_free(stu_cycle->slab_pool, ch);
+
+		stu_log_debug(0, "removed channel(\"%s\") from channel(\"%s\"), total=%lu.", key->data, ch->id.data, ch->userlist.length);
+	}
 }
 

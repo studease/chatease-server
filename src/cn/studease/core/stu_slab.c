@@ -276,7 +276,7 @@ stu_slab_free_locked(stu_slab_pool_t *pool, void *p) {
 	u_char          *c, *b;
 
 	if ((u_char *) p < pool->data.start || (u_char *) p > pool->data.end) {
-		stu_log_error(0, "Failed to free slab: outside of pool.");
+		stu_log_error(0, "Failed to free slab: outside of pool, p=%p.", p);
 		return;
 	}
 

@@ -195,14 +195,24 @@ stu_hash_remove_locked(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t le
 			continue;
 		}
 		if (stu_strncmp(e->key.data, name, len) == 0) {
+			stu_queue_remove(&e->queue);
+			stu_queue_remove(&e->q);
+
 			if (hash->free) {
 				hash->free(hash->pool, e->key.data);
 				hash->free(hash->pool, e);
 			}
-			stu_queue_remove(&e->queue);
-			stu_queue_remove(&e->q);
+
 			hash->length--;
 			break;
+		}
+	}
+
+	if (elts->queue.next == &elts->queue) {
+		hash->buckets[i] = NULL;
+
+		if (hash->free) {
+			hash->free(hash->pool, elts);
 		}
 	}
 }
