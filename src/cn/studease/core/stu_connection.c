@@ -71,7 +71,7 @@ stu_connection_get(stu_socket_t s) {
 			return NULL;
 		}
 
-		c = stu_connection_page_alloc(p); // no need to lock p
+		c = stu_connection_page_alloc(p); // no need to lock p, & unbelievably to be failed.
 		stu_connection_init(c, s);
 
 		q = stu_queue_last(&pool->pages.queue);
@@ -80,8 +80,6 @@ stu_connection_get(stu_socket_t s) {
 		stu_spin_lock(&last->lock);
 		stu_queue_insert_after(&last->queue, &p->queue);
 		stu_spin_unlock(&last->lock);
-
-		pool->pages.length ++;
 
 		stu_spin_unlock(&pool->lock);
 	}
@@ -106,32 +104,41 @@ stu_connection_get(stu_socket_t s) {
 	// protect events from resetting pool.
 	c->pool->data.start = c->pool->data.last;
 
+	stu_log_debug(0, "Got connection: c=%p, fd=%d.", c, c->fd);
+
 	return c;
 }
 
 void
 stu_connection_free(stu_connection_t *c) {
+	stu_socket_t  fd;
+
 	stu_spin_lock(&c->page->lock);
 
 	stu_ram_free(stu_cycle->ram_pool, (void *) c->pool);
 
-	stu_atomic_fetch_sub(&stu_cycle->connection_n, 1);
-
+	fd = c->fd;
 	c->fd = (stu_socket_t) -1;
 	c->read = c->write = NULL;
 
-	stu_queue_remove(&c->queue);
+	c->queue.next->prev = c->queue.prev;
+	c->queue.prev->next = c->queue.next;
 	stu_queue_insert_tail(&c->page->free.queue, &c->queue);
+
+	c->page->length--;
+	stu_atomic_fetch_sub(&stu_cycle->connection_n, 1);
+
+	stu_log_debug(0, "Freed connection: c=%p, fd=%d.", c, fd);
 
 	stu_spin_unlock(&c->page->lock);
 }
 
 void
 stu_connection_close(stu_connection_t *c) {
-	if (c->fd == (stu_socket_t) -1) {
+	/*if (c->fd == (stu_socket_t) -1) {
 		stu_log_debug(0, "connection already closed.");
 		return;
-	}
+	}*/
 
 	stu_close_socket(c->fd);
 	stu_connection_free(c);
@@ -140,7 +147,6 @@ stu_connection_close(stu_connection_t *c) {
 
 static void
 stu_connection_init(stu_connection_t *c, stu_socket_t s) {
-	stu_queue_init(&c->queue);
 	stu_spinlock_init(&c->lock);
 
 	c->pool = NULL;
@@ -205,6 +211,8 @@ failed:
 
 done:
 
+	pool->pages.length++;
+
 	return page;
 }
 
@@ -214,6 +222,9 @@ stu_connection_page_init(stu_connection_page_t *page) {
 	stu_spinlock_init(&page->lock);
 
 	page->data.start = page->data.last = page->data.end = NULL;
+
+	stu_queue_init(&page->connections.queue);
+	stu_queue_init(&page->free.queue);
 
 	stu_connection_init(&page->connections, 0);
 	stu_connection_init(&page->free, 0);
@@ -232,7 +243,7 @@ stu_connection_page_alloc(stu_connection_page_t *page) {
 	}
 
 	q = stu_queue_head(&page->free.queue);
-	if (q !=  stu_queue_sentinel(&page->free.queue)) {
+	if (q != stu_queue_sentinel(&page->free.queue)) {
 		c = stu_queue_data(q, stu_connection_t, queue);
 		stu_queue_remove(&c->queue);
 		goto done;
@@ -250,7 +261,7 @@ done:
 
 	c->page = page;
 	stu_queue_insert_tail(&page->connections.queue, &c->queue);
-	page->length ++;
+	page->length++;
 
 	return c;
 }

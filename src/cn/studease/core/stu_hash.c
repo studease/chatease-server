@@ -86,6 +86,8 @@ stu_hash_insert_locked(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t
 	}
 	k = kh % hash->size;
 
+	stu_log_debug(0, "Inserting into hash: key=%lu, i=%lu, name=%s.", kh, k, key->data);
+
 	elts = hash->buckets[k];
 	if (elts == NULL) {
 		elts = hash->palloc(hash->pool, sizeof(stu_hash_elt_t));
@@ -186,9 +188,11 @@ stu_hash_remove_locked(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t le
 
 	elts = hash->buckets[i];
 	if (elts == NULL) {
+		stu_log_debug(0, "Failed to remove from hash: key=%lu, i=%lu, name=%s.", key, i, name);
 		return;
 	}
 
+	stu_log_debug(0, "Removing from hash: key=%lu, i=%lu, name=%s.", key, i, name);
 	for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
 		e = stu_queue_data(q, stu_hash_elt_t, queue);
 		if (e->key_hash != key || e->key.len != len) {
@@ -204,16 +208,21 @@ stu_hash_remove_locked(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t le
 			}
 
 			hash->length--;
+
+			stu_log_debug(0, "Removed from hash: key=%lu, i=%lu, name=%s.", key, i, name);
+
 			break;
 		}
 	}
 
-	if (elts->queue.next == &elts->queue) {
+	if (elts->queue.next == stu_queue_sentinel(&elts->queue)) {
 		hash->buckets[i] = NULL;
 
 		if (hash->free) {
 			hash->free(hash->pool, elts);
 		}
+
+		stu_log_debug(0, "Removed sentinel from hash: key=%lu, i=%lu, name=%s.", key, i, name);
 	}
 }
 

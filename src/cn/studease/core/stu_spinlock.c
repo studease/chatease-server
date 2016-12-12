@@ -23,7 +23,7 @@ stu_spin_lock(stu_spinlock_t *lock) {
 		now = time(NULL);
 
 		if (now - start > 5) {
-			stu_log_error(0, "stu_sched_yield()");
+			//stu_log_error(0, "stu_sched_yield()");
 			stu_sched_yield();
 		}
 

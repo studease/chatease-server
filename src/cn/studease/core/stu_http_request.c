@@ -206,7 +206,6 @@ stu_http_process_request(stu_http_request_t *r) {
 
 		c->user.channel = ch;
 
-		stu_log_debug(0, "inserting: %lu.", stu_atomic_read(&ch->userlist.lock.rlock.counter));
 		if (stu_channel_insert(ch , c) == STU_ERROR) {
 			goto failed;
 		}
