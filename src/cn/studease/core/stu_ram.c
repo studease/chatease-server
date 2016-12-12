@@ -96,7 +96,7 @@ alloc:
 			}
 
 			c = (u_char *) bitmap;
-			for (j = 0; j < 8; j++) {
+			for (j = 0; j < 8; j++, c++) {
 				if (*c == STU_RAM_BUSY8) {
 					continue;
 				}

@@ -75,7 +75,7 @@ stu_hash_insert(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t flags)
 
 stu_int_t
 stu_hash_insert_locked(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t flags) {
-	stu_uint_t      kh, k;
+	stu_uint_t      kh, i;
 	stu_hash_elt_t *elts, *e, *elt;
 	stu_queue_t    *q;
 
@@ -84,11 +84,11 @@ stu_hash_insert_locked(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t
 	} else {
 		kh = stu_hash_key(key->data, key->len);
 	}
-	k = kh % hash->size;
+	i = kh % hash->size;
 
-	stu_log_debug(0, "Inserting into hash: key=%lu, i=%lu, name=%s.", kh, k, key->data);
+	stu_log_debug(0, "Inserting into hash: key=%lu, i=%lu, name=%s.", kh, i, key->data);
 
-	elts = hash->buckets[k];
+	elts = hash->buckets[i];
 	if (elts == NULL) {
 		elts = hash->palloc(hash->pool, sizeof(stu_hash_elt_t));
 		if (elts == NULL) {
@@ -96,7 +96,7 @@ stu_hash_insert_locked(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t
 		}
 
 		stu_queue_init(&elts->queue);
-		hash->buckets[k] = elts;
+		hash->buckets[i] = elts;
 	}
 
 	for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
@@ -216,11 +216,11 @@ stu_hash_remove_locked(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t le
 	}
 
 	if (elts->queue.next == stu_queue_sentinel(&elts->queue)) {
-		hash->buckets[i] = NULL;
-
 		if (hash->free) {
 			hash->free(hash->pool, elts);
 		}
+
+		hash->buckets[i] = NULL;
 
 		stu_log_debug(0, "Removed sentinel from hash: key=%lu, i=%lu, name=%s.", key, i, name);
 	}

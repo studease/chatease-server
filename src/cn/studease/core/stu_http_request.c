@@ -176,8 +176,14 @@ stu_http_process_request(stu_http_request_t *r) {
 		channel_id.len = last - channel_id.data;
 
 		kh = stu_hash_key_lc(channel_id.data, channel_id.len);
-		ch = stu_hash_find(&stu_cycle->channels, kh, channel_id.data, channel_id.len);
+
+		stu_spin_lock(&stu_cycle->channels.lock);
+
+		ch = stu_hash_find_locked(&stu_cycle->channels, kh, channel_id.data, channel_id.len);
 		if (ch == NULL) {
+			stu_log_debug(0, "channel(\"%s\") not found: kh=%lu, i=%lu, len=%lu.",
+					channel_id.data, kh, kh % stu_cycle->channels.size, stu_cycle->channels.length);
+
 			ch = stu_slab_calloc(stu_cycle->slab_pool, sizeof(stu_channel_t) + channel_id.len + 1);
 			if (ch == NULL) {
 				stu_log_error(0, "Failed to alloc new channel.");
@@ -190,12 +196,12 @@ stu_http_process_request(stu_http_request_t *r) {
 			}
 
 			if (stu_hash_init(&ch->userlist, NULL, STU_MAX_USER_N, stu_cycle->slab_pool,
-					(stu_hash_palloc_pt) stu_slab_alloc, (stu_hash_free_pt) stu_slab_free) == STU_ERROR) {
+					(stu_hash_palloc_pt) stu_slab_calloc, (stu_hash_free_pt) stu_slab_free) == STU_ERROR) {
 				stu_log_error(0, "Failed to init userlist.");
 				goto failed;
 			}
 
-			if (stu_hash_insert(&stu_cycle->channels, &channel_id, ch, STU_HASH_LOWCASE_KEY) == STU_ERROR) {
+			if (stu_hash_insert_locked(&stu_cycle->channels, &channel_id, ch, STU_HASH_LOWCASE_KEY) == STU_ERROR) {
 				stu_log_error(0, "Failed to insert channel.");
 				goto failed;
 			}
@@ -203,6 +209,8 @@ stu_http_process_request(stu_http_request_t *r) {
 			stu_log_debug(0, "new channel(\"%s\"): kh=%lu, total=%lu.",
 					ch->id.data, kh, stu_atomic_read(&stu_cycle->channels.length));
 		}
+
+		stu_spin_unlock(&stu_cycle->channels.lock);
 
 		c->user.channel = ch;
 
