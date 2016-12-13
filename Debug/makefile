@@ -8,9 +8,9 @@ RM := rm -rf
 
 # All of the sources participating in the build are defined here
 -include sources.mk
--include subdir.mk
 -include src/cn/studease/core/subdir.mk
 -include src/subdir.mk
+-include subdir.mk
 -include objects.mk
 
 ifneq ($(MAKECMDGOALS),clean)
@@ -30,7 +30,7 @@ all: chatease-server
 chatease-server: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C Linker'
-	gcc -L/usr/local/ssl/lib -o "chatease-server" $(OBJS) $(USER_OBJS) $(LIBS) -pthread -march=x86-64
+	gcc  -o "chatease-server" $(OBJS) $(USER_OBJS) $(LIBS) -pthread -march=x86-64
 	@echo 'Finished building target: $@'
 	@echo ' '
 

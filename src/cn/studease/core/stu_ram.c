@@ -46,7 +46,7 @@ stu_ram_pool_create() {
 	//stu_memzero(c, 512);
 	for (n = 0; n < 8; n++) {
 		p->pages[n].bitmap = (uintptr_t) c;
-		c += 1 + 64;
+		c += 64;
 	}
 
 	p->data.start = p->data.last = (u_char *) stu_align_ptr((uintptr_t) c, STU_RAM_BLOCK_SIZE);
@@ -80,7 +80,7 @@ stu_ram_alloc_locked(stu_ram_pool_t *pool) {
 			return NULL;
 		}
 
-		stu_memzero((void *) page->bitmap, 1 + 64);
+		stu_memzero((void *) page->bitmap, 64);
 
 		page->prev = page->next = sentinel;
 		sentinel->prev = sentinel->next = page;
@@ -89,7 +89,7 @@ stu_ram_alloc_locked(stu_ram_pool_t *pool) {
 alloc:
 
 	do {
-		bitmap = (uint64_t *) ((u_char *)page->bitmap + 1);
+		bitmap = (uint64_t *) ((u_char *)page->bitmap);
 		for (i = 0; i < 8; i++, bitmap++) {
 			if (*bitmap == STU_RAM_BUSY64) {
 				continue;
@@ -110,8 +110,8 @@ alloc:
 				p += (page - pool->pages) << STU_RAM_PAGE_SHIFT;
 				p += (i * 64 + j * 8 + k) << STU_RAM_BLOCK_SHIFT;
 
-				if (*c == STU_RAM_BUSY8 && *bitmap == STU_SLAB_BUSY64) {
-					b = (u_char *) page->bitmap;
+				if (*c == STU_RAM_BUSY8 && *bitmap == STU_RAM_BUSY64) {
+					b = (u_char *) &pool->bitmap + (page - pool->pages);
 					*b |= 1 << i;
 					if (*b == STU_RAM_BUSY8) {
 						goto full;
@@ -130,7 +130,7 @@ alloc:
 		return NULL;
 	}
 
-	stu_memzero((void *) page->bitmap, 1 + 64);
+	stu_memzero((void *) page->bitmap, 64);
 
 	page->prev = sentinel;
 	page->next = sentinel->next;
@@ -179,11 +179,11 @@ stu_ram_free_locked(stu_ram_pool_t *pool, void *p) {
 	j = k >> 3;
 	i = j >> 3;
 
-	bitmap = (uint64_t *) ((u_char *) page->bitmap + 1 + i * 8);
+	bitmap = (uint64_t *) ((u_char *) page->bitmap + i * 8);
 	c = (u_char *) bitmap + j;
 
-	b = (u_char *) page->bitmap;
-	if (*c == STU_SLAB_BUSY8 && *bitmap == STU_SLAB_BUSY64) {
+	b = (u_char *) &pool->bitmap + (page - pool->pages);
+	if (*c == STU_SLAB_BUSY8 && *bitmap == STU_RAM_BUSY64) {
 		*b &= ~(1 << i);
 	}
 

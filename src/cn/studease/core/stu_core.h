@@ -36,6 +36,7 @@ typedef enum {
 
 #include "stu_string.h"
 #include "stu_buf.h"
+#include "stu_queue.h"
 #include "stu_errno.h"
 #include "stu_log.h"
 #include "stu_alloc.h"
@@ -44,7 +45,6 @@ typedef enum {
 #include "stu_palloc.h"
 #include "stu_ram.h"
 #include "stu_slab.h"
-#include "stu_queue.h"
 #include "stu_list.h"
 #include "stu_socket.h"
 #include "stu_event.h"

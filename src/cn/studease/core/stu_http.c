@@ -86,13 +86,28 @@ stu_http_server_handler(stu_event_t *ev) {
 	stu_socket_t        fd;
 	struct sockaddr_in  sa;
 	socklen_t           socklen;
+	stu_int_t           err, retried;
 	stu_connection_t   *c;
 
 	socklen = sizeof(sa);
+	retried = 0;
+
+again:
 
 	fd = accept(stu_httpfd, (struct sockaddr*)&sa, &socklen);
 	if (fd == -1) {
-		stu_log_error(stu_errno, "Failed to accept!");
+		err = stu_errno;
+		if (err == EAGAIN || err == EINTR) {
+			if (retried++ >= 5) {
+				stu_log_debug(0, "accept aborted: errno=%d.", err);
+				return;
+			}
+
+			stu_log_debug(0, "accept trying again: errno=%d.", err);
+			goto again;
+		}
+
+		stu_log_error(err, "Failed to accept!");
 		return;
 	}
 

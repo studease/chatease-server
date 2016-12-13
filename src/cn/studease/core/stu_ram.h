@@ -33,8 +33,11 @@ struct stu_ram_page_s {
 };
 
 typedef struct {
+	stu_queue_t      queue;
 	stu_spinlock_t   lock;
 	stu_pool_data_t  data;
+
+	uint64_t         bitmap;
 
 	stu_ram_page_t  *slots;
 	stu_ram_page_t  *pages;

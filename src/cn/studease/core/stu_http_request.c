@@ -79,7 +79,7 @@ again:
 		err = stu_errno;
 		if (err == EAGAIN || err == EINTR) {
 			if (retried++ >= 1) {
-				stu_log_error(0, "recv aborted: fd=%d, err=%d.", c->fd, err);
+				stu_log_debug(0, "recv aborted: fd=%d, err=%d.", c->fd, err);
 				goto done;
 			}
 
@@ -184,7 +184,7 @@ stu_http_process_request(stu_http_request_t *r) {
 			stu_log_debug(0, "channel(\"%s\") not found: kh=%lu, i=%lu, len=%lu.",
 					channel_id.data, kh, kh % stu_cycle->channels.size, stu_cycle->channels.length);
 
-			ch = stu_slab_calloc(stu_cycle->slab_pool, sizeof(stu_channel_t) + channel_id.len + 1);
+			ch = stu_slab_calloc(stu_cycle->slab_pool, sizeof(stu_channel_t));
 			if (ch == NULL) {
 				stu_log_error(0, "Failed to alloc new channel.");
 				goto failed;

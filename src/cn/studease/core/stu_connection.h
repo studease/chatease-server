@@ -11,8 +11,8 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
-#define STU_CONNECTIONS_PER_PAGE 2048
-#define STU_CONNECTION_MAX_PAGE  32
+#define STU_CONNECTIONS_PER_PAGE 4096
+#define STU_CONNECTION_MAX_PAGE  16
 
 #define STU_CONNECTION_ERROR_NONE      0
 #define STU_CONNECTION_ERROR_TIMEDOUT  0x01

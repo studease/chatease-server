@@ -41,7 +41,7 @@ again:
 		err = stu_errno;
 		if (err == EAGAIN || err == EINTR) {
 			if (retried++ >= 1) {
-				stu_log_error(0, "recv aborted: fd=%d, err=%d.", c->fd, err);
+				stu_log_debug(0, "recv aborted: fd=%d, err=%d.", c->fd, err);
 				goto done;
 			}
 

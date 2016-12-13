@@ -13,7 +13,7 @@ extern stu_cycle_t *stu_cycle;
 
 stu_int_t
 stu_channel_init(stu_channel_t *ch, stu_str_t *id) {
-	ch->id.data = (u_char *) ch  + sizeof(stu_channel_t);
+	ch->id.data = stu_slab_calloc(stu_cycle->slab_pool, id->len + 1);
 	memcpy(ch->id.data, id->data, id->len);
 	ch->id.len = id->len;
 
@@ -77,6 +77,7 @@ stu_channel_remove_locked(stu_channel_t *ch, stu_connection_t *c) {
 
 		stu_hash_remove(&stu_cycle->channels, kh, key->data, key->len);
 
+		stu_slab_free(stu_cycle->slab_pool, key->data);
 		stu_slab_free(stu_cycle->slab_pool, ch);
 
 		stu_log_debug(0, "removed channel(\"%s\") from channel(\"%s\"), total=%lu.", key->data, ch->id.data, ch->userlist.length);
