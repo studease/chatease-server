@@ -214,7 +214,7 @@ stu_http_process_request(stu_http_request_t *r) {
 
 		c->user.channel = ch;
 
-		if (stu_channel_insert(ch , c) == STU_ERROR) {
+		if (stu_channel_insert(ch, c) == STU_ERROR) {
 			goto failed;
 		}
 

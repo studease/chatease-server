@@ -86,7 +86,7 @@ stu_hash_insert_locked(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t
 	}
 	i = kh % hash->size;
 
-	stu_log_debug(0, "Inserting into hash: key=%lu, i=%lu, name=%s.", kh, i, key->data);
+	//stu_log_debug(0, "Inserting into hash: key=%lu, i=%lu, name=%s.", kh, i, key->data);
 
 	elts = hash->buckets[i];
 	if (elts == NULL) {
@@ -114,8 +114,6 @@ stu_hash_insert_locked(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t
 	if (elt == NULL) {
 		return STU_ERROR;
 	}
-	stu_queue_insert_tail(&elts->queue, &elt->queue);
-	hash->length++;
 
 	elt->key.data = hash->palloc(hash->pool, key->len + 1);
 	if (elt->key.data == NULL) {
@@ -127,6 +125,10 @@ stu_hash_insert_locked(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t
 
 	elt->key_hash = kh;
 	elt->value = value;
+
+	stu_queue_init(&elt->queue);
+	stu_queue_insert_tail(&elts->queue, &elt->queue);
+	hash->length++;
 
 	stu_queue_init(&elt->q);
 	stu_queue_insert_tail(&hash->keys.elts.queue, &elt->q);

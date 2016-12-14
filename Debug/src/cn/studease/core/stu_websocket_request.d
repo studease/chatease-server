@@ -14,7 +14,10 @@ src/cn/studease/core/stu_websocket_request.d: \
  ../src/cn/studease/core/stu_connection.h \
  ../src/cn/studease/core/stu_shmem.h ../src/cn/studease/core/stu_thread.h \
  ../src/cn/studease/core/stu_cycle.h ../src/cn/studease/core/stu_base64.h \
- ../src/cn/studease/core/stu_sha1.h ../src/cn/studease/core/stu_http.h \
+ ../src/cn/studease/core/stu_sha1.h /usr/local/ssl/include/openssl/sha.h \
+ /usr/local/ssl/include/openssl/e_os2.h \
+ /usr/local/ssl/include/openssl/opensslconf.h \
+ ../src/cn/studease/core/stu_http.h \
  ../src/cn/studease/core/stu_http_request.h \
  ../src/cn/studease/core/stu_http_parse.h \
  ../src/cn/studease/core/stu_websocket_request.h \
@@ -73,6 +76,12 @@ src/cn/studease/core/stu_websocket_request.d: \
 ../src/cn/studease/core/stu_base64.h:
 
 ../src/cn/studease/core/stu_sha1.h:
+
+/usr/local/ssl/include/openssl/sha.h:
+
+/usr/local/ssl/include/openssl/e_os2.h:
+
+/usr/local/ssl/include/openssl/opensslconf.h:
 
 ../src/cn/studease/core/stu_http.h:
 

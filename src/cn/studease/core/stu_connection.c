@@ -40,10 +40,12 @@ stu_connection_get(stu_socket_t s) {
 	stu_connection_pool_t *pool;
 	stu_connection_page_t *pages, *p, *last;
 	stu_queue_t           *q;
-	stu_connection_t      *c = NULL;
+	stu_connection_t      *c;
 
 	pool = stu_cycle->connection_pool;
 	pages = &pool->pages;
+	c = NULL;
+
 	for (q = stu_queue_head(&pages->queue); q != stu_queue_sentinel(&pages->queue); q = stu_queue_next(q)) {
 		p = stu_queue_data(q, stu_connection_page_t, queue);
 		if (p->length < STU_CONNECTIONS_PER_PAGE) {

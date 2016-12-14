@@ -182,8 +182,8 @@ stu_ram_free_locked(stu_ram_pool_t *pool, void *p) {
 	bitmap = (uint64_t *) ((u_char *) page->bitmap + i * 8);
 	c = (u_char *) bitmap + j;
 
-	b = (u_char *) &pool->bitmap + (page - pool->pages);
-	if (*c == STU_SLAB_BUSY8 && *bitmap == STU_RAM_BUSY64) {
+	b = (u_char *) &pool->bitmap + x;
+	if (*c == STU_RAM_BUSY8 && *bitmap == STU_RAM_BUSY64) {
 		*b &= ~(1 << i);
 	}
 
@@ -195,7 +195,7 @@ stu_ram_free_locked(stu_ram_pool_t *pool, void *p) {
 	}
 
 	n = 8;
-	bitmap = (uint64_t *) ((u_char *) page->bitmap + 1);
+	bitmap = (uint64_t *) page->bitmap;
 	while (n--) {
 		if (*bitmap) {
 			goto done;

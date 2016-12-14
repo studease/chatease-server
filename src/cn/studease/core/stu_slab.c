@@ -68,7 +68,7 @@ stu_slab_alloc_locked(stu_slab_pool_t *pool, size_t size) {
 	stu_slab_page_t *page, *sentinel;
 	uintptr_t        p;
 	uint64_t        *bitmap;
-	u_char          *c, *b;
+	u_char          *c;
 
 	if (size > STU_SLAB_MAX_SIZE) {
 		if (size > STU_SLAB_PAGE_SIZE) {
@@ -125,7 +125,7 @@ stu_slab_alloc_locked(stu_slab_pool_t *pool, size_t size) {
 			stu_memzero((void *) page->bitmap, n + 1);
 
 			n = n / (1 << shift) + (n % (1 << shift) ? 1 : 0);
-			bitmap = (uint64_t *) ((u_char *) page->bitmap + 1);
+			bitmap = (uint64_t *) page->bitmap;
 			for (m = 1, i = 0; i < n; m <<= 1, i++) {
 				*bitmap |= m;
 			}
@@ -139,7 +139,7 @@ stu_slab_alloc_locked(stu_slab_pool_t *pool, size_t size) {
 			|| (shift == STU_SLAB_MID_SHIFT && __WORDSIZE == 32)) {
 		n = 1 << (STU_SLAB_MID_SHIFT - shift);
 		do {
-			bitmap = (uint64_t *) ((u_char *) page->bitmap + 1);
+			bitmap = (uint64_t *) page->bitmap;
 			for (i = 0; i < n; i++, bitmap++) {
 				if (*bitmap == STU_SLAB_BUSY64) {
 					continue;
@@ -159,12 +159,14 @@ stu_slab_alloc_locked(stu_slab_pool_t *pool, size_t size) {
 					p = (i * 64 + s * 8 + j) << shift;
 					p += (uintptr_t) page->bitmap;
 
-					if (*c == STU_SLAB_BUSY8 && *bitmap == STU_SLAB_BUSY64) {
-						b = (u_char *) page->bitmap;
-						*b |= 1 << i;
-						if (*b == STU_SLAB_BUSY8 >> (8 - n)) {
-							goto full;
+					if (*bitmap == STU_SLAB_BUSY64) {
+						for (i = i + 1, bitmap++; i < n; i++, bitmap++) {
+							if (*bitmap != STU_SLAB_BUSY64) {
+								goto done;
+							}
 						}
+
+						goto full;
 					}
 
 					goto done;
@@ -273,7 +275,7 @@ stu_slab_free_locked(stu_slab_pool_t *pool, void *p) {
 	stu_slab_page_t *page, *sentinel;
 	stu_uint_t       x, shift, slot, s, m, n, i, j;
 	uint64_t        *bitmap;
-	u_char          *c, *b;
+	u_char          *c;
 
 	if ((u_char *) p < pool->data.start || (u_char *) p > pool->data.end) {
 		stu_log_error(0, "Failed to free slab: outside of pool, p=%p.", p);
@@ -292,13 +294,8 @@ stu_slab_free_locked(stu_slab_pool_t *pool, void *p) {
 		s = j >> 3;
 		i = s >> 3;
 
-		bitmap = (uint64_t *) ((u_char *) page->bitmap + 1 + i * 8);
+		bitmap = (uint64_t *) ((u_char *) page->bitmap + i * 8);
 		c = (u_char *) bitmap + s;
-
-		b = (u_char *) page->bitmap;
-		if (*c == STU_SLAB_BUSY8 && *bitmap == STU_SLAB_BUSY64) {
-			*b &= ~(1 << i);
-		}
 
 		m = 1 << (j % 8);
 		*c &= ~m;
