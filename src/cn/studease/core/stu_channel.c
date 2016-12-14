@@ -80,7 +80,7 @@ stu_channel_remove_locked(stu_channel_t *ch, stu_connection_t *c) {
 		stu_slab_free(stu_cycle->slab_pool, key->data);
 		stu_slab_free(stu_cycle->slab_pool, ch);
 
-		stu_log_debug(0, "removed channel(\"%s\") from channel(\"%s\"), total=%lu.", key->data, ch->id.data, ch->userlist.length);
+		stu_log_debug(0, "removed channel(\"%s\"), total=%lu.", key->data, ch->userlist.length);
 	}
 }
 

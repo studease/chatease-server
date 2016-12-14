@@ -72,7 +72,55 @@ stu_ram_alloc_locked(stu_ram_pool_t *pool) {
 	uint8_t         i, j, k, m;
 	u_char         *c, *p, *b;
 
+start:
+
 	sentinel = pool->slots;
+
+	for (page = sentinel->next; page != sentinel; page = page->next) {
+		bitmap = (uint64_t *) page->bitmap;
+
+		for (i = 0; i < 8; i++, bitmap++) {
+			if (*bitmap == STU_RAM_BUSY64) {
+				continue;
+			}
+
+			c = (u_char *) bitmap;
+
+			for (j = 0; j < 8; j++, c++) {
+				if (*c == STU_RAM_BUSY8) {
+					continue;
+				}
+
+				for (m = 1, k = 0; *c & m; m <<= 1, k++) {
+					/* void */
+				}
+
+				*c |= m;
+
+				p = pool->data.start;
+				p += (page - pool->pages) << STU_RAM_PAGE_SHIFT;
+				p += (i * 64 + j * 8 + k) << STU_RAM_BLOCK_SHIFT;
+
+				if (*bitmap == STU_RAM_BUSY64) {
+					b = (u_char *) &pool->bitmap + (page - pool->pages);
+					*b &= ~(1 << i);
+
+					bitmap++;
+
+					for (i = i + 1; i < 8; i++, bitmap++) {
+						if (*bitmap != STU_RAM_BUSY64) {
+							goto done;
+						}
+					}
+
+					goto full;
+				}
+
+				goto done;
+			}
+		}
+	}
+
 	page = sentinel->next;
 	if (page == sentinel) {
 		page = stu_ram_alloc_page(pool);
@@ -86,58 +134,7 @@ stu_ram_alloc_locked(stu_ram_pool_t *pool) {
 		sentinel->prev = sentinel->next = page;
 	}
 
-alloc:
-
-	do {
-		bitmap = (uint64_t *) ((u_char *)page->bitmap);
-		for (i = 0; i < 8; i++, bitmap++) {
-			if (*bitmap == STU_RAM_BUSY64) {
-				continue;
-			}
-
-			c = (u_char *) bitmap;
-			for (j = 0; j < 8; j++, c++) {
-				if (*c == STU_RAM_BUSY8) {
-					continue;
-				}
-
-				for (m = 1, k = 0; *c & m; m <<= 1, k++) {
-					/* void */
-				}
-
-				*c |= m;
-				p = pool->data.start;
-				p += (page - pool->pages) << STU_RAM_PAGE_SHIFT;
-				p += (i * 64 + j * 8 + k) << STU_RAM_BLOCK_SHIFT;
-
-				if (*c == STU_RAM_BUSY8 && *bitmap == STU_RAM_BUSY64) {
-					b = (u_char *) &pool->bitmap + (page - pool->pages);
-					*b |= 1 << i;
-					if (*b == STU_RAM_BUSY8) {
-						goto full;
-					}
-				}
-
-				goto done;
-			}
-		}
-
-		page = page->next;
-	} while (page != sentinel);
-
-	page = stu_ram_alloc_page(pool);
-	if (page == NULL) {
-		return NULL;
-	}
-
-	stu_memzero((void *) page->bitmap, 64);
-
-	page->prev = sentinel;
-	page->next = sentinel->next;
-	page->next->prev = page;
-	sentinel->next = page;
-
-	goto alloc;
+	goto start;
 
 full:
 
@@ -179,23 +176,20 @@ stu_ram_free_locked(stu_ram_pool_t *pool, void *p) {
 	j = k >> 3;
 	i = j >> 3;
 
-	bitmap = (uint64_t *) ((u_char *) page->bitmap + i * 8);
+	bitmap = (uint64_t *) page->bitmap;
 	c = (u_char *) bitmap + j;
 
-	b = (u_char *) &pool->bitmap + x;
-	if (*c == STU_RAM_BUSY8 && *bitmap == STU_RAM_BUSY64) {
-		*b &= ~(1 << i);
-	}
-
-	m = 1 << k;
+	m = 1 << (k % 8);
 	*c &= ~m;
+
+	b = (u_char *) &pool->bitmap + x;
+	*b &= ~(1 << i);
 
 	if (page->prev == NULL) {
 		goto append;
 	}
 
 	n = 8;
-	bitmap = (uint64_t *) page->bitmap;
 	while (n--) {
 		if (*bitmap) {
 			goto done;

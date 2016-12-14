@@ -289,7 +289,7 @@ stu_http_process_request_headers(stu_http_request_t *r) {
 			stu_list_push(&r->headers_in.headers, elt);
 
 			hk = stu_hash_key(h->lowcase_key, h->key.len);
-			hh = stu_hash_find(&stu_http_headers_in_hash, hk, h->lowcase_key, h->key.len);
+			hh = stu_hash_find_locked(&stu_http_headers_in_hash, hk, h->lowcase_key, h->key.len);
 			if (hh) {
 				rc = hh->handler(r, h, hh->offset);
 				if (rc != STU_OK) {

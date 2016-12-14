@@ -122,7 +122,7 @@ stu_slab_alloc_locked(stu_slab_pool_t *pool, size_t size) {
 
 			s = 1 << (STU_SLAB_MID_SHIFT - shift);
 			n = s * 8;
-			stu_memzero((void *) page->bitmap, n + 1);
+			stu_memzero((void *) page->bitmap, n);
 
 			n = n / (1 << shift) + (n % (1 << shift) ? 1 : 0);
 			bitmap = (uint64_t *) page->bitmap;
@@ -160,7 +160,9 @@ stu_slab_alloc_locked(stu_slab_pool_t *pool, size_t size) {
 					p += (uintptr_t) page->bitmap;
 
 					if (*bitmap == STU_SLAB_BUSY64) {
-						for (i = i + 1, bitmap++; i < n; i++, bitmap++) {
+						bitmap++;
+
+						for (i = i + 1; i < n; i++, bitmap++) {
 							if (*bitmap != STU_SLAB_BUSY64) {
 								goto done;
 							}
@@ -294,7 +296,7 @@ stu_slab_free_locked(stu_slab_pool_t *pool, void *p) {
 		s = j >> 3;
 		i = s >> 3;
 
-		bitmap = (uint64_t *) ((u_char *) page->bitmap + i * 8);
+		bitmap = (uint64_t *) page->bitmap;
 		c = (u_char *) bitmap + s;
 
 		m = 1 << (j % 8);
@@ -305,7 +307,6 @@ stu_slab_free_locked(stu_slab_pool_t *pool, void *p) {
 		}
 
 		n = 1 << (STU_SLAB_MID_SHIFT - shift);
-		bitmap = (uint64_t *) ((u_char *) page->bitmap + 1);
 		while (n--) {
 			if (*bitmap) {
 				goto done;

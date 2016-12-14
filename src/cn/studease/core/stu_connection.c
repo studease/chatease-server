@@ -117,8 +117,6 @@ stu_connection_free(stu_connection_t *c) {
 
 	stu_spin_lock(&c->page->lock);
 
-	stu_ram_free(stu_cycle->ram_pool, (void *) c->pool);
-
 	fd = c->fd;
 	c->fd = (stu_socket_t) -1;
 	c->read = c->write = NULL;
@@ -129,6 +127,8 @@ stu_connection_free(stu_connection_t *c) {
 
 	c->page->length--;
 	stu_atomic_fetch_sub(&stu_cycle->connection_n, 1);
+
+	stu_ram_free(stu_cycle->ram_pool, (void *) c->pool);
 
 	stu_log_debug(0, "Freed connection: c=%p, fd=%d.", c, fd);
 
