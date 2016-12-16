@@ -38,17 +38,25 @@ stu_connection_pool_create(stu_pool_t *pool) {
 stu_connection_t *
 stu_connection_get(stu_socket_t s) {
 	stu_connection_pool_t *pool;
-	stu_connection_page_t *pages, *p, *last;
+	stu_connection_page_t *pages, *p;
 	stu_queue_t           *q;
+	stu_uint_t             lock;
 	stu_connection_t      *c;
 
 	pool = stu_cycle->connection_pool;
 	pages = &pool->pages;
 	c = NULL;
 
+start:
+
 	for (q = stu_queue_head(&pages->queue); q != stu_queue_sentinel(&pages->queue); q = stu_queue_next(q)) {
 		p = stu_queue_data(q, stu_connection_page_t, queue);
-		if (p->length < STU_CONNECTIONS_PER_PAGE) {
+		if (stu_atomic_read(&p->length) < STU_CONNECTIONS_PER_PAGE) {
+			lock = stu_atomic_read(&p->lock.rlock.counter);
+			if ((lock >> 16) !=  (lock & STU_SPINLOCK_OWNER_MASK)) {
+				continue;
+			}
+
 			stu_spin_lock(&p->lock);
 
 			c = stu_connection_page_alloc(p);
@@ -56,10 +64,10 @@ stu_connection_get(stu_socket_t s) {
 				stu_spin_unlock(&p->lock);
 				continue;
 			}
-			stu_connection_init(c, s);
 
 			stu_spin_unlock(&p->lock);
-			break;
+
+			goto done;
 		}
 	}
 
@@ -68,27 +76,26 @@ stu_connection_get(stu_socket_t s) {
 
 		p = stu_connection_page_create(pool);
 		if (p == NULL) {
-			stu_log_error(0, "Failed to create connection page.");
 			stu_spin_unlock(&pool->lock);
+			stu_log_error(0, "Failed to create connection page.");
+
 			return NULL;
 		}
 
-		c = stu_connection_page_alloc(p); // no need to lock p, & unbelievably to be failed.
-		stu_connection_init(c, s);
-
-		q = stu_queue_last(&pool->pages.queue);
-		last = stu_queue_data(q, stu_connection_page_t, queue);
-
-		stu_spin_lock(&last->lock);
-		stu_queue_insert_after(&last->queue, &p->queue);
-		stu_spin_unlock(&last->lock);
+		stu_queue_insert_tail(&pages->queue, &p->queue);
 
 		stu_spin_unlock(&pool->lock);
+
+		goto start;
 	}
+
+done:
 
 	stu_atomic_fetch_add(&stu_cycle->connection_n, 1);
 
-	c->pool = stu_ram_alloc(stu_cycle->ram_pool);
+	stu_connection_init(c, s);
+
+	c->pool = stu_ram_alloc(&stu_cycle->ram_pool);
 
 	stu_spinlock_init(&c->pool->lock);
 	c->pool->data.start = c->pool->data.last = (u_char *) c->pool + sizeof(stu_base_pool_t);
@@ -106,7 +113,7 @@ stu_connection_get(stu_socket_t s) {
 	// protect events from resetting pool.
 	c->pool->data.start = c->pool->data.last;
 
-	stu_log_debug(0, "Got connection: c=%p, fd=%d.", c, c->fd);
+	stu_log_debug(2, "Got connection: c=%p, fd=%d.", c, c->fd);
 
 	return c;
 }
@@ -128,9 +135,9 @@ stu_connection_free(stu_connection_t *c) {
 	c->page->length--;
 	stu_atomic_fetch_sub(&stu_cycle->connection_n, 1);
 
-	stu_ram_free(stu_cycle->ram_pool, (void *) c->pool);
+	stu_ram_free(&stu_cycle->ram_pool, (void *) c->pool);
 
-	stu_log_debug(0, "Freed connection: c=%p, fd=%d.", c, fd);
+	stu_log_debug(2, "Freed connection: c=%p, fd=%d.", c, fd);
 
 	stu_spin_unlock(&c->page->lock);
 }
@@ -138,7 +145,7 @@ stu_connection_free(stu_connection_t *c) {
 void
 stu_connection_close(stu_connection_t *c) {
 	/*if (c->fd == (stu_socket_t) -1) {
-		stu_log_debug(0, "connection already closed.");
+		stu_log_debug(2, "connection already closed.");
 		return;
 	}*/
 
@@ -170,7 +177,7 @@ stu_connection_page_create(stu_connection_pool_t *pool) {
 	stu_shm_t             *shm = NULL;
 	stu_list_elt_t        *elt;
 
-	if (pool->pages.length >= STU_CONNECTION_MAX_PAGE) {
+	if (pool->pages.length >= STU_CONNECTION_PAGE_MAX_N) {
 		stu_log_error(0, "Failed to alloc connection page: Page length limited.");
 		goto failed;
 	}

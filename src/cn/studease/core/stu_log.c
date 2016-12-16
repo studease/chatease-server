@@ -38,6 +38,10 @@ stu_log_debug(stu_int_t level, const char *fmt, ...) {
 	u_char  *p, *last = temp + STU_LOG_RECORD_MAX_LEN;
 	va_list  args;
 
+	if (level < __LOGGER) {
+		return;
+	}
+
 	p = stu_log_prefix(temp, STU_DEBUG_PREFIX);
 	p = stu_sprintf(p, "%d: ", level);
 

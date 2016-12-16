@@ -275,7 +275,7 @@ stu_slab_free(stu_slab_pool_t *pool, void *p) {
 void
 stu_slab_free_locked(stu_slab_pool_t *pool, void *p) {
 	stu_slab_page_t *page, *sentinel;
-	stu_uint_t       x, shift, slot, s, m, n, i, j;
+	stu_uint_t       x, shift, slot, s, m, n, j;
 	uint64_t        *bitmap;
 	u_char          *c;
 
@@ -294,7 +294,7 @@ stu_slab_free_locked(stu_slab_pool_t *pool, void *p) {
 	if (shift < STU_SLAB_MID_SHIFT
 			|| (shift == STU_SLAB_MID_SHIFT && __WORDSIZE == 32)) {
 		s = j >> 3;
-		i = s >> 3;
+		//i = s >> 3;
 
 		bitmap = (uint64_t *) page->bitmap;
 		c = (u_char *) bitmap + s;

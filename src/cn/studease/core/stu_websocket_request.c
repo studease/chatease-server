@@ -16,7 +16,7 @@ void
 stu_websocket_wait_request_handler(stu_event_t *rev) {
 	stu_connection_t *c;
 	stu_channel_t    *ch;
-	stu_int_t         n, err, retried;
+	stu_int_t         n, err;
 
 	c = (stu_connection_t *) rev->data;
 
@@ -32,20 +32,18 @@ stu_websocket_wait_request_handler(stu_event_t *rev) {
 	c->buffer.last = c->buffer.start;
 	stu_memzero(c->buffer.start, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
 
-	retried = 0;
-
 again:
 
 	n = recv(c->fd, c->buffer.start, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE, 0);
 	if (n == -1) {
 		err = stu_errno;
-		if (err == EAGAIN || err == EINTR) {
-			if (retried++ >= 1) {
-				stu_log_debug(0, "recv aborted: fd=%d, err=%d.", c->fd, err);
-				goto done;
-			}
+		if (err == EAGAIN) {
+			stu_log_debug(4, "Already received by other threads: fd=%d, errno=%d.", c->fd, err);
+			goto done;
+		}
 
-			stu_log_debug(0, "recv trying again: fd=%d, err=%d.", c->fd, err);
+		if (err == EINTR) {
+			stu_log_debug(4, "recv trying again: fd=%d, errno=%d.", c->fd, err);
 			goto again;
 		}
 
@@ -54,11 +52,11 @@ again:
 	}
 
 	if (n == 0) {
-		stu_log_debug(0, "Remote client has closed connection: fd=%d.", c->fd);
+		stu_log_debug(4, "Remote client has closed connection: fd=%d.", c->fd);
 		goto failed;
 	}
 
-	stu_log_debug(0, "recv: fd=%d, bytes=%d, str=\n%s", c->fd, n, c->buffer.start);
+	stu_log_debug(4, "recv: fd=%d, bytes=%d, str=\n%s", c->fd, n, c->buffer.start);
 
 	c->data = (void *) stu_websocket_create_request(c);
 	if (c->data == NULL) {
@@ -157,15 +155,7 @@ stu_websocket_process_request_frames(stu_websocket_request_t *r) {
 
 void
 stu_websocket_finalize_request(stu_websocket_request_t *r, stu_channel_t *ch) {
-	stu_connection_t      *c, *t;
-	stu_websocket_frame_t *f;
-	stu_buf_t              buf;
-	u_char                 temp[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE], *data;
-	stu_int_t              s, extened, n;
-	uint64_t               size;
-	stu_list_elt_t        *elts;
-	stu_hash_elt_t        *e;
-	stu_queue_t           *q;
+	stu_connection_t *c;
 
 	c = r->connection;
 
@@ -174,6 +164,28 @@ stu_websocket_finalize_request(stu_websocket_request_t *r, stu_channel_t *ch) {
 		stu_log_error(0, "Failed to add websocket client write event.");
 		return;
 	}*/
+
+	stu_websocket_request_handler(c->write);
+}
+
+
+void
+stu_websocket_request_handler(stu_event_t *wev) {
+	stu_websocket_request_t *r;
+	stu_connection_t        *c, *t;
+	stu_channel_t           *ch;
+	stu_websocket_frame_t   *f;
+	stu_buf_t                buf;
+	u_char                   temp[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE], *data;
+	stu_int_t                s, extened, n;
+	uint64_t                 size;
+	stu_list_elt_t          *elts;
+	stu_hash_elt_t          *e;
+	stu_queue_t             *q;
+
+	c = (stu_connection_t *) wev->data;
+	r = (stu_websocket_request_t *) c->data;
+	ch = c->user.channel;
 
 	stu_memzero(temp, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
 
@@ -227,7 +239,7 @@ stu_websocket_finalize_request(stu_websocket_request_t *r, stu_channel_t *ch) {
 		extened = 8;
 	}
 
-	stu_log_debug(0, "frame header: %d %d %d %d %d %d %d %d %d %d",
+	stu_log_debug(4, "frame header: %d %d %d %d %d %d %d %d %d %d",
 			buf.start[0], buf.start[1], buf.start[2], buf.start[3], buf.start[4],
 			buf.start[5], buf.start[6], buf.start[7], buf.start[8], buf.start[9]);
 
@@ -241,72 +253,19 @@ stu_websocket_finalize_request(stu_websocket_request_t *r, stu_channel_t *ch) {
 		if (n == -1) {
 			stu_log_error(stu_errno, "Failed to send data: from=%d, to=%d.", c->fd, t->fd);
 
+			q = stu_queue_prev(q);
+
 			stu_channel_remove_locked(ch, t);
 			stu_websocket_close_connection(t);
 
 			continue;
 		}
 
-		stu_log_debug(0, "sent to fd=%d.", t->fd);
+		stu_log_debug(4, "sent to fd=%d, bytes=%d.", t->fd, n);
 	}
 	stu_spin_unlock(&ch->userlist.lock);
 
-	stu_log_debug(0, "sent: fd=%d, bytes=%d, str=\n%s", c->fd, n, buf.start + 10);
-}
-
-
-void
-stu_websocket_request_handler(stu_event_t *wev) {
-	stu_websocket_request_t *r;
-	stu_connection_t        *c;
-	stu_channel_t           *ch;
-	stu_buf_t               *buf;
-	stu_int_t                n;
-
-	c = (stu_connection_t *) wev->data;
-
-	stu_spin_lock(&c->lock);
-	if (c->fd == (stu_socket_t) -1) {
-		goto done;
-	}
-
-	//stu_epoll_del_event(c->write, STU_WRITE_EVENT);
-
-	buf = &c->buffer;
-	buf->last = buf->start;
-	stu_memzero(buf->start, buf->end - buf->start);
-
-	r = (stu_websocket_request_t *) c->data;
-	if (r == NULL) {
-		goto failed;
-	}
-
-	*buf->last++ = 129;
-	*buf->last++ = 88;
-	buf->last = stu_memcpy(buf->last, "{\"raw\":\"identity\",\"channel\":{\"id\":\"1\",\"state\":3,\"role\":0},\"user\":{\"id\":1,\"name\":\"Tony\"}}", 88);
-
-	n = send(c->fd, buf->start, stu_strlen(buf->start), 0);
-	if (n == -1) {
-		stu_log_debug(0, "Failed to send data: fd=%d.", c->fd);
-		goto failed;
-	}
-
-	stu_log_debug(0, "sent: fd=%d, bytes=%d, str=\n%s", c->fd, n, buf->start);
-
-	goto done;
-
-failed:
-
-	c->read->active = FALSE;
-	stu_epoll_del_event(c->read, STU_READ_EVENT);
-
-	ch = c->user.channel;
-	stu_channel_remove(ch, c);
-	stu_websocket_close_connection(c);
-
-done:
-
-	stu_spin_unlock(&c->lock);
+	stu_log_debug(4, "sent: fd=%d, bytes=%d, str=\n%s", c->fd, n, buf.start + 10);
 }
 
 

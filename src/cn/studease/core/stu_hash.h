@@ -72,4 +72,6 @@ void  stu_hash_foreach(stu_hash_t *hash, stu_hash_foreach_pt cb);
 
 void  stu_hash_free_empty_pt(void *pool, void *p);
 
+void  stu_hash_test(stu_hash_t *hash);
+
 #endif /* STU_HASH_H_ */

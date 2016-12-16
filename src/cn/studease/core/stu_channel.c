@@ -42,7 +42,7 @@ stu_channel_insert_locked(stu_channel_t *ch, stu_connection_t *c) {
 		return STU_ERROR;
 	}
 
-	stu_log_debug(0, "Inserted user(\"%s\") into channel(\"%s\"), total=%lu.", key->data, ch->id.data, ch->userlist.length);
+	stu_log_debug(4, "Inserted user(\"%s\") into channel(\"%s\"), total=%lu.", key->data, ch->id.data, ch->userlist.length);
 
 	return STU_OK;
 }
@@ -64,7 +64,7 @@ stu_channel_remove_locked(stu_channel_t *ch, stu_connection_t *c) {
 
 	stu_hash_remove_locked(&ch->userlist, kh, key->data, key->len);
 
-	stu_log_debug(0, "removed user(\"%s\") from channel(\"%s\"), total=%lu.", key->data, ch->id.data, ch->userlist.length);
+	stu_log_debug(4, "removed user(\"%s\") from channel(\"%s\"), total=%lu.", key->data, ch->id.data, ch->userlist.length);
 
 	if (ch->userlist.length == 0) {
 		if (ch->userlist.free) {
@@ -80,7 +80,7 @@ stu_channel_remove_locked(stu_channel_t *ch, stu_connection_t *c) {
 		stu_slab_free(stu_cycle->slab_pool, key->data);
 		stu_slab_free(stu_cycle->slab_pool, ch);
 
-		stu_log_debug(0, "removed channel(\"%s\"), total=%lu.", key->data, ch->userlist.length);
+		stu_log_debug(4, "removed channel(\"%s\"), total=%lu.", key->data, ch->userlist.length);
 	}
 }
 

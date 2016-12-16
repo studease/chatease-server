@@ -14,10 +14,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#define __NAME    "chatease-server"
-#define __VERSION "0.0.01"
-#define __LOGGER  0 // debug: 0 - 3, log: 4, error: 5
-
 extern stu_cycle_t *stu_cycle;
 
 

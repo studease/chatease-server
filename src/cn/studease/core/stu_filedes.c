@@ -148,7 +148,7 @@ stu_filedes_add_event(stu_fd_t fd, uint32_t event, stu_event_handler_pt handler)
 	ev->handler = handler;
 
 	if (stu_epoll_add_event(ev, event) == STU_ERROR) {
-		stu_connection_free(c);
+		stu_connection_close(c);
 		return STU_ERROR;
 	}
 

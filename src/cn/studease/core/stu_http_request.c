@@ -54,7 +54,7 @@ stu_http_header_t  stu_http_headers_in[] = {
 void
 stu_http_wait_request_handler(stu_event_t *rev) {
 	stu_connection_t *c;
-	stu_int_t         n, err, retried;
+	stu_int_t         n, err;
 
 	c = (stu_connection_t *) rev->data;
 
@@ -70,35 +70,31 @@ stu_http_wait_request_handler(stu_event_t *rev) {
 	c->buffer.last = c->buffer.start;
 	stu_memzero(c->buffer.start, STU_HTTP_REQUEST_DEFAULT_SIZE);
 
-	retried = 0;
-
 again:
 
 	n = recv(c->fd, c->buffer.start, STU_HTTP_REQUEST_DEFAULT_SIZE, 0);
 	if (n == -1) {
 		err = stu_errno;
-		if (err == EAGAIN || err == EINTR) {
-			if (retried++ >= 1) {
-				stu_log_debug(0, "recv aborted: fd=%d, err=%d.", c->fd, err);
-				goto done;
-			}
+		if (err == EAGAIN) {
+			stu_log_debug(4, "Already received by other threads: fd=%d, errno=%d.", c->fd, err);
+			goto done;
+		}
 
-			stu_log_debug(0, "recv trying again: fd=%d, err=%d.", c->fd, err);
+		if (err == EINTR) {
+			stu_log_debug(4, "recv trying again: fd=%d, errno=%d.", c->fd, err);
 			goto again;
 		}
 
 		stu_log_error(err, "Failed to recv data: fd=%d.", c->fd);
-		stu_connection_free(c);
-
 		goto failed;
 	}
 
 	if (n == 0) {
-		stu_log_debug(0, "Remote client has closed connection: fd=%d.", c->fd);
+		stu_log_debug(4, "Remote client has closed connection: fd=%d.", c->fd);
 		goto failed;
 	}
 
-	stu_log_debug(0, "recv: fd=%d, bytes=%d.", c->fd, n);//str=\n%s, c->buffer.start
+	stu_log_debug(4, "recv: fd=%d, bytes=%d.", c->fd, n);//str=\n%s, c->buffer.start
 
 	c->data = (void *) stu_http_create_request(c);
 	if (c->data == NULL) {
@@ -181,7 +177,7 @@ stu_http_process_request(stu_http_request_t *r) {
 
 		ch = stu_hash_find_locked(&stu_cycle->channels, kh, channel_id.data, channel_id.len);
 		if (ch == NULL) {
-			stu_log_debug(0, "channel(\"%s\") not found: kh=%lu, i=%lu, len=%lu.",
+			stu_log_debug(4, "channel(\"%s\") not found: kh=%lu, i=%lu, len=%lu.",
 					channel_id.data, kh, kh % stu_cycle->channels.size, stu_cycle->channels.length);
 
 			ch = stu_slab_calloc(stu_cycle->slab_pool, sizeof(stu_channel_t));
@@ -206,17 +202,19 @@ stu_http_process_request(stu_http_request_t *r) {
 				goto failed;
 			}
 
-			stu_log_debug(0, "new channel(\"%s\"): kh=%lu, total=%lu.",
+			stu_log_debug(4, "new channel(\"%s\"): kh=%lu, total=%lu.",
 					ch->id.data, kh, stu_atomic_read(&stu_cycle->channels.length));
 		}
 
 		stu_spin_unlock(&stu_cycle->channels.lock);
 
-		c->user.channel = ch;
+		//stu_hash_test(&ch->userlist);
 
 		if (stu_channel_insert(ch, c) == STU_ERROR) {
 			goto failed;
 		}
+
+		c->user.channel = ch;
 
 		rc = STU_HTTP_SWITCHING_PROTOCOLS;
 	}
@@ -297,18 +295,18 @@ stu_http_process_request_headers(stu_http_request_t *r) {
 				}
 			}
 
-			//stu_log_debug(0, "http header => \"%s: %s\"", h->key.data, h->value.data);
+			//stu_log_debug(4, "http header => \"%s: %s\"", h->key.data, h->value.data);
 
 			continue;
 		}
 
 		if (rc == STU_DONE) {
-			stu_log_debug(0, "the whole header has been parsed successfully.");
+			stu_log_debug(4, "the whole header has been parsed successfully.");
 			return STU_OK;
 		}
 
 		if (rc == STU_AGAIN) {
-			stu_log_debug(0, "a header line parsing is still not complete.");
+			stu_log_debug(4, "a header line parsing is still not complete.");
 			continue;
 		}
 
@@ -422,11 +420,13 @@ stu_http_finalize_request(stu_http_request_t *r, stu_int_t rc) {
 	r->headers_out.status = rc;
 	c = r->connection;
 
-	c->write->handler = stu_http_request_handler;
+	/*c->write->handler = stu_http_request_handler;
 	if (stu_epoll_add_event(c->write, STU_WRITE_EVENT|EPOLLET) == STU_ERROR) {
 		stu_log_error(0, "Failed to add http client write event.");
 		return;
-	}
+	}*/
+
+	stu_http_request_handler(c->write);
 }
 
 static void
@@ -438,9 +438,9 @@ stu_http_request_handler(stu_event_t *wev) {
 
 	c = (stu_connection_t *) wev->data;
 
-	stu_spin_lock(&c->lock);
+	//stu_spin_lock(&c->lock);
 	if (c->fd == (stu_socket_t) -1) {
-		goto done;
+		return;
 	}
 
 	stu_epoll_del_event(c->write, STU_WRITE_EVENT);
@@ -465,11 +465,11 @@ stu_http_request_handler(stu_event_t *wev) {
 
 	n = send(c->fd, buf->start, stu_strlen(buf->start), 0);
 	if (n == -1) {
-		stu_log_debug(0, "Failed to send data: fd=%d.", c->fd);
+		stu_log_debug(4, "Failed to send data: fd=%d.", c->fd);
 		goto failed;
 	}
 
-	stu_log_debug(0, "sent: fd=%d, bytes=%d.", c->fd, n);//str=\n%s, buf->start
+	stu_log_debug(4, "sent: fd=%d, bytes=%d.", c->fd, n);//str=\n%s, buf->start
 
 	if (r->headers_out.status == STU_HTTP_SWITCHING_PROTOCOLS) {
 		if (stu_http_switch_protocol(r) == STU_ERROR) {
@@ -478,7 +478,7 @@ stu_http_request_handler(stu_event_t *wev) {
 		}
 	}
 
-	goto done;
+	return;
 
 failed:
 
@@ -487,9 +487,9 @@ failed:
 
 	stu_http_close_connection(c);
 
-done:
+//done:
 
-	stu_spin_unlock(&c->lock);
+	//stu_spin_unlock(&c->lock);
 }
 
 static stu_int_t
@@ -505,11 +505,6 @@ stu_http_switch_protocol(stu_http_request_t *r) {
 
 	c->read->handler = stu_websocket_wait_request_handler;
 	c->write->handler = stu_websocket_request_handler;
-
-	if (stu_epoll_add_event(c->read, STU_READ_EVENT|EPOLLET) == STU_ERROR) {
-		stu_log_error(0, "Failed to add http client read event.");
-		return STU_ERROR;
-	}
 
 	return STU_OK;
 }

@@ -26,7 +26,7 @@ stu_config_default(stu_config_t *cf) {
 	cf->origin_port = 80;
 	cf->master_process = TRUE;
 	cf->worker_processes = 1;
-	cf->worker_threads = 1;
+	cf->worker_threads = 2;
 	stu_str_set(&cf->pid, "chatd.pid");
 }
 
@@ -76,7 +76,10 @@ stu_cycle_create(stu_config_t *cf) {
 		stu_log_error(0, "Failed to create ram pool.");
 		return NULL;
 	}
-	cycle->ram_pool = ram_pool;
+	stu_queue_init(&cycle->ram_pool.queue);
+	stu_queue_insert_tail(&cycle->ram_pool.queue, &ram_pool->queue);
+
+	//stu_ram_test(&cycle->ram_pool);
 
 	stu_config_copy(&cycle->config, cf, pool);
 	stu_list_init(&cycle->shared_memory, slab_pool);

@@ -15,6 +15,10 @@
 #include <sys/types.h>
 #include <time.h>
 
+#define __NAME    "chatease-server"
+#define __VERSION "0.0.01"
+#define __LOGGER  2 // debug: 0 - 7, log: 8, error: 9
+
 #define STU_HAVE_OPENSSL_EVP_H   1
 #define STU_HAVE_OPENSSL_SHA1_H  1
 

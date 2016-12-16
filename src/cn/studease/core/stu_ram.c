@@ -51,16 +51,64 @@ stu_ram_pool_create() {
 
 	p->data.start = p->data.last = (u_char *) stu_align_ptr((uintptr_t) c, STU_RAM_BLOCK_SIZE);
 
+	stu_log_debug(1, "created new ram pool %p.", p);
+
 	return p;
 }
 
 void *
 stu_ram_alloc(stu_ram_pool_t *pool) {
-	void *p;
+	stu_ram_pool_t *t;
+	stu_queue_t    *q;
+	stu_uint_t      lock;
+	void           *p;
 
-	stu_spin_lock(&pool->lock);
-	p = stu_ram_alloc_locked(pool);
-	stu_spin_unlock(&pool->lock);
+	t = NULL;
+	p = NULL;
+
+start:
+
+	for (q = stu_queue_head(&pool->queue); q != stu_queue_sentinel(&pool->queue); q = stu_queue_next(q)) {
+		t = stu_queue_data(q, stu_ram_pool_t, queue);
+		if (t->bitmap != STU_RAM_BUSY64) {
+			lock = stu_atomic_read(&t->lock.rlock.counter);
+			if ((lock >> 16) !=  (lock & STU_SPINLOCK_OWNER_MASK)) {
+				continue;
+			}
+
+			stu_spin_lock(&t->lock);
+
+			p = stu_ram_alloc_locked(t);
+			if (p == NULL) {
+				stu_spin_unlock(&t->lock);
+				continue;
+			}
+
+			stu_spin_unlock(&t->lock);
+
+			goto done;
+		}
+	}
+
+	if (pool->bitmap < STU_RAM_POOL_MAX_N) {
+		stu_spin_lock(&pool->lock);
+
+		t = stu_ram_pool_create();
+		if (t == NULL) {
+			stu_spin_unlock(&pool->lock);
+			stu_log_error(0, "Failed to create ram pool.");
+
+			return NULL;
+		}
+
+		stu_queue_insert_tail(&pool->queue, &t->queue);
+
+		stu_spin_unlock(&pool->lock);
+
+		goto start;
+	}
+
+done:
 
 	return p;
 }
@@ -121,18 +169,17 @@ start:
 		}
 	}
 
-	page = sentinel->next;
-	if (page == sentinel) {
-		page = stu_ram_alloc_page(pool);
-		if (page == NULL) {
-			return NULL;
-		}
-
-		stu_memzero((void *) page->bitmap, 64);
-
-		page->prev = page->next = sentinel;
-		sentinel->prev = sentinel->next = page;
+	page = stu_ram_alloc_page(pool);
+	if (page == NULL) {
+		return NULL;
 	}
+
+	stu_memzero((void *) page->bitmap, 64);
+
+	page->prev = sentinel->prev;
+	page->prev->next = page;
+	page->next = sentinel;
+	sentinel->prev = page;
 
 	goto start;
 
@@ -142,18 +189,32 @@ full:
 	page->next->prev = page->prev;
 	page->prev = page->next = NULL;
 
+	stu_log_debug(1, "ram page full %p.", page);
+
 done:
 
-	stu_log_debug(0, "ram alloc: %p", p);
+	stu_log_debug(1, "ram alloc: %p", p);
 
 	return p;
 }
 
 void
 stu_ram_free(stu_ram_pool_t *pool, void *p) {
-	stu_spin_lock(&pool->lock);
-	stu_ram_free_locked(pool, p);
-	stu_spin_unlock(&pool->lock);
+	stu_ram_pool_t *t;
+	stu_queue_t    *q;
+
+	for (q = stu_queue_head(&pool->queue); q != stu_queue_sentinel(&pool->queue); q = stu_queue_next(q)) {
+		t = stu_queue_data(q, stu_ram_pool_t, queue);
+		if ((u_char *) p < t->data.start || (u_char *) p > t->data.end) {
+			continue;
+		}
+
+		stu_spin_lock(&t->lock);
+		stu_ram_free_locked(t, p);
+		stu_spin_unlock(&t->lock);
+
+		break;
+	}
 }
 
 void
@@ -198,6 +259,8 @@ stu_ram_free_locked(stu_ram_pool_t *pool, void *p) {
 	}
 	stu_ram_free_page(pool, page);
 
+	goto done;
+
 append:
 
 	page->prev = sentinel->prev;
@@ -207,7 +270,7 @@ append:
 
 done:
 
-	stu_log_debug(0, "ram free: %p", p);
+	stu_log_debug(1, "ram free: %p", p);
 }
 
 
@@ -220,6 +283,9 @@ stu_ram_alloc_page(stu_ram_pool_t *pool) {
 	if (page != &pool->free) {
 		pool->free.next = page->next;
 		page->next->prev = &pool->free;
+
+		stu_log_debug(1, "got freed ram page %p.", page);
+
 		return page;
 	}
 
@@ -229,7 +295,10 @@ stu_ram_alloc_page(stu_ram_pool_t *pool) {
 		stu_log_error(0, "Failed to alloc ram page: no memory.");
 		return NULL;
 	}
+
 	pool->data.last += STU_RAM_PAGE_SIZE;
+
+	stu_log_debug(1, "got new ram page %p.", page);
 
 	return page;
 }
@@ -240,10 +309,50 @@ stu_ram_free_page(stu_ram_pool_t *pool, stu_ram_page_t *page) {
 		page->prev->next = page->next;
 		page->next->prev = page->prev;
 	}
+
 	page->prev = pool->free.prev;
 	page->next = &pool->free;
-
 	pool->free.prev->next = page;
 	pool->free.prev = page;
+
+	stu_log_debug(1, "freed ram page %p.", page);
+}
+
+
+void
+stu_ram_test(stu_ram_pool_t *pool) {
+	stu_int_t  n;
+	void      *a[513];
+	void      *p;
+
+	stu_log_debug(1, "ram alloc test starting...");
+
+	for (n = 0; n <= 512; n++) {
+		p = stu_ram_alloc(pool);
+		a[n] = p;
+	}
+
+	stu_log_debug(1, "ram free test starting...");
+
+	for (n = 0; n <= 512; n++) {
+		p = a[n];
+		stu_ram_free(pool, p);
+	}
+
+	stu_log_debug(1, "ram alloc test starting...");
+
+	for (n = 0; n <= 512; n++) {
+		p = stu_ram_alloc(pool);
+		a[n] = p;
+	}
+
+	stu_log_debug(1, "ram free test starting...");
+
+	for (n = 512; n >= 0; n--) {
+		p = a[n];
+		stu_ram_free(pool, p);
+	}
+
+	stu_log_debug(1, "ram test finished.");
 }
 

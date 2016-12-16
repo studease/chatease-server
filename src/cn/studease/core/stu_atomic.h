@@ -48,7 +48,7 @@ typedef struct {
 	__sync_fetch_and_sub(ptr, val)
 
 #define stu_atomic_read(ptr)                      \
-		stu_atomic_read_long((const long *) ptr)
+	stu_atomic_read_long((const long *) ptr)
 
 static inline stu_int_t
 stu_atomic_read_long(const stu_int_t *v) {

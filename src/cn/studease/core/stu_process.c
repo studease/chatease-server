@@ -58,7 +58,7 @@ stu_process_master_cycle(stu_cycle_t *cycle) {
 	sigemptyset(&set);
 
 	for ( ;; ) {
-		stu_log_debug(0, "sigsuspending...");
+		stu_log_debug(3, "sigsuspending...");
 		sigsuspend(&set);
 
 		if (stu_quit) {
@@ -115,7 +115,7 @@ stu_spawn_process(stu_cycle_t *cycle, stu_spawn_proc_pt proc, void *data, char *
 		return STU_INVALID_PID;
 	}
 
-	stu_log_debug(0, "filedes: %d, %d.", stu_processes[s].filedes[0], stu_processes[s].filedes[1]);
+	stu_log_debug(3, "filedes: %d, %d.", stu_processes[s].filedes[0], stu_processes[s].filedes[1]);
 
 	if (stu_nonblocking(stu_processes[s].filedes[0]) == -1) {
 		stu_log_error(stu_errno, "fcntl(O_NONBLOCK) failed while spawning \"%s\"", name);
@@ -172,7 +172,7 @@ stu_spawn_process(stu_cycle_t *cycle, stu_spawn_proc_pt proc, void *data, char *
 		break;
 	}
 
-	stu_log_debug(0, "started \"%s\", pid: %d", name, pid);
+	stu_log_debug(3, "started \"%s\", pid: %d", name, pid);
 
 	stu_processes[s].pid = pid;
 	stu_processes[s].proc = proc;
@@ -197,7 +197,7 @@ stu_pass_open_filedes(stu_cycle_t *cycle, stu_filedes_t *fds) {
 			continue;
 		}
 
-		stu_log_debug(0, "pass filedes: slot=%d, pid=%lu, fd=%d, to slot=%d, pid=%lu, fd=%d.",
+		stu_log_debug(3, "pass filedes: slot=%d, pid=%lu, fd=%d, to slot=%d, pid=%lu, fd=%d.",
 				fds->slot, fds->pid, fds->fd, i, stu_processes[i].pid, stu_processes[i].filedes[0]);
 
 		stu_filedes_write(stu_processes[i].filedes[0], fds, sizeof(stu_filedes_t));
@@ -226,7 +226,7 @@ stu_signal_worker_processes(stu_cycle_t *cycle, int signo) {
 	fds.fd = -1;
 
 	for (i = 0; i < stu_process_last; i++) {
-		stu_log_debug(0, "stu_processes[%d]: pid=%d, state=%d.", i, stu_processes[i].pid, stu_processes[i].state);
+		stu_log_debug(3, "stu_processes[%d]: pid=%d, state=%d.", i, stu_processes[i].pid, stu_processes[i].state);
 
 		if (stu_processes[i].pid == STU_INVALID_PID || stu_processes[i].state == 0) {
 			continue;
@@ -238,7 +238,7 @@ stu_signal_worker_processes(stu_cycle_t *cycle, int signo) {
 			}
 		}
 
-		stu_log_debug(0, "kill (%P, %d)", stu_processes[i].pid, signo);
+		stu_log_debug(3, "kill (%P, %d)", stu_processes[i].pid, signo);
 
 		if (kill(stu_processes[i].pid, signo) == -1) {
 			stu_log_error(stu_errno, "kill(%d, %d) failed", stu_processes[i].pid, signo);
@@ -338,7 +338,7 @@ stu_filedes_handler(stu_event_t *ev) {
 	stu_connection_t  *c;
 
 	c = ev->data;
-	//stu_log_debug(0, "filedes handler called.");
+	//stu_log_debug(4, "filedes handler called.");
 
 	for ( ;; ) {
 		n = stu_filedes_read(c->fd, &ch, sizeof(stu_filedes_t));
@@ -355,7 +355,7 @@ stu_filedes_handler(stu_event_t *ev) {
 			return;
 		}
 
-		stu_log_debug(0, "filedes command: %d.", ch.command);
+		stu_log_debug(3, "filedes command: %d.", ch.command);
 
 		switch (ch.command) {
 		case STU_CMD_QUIT:
@@ -365,13 +365,13 @@ stu_filedes_handler(stu_event_t *ev) {
 			stu_restart = 1;
 			break;
 		case STU_CMD_OPEN_FILEDES:
-			stu_log_debug(0, "open filedes: s=%i, pid=%d, fd=%d.", ch.slot, ch.pid, ch.fd);
+			stu_log_debug(3, "open filedes: s=%i, pid=%d, fd=%d.", ch.slot, ch.pid, ch.fd);
 
 			stu_processes[ch.slot].pid = ch.pid;
 			stu_processes[ch.slot].filedes[0] = ch.fd;
 			break;
 		case STU_CMD_CLOSE_FILEDES:
-			stu_log_debug(0, "close filedes: s=%i, pid=%d, our=%d, fd=%d.", ch.slot, ch.pid, stu_processes[ch.slot].pid, stu_processes[ch.slot].filedes[0]);
+			stu_log_debug(3, "close filedes: s=%i, pid=%d, our=%d, fd=%d.", ch.slot, ch.pid, stu_processes[ch.slot].pid, stu_processes[ch.slot].filedes[0]);
 
 			if (close(stu_processes[ch.slot].filedes[0]) == -1) {
 				stu_log_error(stu_errno, "close() filedes failed.");

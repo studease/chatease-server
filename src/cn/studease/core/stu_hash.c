@@ -86,13 +86,11 @@ stu_hash_insert_locked(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t
 	}
 	i = kh % hash->size;
 
-	//stu_log_debug(0, "Inserting into hash: key=%lu, i=%lu, name=%s.", kh, i, key->data);
-
 	elts = hash->buckets[i];
 	if (elts == NULL) {
 		elts = hash->palloc(hash->pool, sizeof(stu_hash_elt_t));
 		if (elts == NULL) {
-			return STU_ERROR;
+			goto failed;
 		}
 
 		stu_queue_init(&elts->queue);
@@ -106,18 +104,18 @@ stu_hash_insert_locked(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t
 		}
 		if (stu_strncmp(e->key.data, key->data, key->len) == 0) {
 			e->value = value;
-			return STU_OK;
+			goto done;
 		}
 	}
 
 	elt = hash->palloc(hash->pool, sizeof(stu_hash_elt_t));
 	if (elt == NULL) {
-		return STU_ERROR;
+		goto failed;
 	}
 
 	elt->key.data = hash->palloc(hash->pool, key->len + 1);
 	if (elt->key.data == NULL) {
-		return STU_ERROR;
+		goto failed;
 	}
 
 	stu_strncpy(elt->key.data, key->data, key->len);
@@ -133,7 +131,17 @@ stu_hash_insert_locked(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t
 	stu_queue_init(&elt->q);
 	stu_queue_insert_tail(&hash->keys.elts.queue, &elt->q);
 
+done:
+
+	stu_log_debug(1, "Inserted into hash: key=%lu, i=%lu, name=%s.", kh, i, key->data);
+
 	return STU_OK;
+
+failed:
+
+	stu_log_error(0, "Failed to insert into hash: key=%lu, i=%lu, name=%s.", kh, i, key->data);
+
+	return STU_ERROR;
 }
 
 void *
@@ -157,7 +165,7 @@ stu_hash_find_locked(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t len)
 
 	elts = hash->buckets[i];
 	if (elts == NULL) {
-		return NULL;
+		goto failed;
 	}
 
 	for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
@@ -166,9 +174,14 @@ stu_hash_find_locked(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t len)
 			continue;
 		}
 		if (stu_strncmp(e->key.data, name, len) == 0) {
+			stu_log_debug(1, "Found element %p in hash: key=%lu, i=%lu, name=%s.", e->value, key, i, name);
 			return e->value;
 		}
 	}
+
+failed:
+
+	//stu_log_error(0, "Failed to find element in hash: key=%lu, i=%lu, name=%s.", key, i, name);
 
 	return NULL;
 }
@@ -190,11 +203,10 @@ stu_hash_remove_locked(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t le
 
 	elts = hash->buckets[i];
 	if (elts == NULL) {
-		stu_log_debug(0, "Failed to remove from hash: key=%lu, i=%lu, name=%s.", key, i, name);
+		stu_log_error(0, "Failed to remove from hash: key=%lu, i=%lu, name=%s.", key, i, name);
 		return;
 	}
 
-	stu_log_debug(0, "Removing from hash: key=%lu, i=%lu, name=%s.", key, i, name);
 	for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
 		e = stu_queue_data(q, stu_hash_elt_t, queue);
 		if (e->key_hash != key || e->key.len != len) {
@@ -211,7 +223,7 @@ stu_hash_remove_locked(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t le
 
 			hash->length--;
 
-			stu_log_debug(0, "Removed from hash: key=%lu, i=%lu, name=%s.", key, i, name);
+			stu_log_debug(1, "Removed %p from hash: key=%lu, i=%lu, name=%s.", e->value, key, i, name);
 
 			break;
 		}
@@ -224,7 +236,7 @@ stu_hash_remove_locked(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t le
 
 		hash->buckets[i] = NULL;
 
-		stu_log_debug(0, "Removed sentinel from hash: key=%lu, i=%lu, name=%s.", key, i, name);
+		//stu_log_debug(1, "Removed sentinel from hash: key=%lu, i=%lu, name=%s.", key, i, name);
 	}
 }
 
@@ -236,5 +248,54 @@ stu_hash_foreach(stu_hash_t *hash, stu_hash_foreach_pt cb) {
 void
 stu_hash_free_empty_pt(void *pool, void *p) {
 
+}
+
+
+void
+stu_hash_test(stu_hash_t *hash) {
+	stu_str_t   key;
+	u_char      value[1024], idstr[8], *p;
+	stu_int_t   n;
+	stu_uint_t  kh;
+
+	stu_log_debug(1, "hash insert starting...");
+
+	for (n = 0; n < 1024; n++) {
+		p = stu_sprintf(idstr, "%ld", n);
+		*p = '\0';
+
+		key.data = idstr;
+		key.len = stu_strlen(idstr);
+
+		stu_hash_insert(hash, &key, &value[n], STU_HASH_LOWCASE_KEY);
+	}
+
+	stu_log_debug(1, "hash remove starting...");
+
+	for (n = 0; n < 512; n++) {
+		p = stu_sprintf(idstr, "%ld", n);
+		*p = '\0';
+
+		key.data = idstr;
+		key.len = stu_strlen(idstr);
+
+		kh = stu_hash_key_lc(key.data, key.len);
+		stu_hash_remove(hash, kh, key.data, key.len);
+	}
+
+	stu_log_debug(1, "hash remove starting...");
+
+	for (n = 1023; n >= 512; n--) {
+		p = stu_sprintf(idstr, "%ld", n);
+		*p = '\0';
+
+		key.data = idstr;
+		key.len = stu_strlen(idstr);
+
+		kh = stu_hash_key_lc(key.data, key.len);
+		stu_hash_remove(hash, kh, key.data, key.len);
+	}
+
+	stu_log_debug(1, "hash test finished.");
 }
 

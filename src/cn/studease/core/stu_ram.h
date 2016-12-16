@@ -14,11 +14,11 @@
 #define STU_RAM_BLOCK_SIZE  4096
 #define STU_RAM_BLOCK_SHIFT 12
 
-#define STU_RAM_PAGE_SIZE   (512 * STU_RAM_BLOCK_SIZE)
+#define STU_RAM_PAGE_SIZE   2097152
 #define STU_RAM_PAGE_SHIFT  21
 
-#define STU_RAM_POOL_BUSY   0xFF
-#define STU_RAM_PAGE_BUSY   0xFF
+#define STU_RAM_POOL_MAX_N  16
+
 #define STU_RAM_BUSY64      0xFFFFFFFFFFFFFFFF
 #define STU_RAM_BUSY8       0xFF
 
@@ -52,5 +52,7 @@ void *stu_ram_alloc_locked(stu_ram_pool_t *pool);
 
 void  stu_ram_free(stu_ram_pool_t *pool, void *p);
 void  stu_ram_free_locked(stu_ram_pool_t *pool, void *p);
+
+void  stu_ram_test(stu_ram_pool_t *pool);
 
 #endif /* STU_RAM_H_ */
