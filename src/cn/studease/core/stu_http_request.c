@@ -60,6 +60,7 @@ stu_http_wait_request_handler(stu_event_t *rev) {
 
 	stu_spin_lock(&c->lock);
 	if (c->fd == (stu_socket_t) -1) {
+		stu_log_error(0, "http waited a invalid fd=%d.", c->fd);
 		goto done;
 	}
 
@@ -433,6 +434,7 @@ static void
 stu_http_request_handler(stu_event_t *wev) {
 	stu_http_request_t *r;
 	stu_connection_t   *c;
+	stu_channel_t      *ch;
 	stu_buf_t          *buf;
 	stu_int_t           n;
 
@@ -485,6 +487,8 @@ failed:
 	c->read->active = FALSE;
 	stu_epoll_del_event(c->read, STU_READ_EVENT);
 
+	ch = c->user.channel;
+	stu_channel_remove(ch, c);
 	stu_http_close_connection(c);
 
 //done:

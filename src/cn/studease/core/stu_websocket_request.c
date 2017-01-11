@@ -6,6 +6,7 @@
  */
 
 #include <sys/socket.h>
+#include <sys/time.h>
 #include "stu_config.h"
 #include "stu_core.h"
 
@@ -22,6 +23,7 @@ stu_websocket_wait_request_handler(stu_event_t *rev) {
 
 	stu_spin_lock(&c->lock);
 	if (c->fd == (stu_socket_t) -1) {
+		stu_log_error(0, "websocket waited a invalid fd=%d.", c->fd);
 		goto done;
 	}
 
@@ -56,7 +58,7 @@ again:
 		goto failed;
 	}
 
-	stu_log_debug(4, "recv: fd=%d, bytes=%d, str=\n%s", c->fd, n, c->buffer.start);
+	stu_log_debug(4, "recv: fd=%d, bytes=%d.", c->fd, n);
 
 	c->data = (void *) stu_websocket_create_request(c);
 	if (c->data == NULL) {
@@ -182,6 +184,8 @@ stu_websocket_request_handler(stu_event_t *wev) {
 	stu_list_elt_t          *elts;
 	stu_hash_elt_t          *e;
 	stu_queue_t             *q;
+	struct timeval           start, end;
+	stu_int_t                cost;
 
 	c = (stu_connection_t *) wev->data;
 	r = (stu_websocket_request_t *) c->data;
@@ -244,6 +248,9 @@ stu_websocket_request_handler(stu_event_t *wev) {
 			buf.start[5], buf.start[6], buf.start[7], buf.start[8], buf.start[9]);
 
 	stu_spin_lock(&ch->userlist.lock);
+
+	gettimeofday(&start, NULL);
+
 	elts = &ch->userlist.keys.elts;
 	for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
 		e = stu_queue_data(q, stu_hash_elt_t, q);
@@ -261,11 +268,15 @@ stu_websocket_request_handler(stu_event_t *wev) {
 			continue;
 		}
 
-		stu_log_debug(4, "sent to fd=%d, bytes=%d.", t->fd, n);
+		//stu_log_debug(4, "sent to fd=%d, bytes=%d.", t->fd, n);
 	}
-	stu_spin_unlock(&ch->userlist.lock);
 
-	stu_log_debug(4, "sent: fd=%d, bytes=%d, str=\n%s", c->fd, n, buf.start + 10);
+	gettimeofday(&end, NULL);
+	cost = 1000000 * (end.tv_sec - start.tv_sec) + end.tv_usec - start.tv_usec;
+
+	stu_log_debug(4, "sent: fd=%d, bytes=%d, cost=%ld.", c->fd, n, cost);
+
+	stu_spin_unlock(&ch->userlist.lock);
 }
 
 

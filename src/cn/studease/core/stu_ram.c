@@ -292,7 +292,7 @@ stu_ram_alloc_page(stu_ram_pool_t *pool) {
 	n = (pool->data.last - pool->data.start) >> STU_RAM_PAGE_SHIFT;
 	page = &pool->pages[n];
 	if (page >= pool->last) {
-		stu_log_error(0, "Failed to alloc ram page: no memory.");
+		stu_log_debug(1, "Failed to alloc ram page: no memory.");
 		return NULL;
 	}
 
