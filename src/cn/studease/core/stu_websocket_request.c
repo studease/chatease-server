@@ -12,6 +12,8 @@
 
 static stu_int_t stu_websocket_process_request_frames(stu_websocket_request_t *r);
 
+extern lua_State *L;
+
 
 void
 stu_websocket_wait_request_handler(stu_event_t *rev) {
@@ -158,6 +160,8 @@ stu_websocket_process_request_frames(stu_websocket_request_t *r) {
 void
 stu_websocket_finalize_request(stu_websocket_request_t *r, stu_channel_t *ch) {
 	stu_connection_t *c;
+	stu_bool_t        success;
+	u_char           *message;
 
 	c = r->connection;
 
@@ -167,9 +171,57 @@ stu_websocket_finalize_request(stu_websocket_request_t *r, stu_channel_t *ch) {
 		return;
 	}*/
 
-	stu_websocket_request_handler(c->write);
+	lua_getglobal(L, "onMessage");
+
+	lua_newtable(L);
+	lua_pushstring(L, "id");
+	lua_pushinteger(L, c->user.id);
+	lua_settable(L, -3);
+
+	lua_pushstring(L, (const char *) r->frames_in.payload_data.start);
+
+	if (lua_pcall(L, 2, 2, 0)) {
+		stu_log_error(0, lua_tostring(L, -1));
+	} else {
+		if (lua_isboolean(L, -2) && lua_isstring(L, -1)) {
+			success = lua_toboolean(L, -2);
+			message = (u_char *) lua_tostring(L, -1);
+
+			stu_log_debug(5, "LUA.onMessage() returned: %d, %s.", success, message);
+
+			if (success) {
+				r->frames_in.payload_data.start = message;
+				r->frames_in.payload_data.end = r->frames_in.payload_data.start + stu_strlen(message);
+
+				stu_websocket_request_handler(c->write);
+			}
+		} else {
+			stu_log_error(0, "LUA.onMessage() should return boolen & string.");
+		}
+	}
+
+	//stu_websocket_request_handler(c->write);
 }
 
+int
+stu_broadcast(lua_State *L) {
+	//stu_connection_t *c;
+	int   id;
+	char *message;
+
+	//stu_log_debug(5, "type: %d", lua_type(L, -3));
+
+	//c = (stu_connection_t *) lua_touserdata(L, -3);
+
+	id = lua_getfield(L, -2, "id");
+	message = (char *) lua_tostring(L, -1);
+
+	stu_log_debug(5, "LUA calling stu_broadcast(%d, %s).", id, message);
+
+	//stu_websocket_request_handler(c->write);
+
+	return 0;
+}
 
 void
 stu_websocket_request_handler(stu_event_t *wev) {

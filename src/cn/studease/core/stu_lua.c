@@ -8,17 +8,14 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
-static const stu_str_t STU_LUA_SCRIPT_URI = stu_string("main.lua");
-static const stu_str_t STU_APPLICATIONS = stu_string("applications");
+static const stu_str_t STU_LUA_SCRIPT_URI = stu_string("applications/main.lua");
 
 static const stu_str_t STU_LUA_INFO_CODE_SHUTDOWN = stu_string("Application.Shutdown");
 static const stu_str_t STU_LUA_INFO_CODE_GC = stu_string("Application.GC");
 
 static const stu_str_t STU_LUA_INFO_LEVEL_STATUS = stu_string("status");
 
-static lua_State *L;
-
-stu_application_t *stu_app;
+lua_State *L;
 
 
 stu_int_t
@@ -26,11 +23,9 @@ stu_lua_init() {
 	L = luaL_newstate();
 	luaL_openlibs(L);
 
+	lua_register(L, "stu_broadcast", stu_broadcast);
+
 	luaL_loadfile(L, (const char *) STU_LUA_SCRIPT_URI.data);
-
-	stu_app = lua_newuserdata(L, sizeof(stu_application_t));
-
-
 	if (lua_resume(L, NULL, 0)) {
 		stu_log_error(0, lua_tostring(L, -1));
 		return STU_ERROR;
