@@ -1,7 +1,6 @@
-src/chatease-server.d: ../src/chatease-server.c \
+src/cn/studease/core/stu_lua.d: ../src/cn/studease/core/stu_lua.c \
  ../src/cn/studease/core/stu_config.h ../src/cn/studease/core/stu_core.h \
  ../src/cn/studease/core/stu_string.h ../src/cn/studease/core/stu_buf.h \
- ../src/cn/studease/core/stu_config.h ../src/cn/studease/core/stu_core.h \
  ../src/cn/studease/core/stu_queue.h ../src/cn/studease/core/stu_errno.h \
  ../src/cn/studease/core/stu_log.h ../src/cn/studease/core/stu_alloc.h \
  ../src/cn/studease/core/stu_atomic.h \
@@ -40,10 +39,6 @@ src/chatease-server.d: ../src/chatease-server.c \
 ../src/cn/studease/core/stu_string.h:
 
 ../src/cn/studease/core/stu_buf.h:
-
-../src/cn/studease/core/stu_config.h:
-
-../src/cn/studease/core/stu_core.h:
 
 ../src/cn/studease/core/stu_queue.h:
 

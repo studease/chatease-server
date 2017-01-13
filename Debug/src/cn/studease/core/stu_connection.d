@@ -17,6 +17,12 @@ src/cn/studease/core/stu_connection.d: \
  ../src/cn/studease/core/stu_sha1.h /usr/local/ssl/include/openssl/sha.h \
  /usr/local/ssl/include/openssl/e_os2.h \
  /usr/local/ssl/include/openssl/opensslconf.h \
+ ../src/cn/studease/core/stu_lua.h \
+ /usr/local/lua-5.3.3_Linux35_64_lib/include/lua.h \
+ /usr/local/lua-5.3.3_Linux35_64_lib/include/luaconf.h \
+ /usr/local/lua-5.3.3_Linux35_64_lib/include/lualib.h \
+ /usr/local/lua-5.3.3_Linux35_64_lib/include/lua.h \
+ /usr/local/lua-5.3.3_Linux35_64_lib/include/lauxlib.h \
  ../src/cn/studease/core/stu_http.h \
  ../src/cn/studease/core/stu_http_request.h \
  ../src/cn/studease/core/stu_http_parse.h \
@@ -82,6 +88,18 @@ src/cn/studease/core/stu_connection.d: \
 /usr/local/ssl/include/openssl/e_os2.h:
 
 /usr/local/ssl/include/openssl/opensslconf.h:
+
+../src/cn/studease/core/stu_lua.h:
+
+/usr/local/lua-5.3.3_Linux35_64_lib/include/lua.h:
+
+/usr/local/lua-5.3.3_Linux35_64_lib/include/luaconf.h:
+
+/usr/local/lua-5.3.3_Linux35_64_lib/include/lualib.h:
+
+/usr/local/lua-5.3.3_Linux35_64_lib/include/lua.h:
+
+/usr/local/lua-5.3.3_Linux35_64_lib/include/lauxlib.h:
 
 ../src/cn/studease/core/stu_http.h:
 
