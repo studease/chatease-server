@@ -182,25 +182,31 @@ stu_websocket_finalize_request(stu_websocket_request_t *r, stu_channel_t *ch) {
 
 	if (lua_pcall(L, 2, 2, 0)) {
 		stu_log_error(0, lua_tostring(L, -1));
-	} else {
-		if (lua_isboolean(L, -2) && lua_isstring(L, -1)) {
-			success = lua_toboolean(L, -2);
-			message = (u_char *) lua_tostring(L, -1);
 
-			stu_log_debug(5, "LUA.onMessage() returned: %d, %s.", success, message);
 
-			if (success) {
-				r->frames_in.payload_data.start = message;
-				r->frames_in.payload_data.end = r->frames_in.payload_data.start + stu_strlen(message);
 
-				stu_websocket_request_handler(c->write);
-			}
-		} else {
-			stu_log_error(0, "LUA.onMessage() should return boolen & string.");
-		}
+		return;
 	}
 
-	//stu_websocket_request_handler(c->write);
+	if (!lua_isboolean(L, -2) || !lua_isstring(L, -1)) {
+		stu_log_error(0, "LUA.onMessage() should return boolen & string.");
+
+
+
+		return;
+	}
+
+	success = lua_toboolean(L, -2);
+	message = (u_char *) lua_tostring(L, -1);
+
+	stu_log_debug(5, "LUA.onMessage() returned: %d, %s.", success, message);
+
+	if (success) {
+		r->frames_in.payload_data.start = message;
+		r->frames_in.payload_data.end = r->frames_in.payload_data.start + stu_strlen(message);
+
+		stu_websocket_request_handler(c->write);
+	}
 }
 
 int
