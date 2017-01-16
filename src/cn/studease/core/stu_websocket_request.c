@@ -11,6 +11,7 @@
 #include "stu_core.h"
 
 static stu_int_t stu_websocket_process_request_frames(stu_websocket_request_t *r);
+static void stu_websocket_analyze_request(stu_websocket_request_t *r);
 
 extern lua_State *L;
 
@@ -113,6 +114,8 @@ stu_websocket_process_request(stu_websocket_request_t *r) {
 
 	rc = stu_websocket_process_request_frames(r);
 	if (rc != STU_DONE) {
+		stu_log_error(0, "Failed to process request frames.");
+		stu_websocket_finalize_request(r, STU_HTTP_BAD_REQUEST);
 		return;
 	}
 
@@ -120,14 +123,12 @@ stu_websocket_process_request(stu_websocket_request_t *r) {
 	ch = c->user.channel;
 
 	if (ch == NULL) {
-		stu_log_error(0, "Failed to process request: %d, channel not found.", STU_HTTP_INTERNAL_SERVER_ERROR);
-
-		stu_websocket_close_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
-
+		stu_log_error(0, "Failed to process request: channel not found.");
+		stu_websocket_finalize_request(r, STU_HTTP_FORBIDDEN);
 		return;
 	}
 
-	stu_websocket_finalize_request(r, ch);
+	stu_websocket_analyze_request(r);
 }
 
 static stu_int_t
@@ -157,12 +158,77 @@ stu_websocket_process_request_frames(stu_websocket_request_t *r) {
 	return rc;
 }
 
-void
-stu_websocket_finalize_request(stu_websocket_request_t *r, stu_channel_t *ch) {
-	stu_connection_t *c;
-	stu_bool_t        success;
-	u_char           *message;
+static void
+stu_websocket_analyze_request(stu_websocket_request_t *r) {
+	stu_connection_t      *c;
+	stu_websocket_frame_t *f, *out;
+	stu_buf_t              buf;
+	u_char                 temp[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE], *data;
+	stu_int_t              sz, rc;
+	uint64_t               size;
 
+	c = r->connection;
+
+	stu_memzero(temp, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
+
+	buf.start = buf.last = temp;
+	buf.end = buf.start + STU_WEBSOCKET_REQUEST_DEFAULT_SIZE;
+
+	for (f = &r->frames_in; f; f = f->next) {
+		if (f->opcode != STU_WEBSOCKET_OPCODE_TEXT) {
+			continue;
+		}
+
+		sz = f->payload_data.end - f->payload_data.start;
+		if (sz == 0) {
+			continue;
+		}
+
+		buf.last = stu_memcpy(buf.last, f->payload_data.start, sz);
+
+		f->payload_data.end = f->payload_data.start;
+	}
+
+	size = buf.last - buf.start;
+	if (size == 0) {
+		return;
+	}
+
+	// call lua api.
+	if (stu_lua_onmessage(c, temp) == STU_ERROR) {
+		stu_log_error(0, lua_tostring(L, -1));
+		stu_websocket_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
+		return;
+	}
+
+	// get returned value[s].
+	if (!lua_isinteger(L, -2) || !lua_isstring(L, -1)) {
+		stu_log_error(0, "LUA.onMessage() should return integer & string.");
+		stu_websocket_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
+		return;
+	}
+
+	rc = lua_tointeger(L, -2);
+	data = (u_char *) lua_tostring(L, -1);
+	lua_pop(L, 2);
+
+	// setup out frame.
+	out = &r->frames_out;
+	out->opcode = STU_WEBSOCKET_OPCODE_TEXT;
+	out->extended = stu_strlen(data);
+	out->payload_data.start = data;
+	out->payload_data.end = data + out->extended;
+
+	stu_log_debug(5, "LUA.onMessage() returned: %d, %s.", rc, data);
+
+	stu_websocket_finalize_request(r, rc);
+}
+
+void
+stu_websocket_finalize_request(stu_websocket_request_t *r, stu_int_t rc) {
+	stu_connection_t *c;
+
+	r->status = rc;
 	c = r->connection;
 
 	/*c->write->handler = stu_websocket_request_handler;
@@ -171,42 +237,7 @@ stu_websocket_finalize_request(stu_websocket_request_t *r, stu_channel_t *ch) {
 		return;
 	}*/
 
-	lua_getglobal(L, "onMessage");
-
-	lua_newtable(L);
-	lua_pushstring(L, "id");
-	lua_pushinteger(L, c->user.id);
-	lua_settable(L, -3);
-
-	lua_pushstring(L, (const char *) r->frames_in.payload_data.start);
-
-	if (lua_pcall(L, 2, 2, 0)) {
-		stu_log_error(0, lua_tostring(L, -1));
-
-
-
-		return;
-	}
-
-	if (!lua_isboolean(L, -2) || !lua_isstring(L, -1)) {
-		stu_log_error(0, "LUA.onMessage() should return boolen & string.");
-
-
-
-		return;
-	}
-
-	success = lua_toboolean(L, -2);
-	message = (u_char *) lua_tostring(L, -1);
-
-	stu_log_debug(5, "LUA.onMessage() returned: %d, %s.", success, message);
-
-	if (success) {
-		r->frames_in.payload_data.start = message;
-		r->frames_in.payload_data.end = r->frames_in.payload_data.start + stu_strlen(message);
-
-		stu_websocket_request_handler(c->write);
-	}
+	stu_websocket_request_handler(c->write);
 }
 
 int
@@ -237,7 +268,7 @@ stu_websocket_request_handler(stu_event_t *wev) {
 	stu_websocket_frame_t   *f;
 	stu_buf_t                buf;
 	u_char                   temp[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE], *data;
-	stu_int_t                s, extened, n;
+	stu_int_t                extened, n;
 	uint64_t                 size;
 	stu_list_elt_t          *elts;
 	stu_hash_elt_t          *e;
@@ -252,89 +283,85 @@ stu_websocket_request_handler(stu_event_t *wev) {
 	stu_memzero(temp, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
 
 	buf.start = temp;
-	buf.last = buf.start + 10;
+	buf.end = buf.start + STU_WEBSOCKET_REQUEST_DEFAULT_SIZE;
 
-	for (f = &r->frames_in; f; f = f->next) {
-		if (f->opcode != STU_WEBSOCKET_OPCODE_TEXT) {
-			continue;
+	for (f = &r->frames_out; f; f = f->next) {
+		buf.last = buf.start + 10;
+		buf.last = stu_memcpy(buf.last, f->payload_data.start, f->extended);
+
+		data = buf.start;
+		size = f->extended;
+		if (size < 126) {
+			data += 8;
+			data[0] = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
+			data[1] = size;
+			extened = 0;
+		} else if (size < 65536) {
+			data += 6;
+			data[0] = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
+			data[1] = 0x7E;
+			data[2] = size >> 8;
+			data[3] = size;
+			extened = 2;
+		} else {
+			data[0] = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
+			data[1] = 0x7F;
+			data[2] = size >> 56;
+			data[3] = size >> 48;
+			data[4] = size >> 40;
+			data[5] = size >> 32;
+			data[6] = size >> 24;
+			data[7] = size >> 16;
+			data[8] = size >> 8;
+			data[9] = size;
+			extened = 8;
 		}
 
-		s = f->payload_data.end - f->payload_data.start;
-		if (s == 0) {
-			continue;
+		stu_log_debug(4, "frame header: %d %d %d %d %d %d %d %d %d %d",
+				buf.start[0], buf.start[1], buf.start[2], buf.start[3], buf.start[4],
+				buf.start[5], buf.start[6], buf.start[7], buf.start[8], buf.start[9]);
+
+		gettimeofday(&start, NULL);
+
+		if (r->status == STU_HTTP_OK) {
+			stu_spin_lock(&ch->userlist.lock);
+
+			elts = &ch->userlist.keys.elts;
+			for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
+				e = stu_queue_data(q, stu_hash_elt_t, q);
+				t = (stu_connection_t *) e->value;
+
+				n = send(t->fd, data, size + 2 + extened, 0);
+				if (n == -1) {
+					stu_log_error(stu_errno, "Failed to send data: from=%d, to=%d.", c->fd, t->fd);
+					/*
+					q = stu_queue_prev(q);
+
+					stu_channel_remove_locked(ch, t);
+					stu_websocket_close_connection(t);
+					*/
+					continue;
+				}
+
+				//stu_log_debug(4, "sent to fd=%d, bytes=%d.", t->fd, n);
+			}
+
+			stu_spin_unlock(&ch->userlist.lock);
+		} else {
+			n = send(c->fd, data, size + 2 + extened, 0);
+			if (n == -1) {
+				stu_log_error(stu_errno, "Failed to send data: to=%d.", c->fd);
+				/*
+				stu_channel_remove(ch, c);
+				stu_websocket_close_connection(c);
+				*/
+			}
 		}
 
-		buf.last = stu_memcpy(buf.last, f->payload_data.start, s);
-
-		f->payload_data.end = f->payload_data.start;
+		gettimeofday(&end, NULL);
+		cost = 1000000 * (end.tv_sec - start.tv_sec) + end.tv_usec - start.tv_usec;
+		stu_log_debug(4, "sent: fd=%d, bytes=%d, cost=%ld.", c->fd, n, cost);
 	}
-
-	size = buf.last - buf.start - 10;
-	if (size == 0) {
-		return;
-	}
-
-	data = buf.start;
-	if (size < 126) {
-		data += 8;
-		data[0] = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
-		data[1] = size;
-		extened = 0;
-	} else if (size < 65536) {
-		data += 6;
-		data[0] = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
-		data[1] = 0x7E;
-		data[2] = size >> 8;
-		data[3] = size;
-		extened = 2;
-	} else {
-		data[0] = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
-		data[1] = 0x7F;
-		data[2] = size >> 56;
-		data[3] = size >> 48;
-		data[4] = size >> 40;
-		data[5] = size >> 32;
-		data[6] = size >> 24;
-		data[7] = size >> 16;
-		data[8] = size >> 8;
-		data[9] = size;
-		extened = 8;
-	}
-
-	stu_log_debug(4, "frame header: %d %d %d %d %d %d %d %d %d %d",
-			buf.start[0], buf.start[1], buf.start[2], buf.start[3], buf.start[4],
-			buf.start[5], buf.start[6], buf.start[7], buf.start[8], buf.start[9]);
-
-	stu_spin_lock(&ch->userlist.lock);
-
-	gettimeofday(&start, NULL);
-
-	elts = &ch->userlist.keys.elts;
-	for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
-		e = stu_queue_data(q, stu_hash_elt_t, q);
-		t = (stu_connection_t *) e->value;
-
-		n = send(t->fd, data, size + 2 + extened, 0);
-		if (n == -1) {
-			stu_log_error(stu_errno, "Failed to send data: from=%d, to=%d.", c->fd, t->fd);
-
-			q = stu_queue_prev(q);
-
-			stu_channel_remove_locked(ch, t);
-			stu_websocket_close_connection(t);
-
-			continue;
-		}
-
-		//stu_log_debug(4, "sent to fd=%d, bytes=%d.", t->fd, n);
-	}
-
-	gettimeofday(&end, NULL);
-	cost = 1000000 * (end.tv_sec - start.tv_sec) + end.tv_usec - start.tv_usec;
-
-	stu_log_debug(4, "sent: fd=%d, bytes=%d, cost=%ld.", c->fd, n, cost);
-
-	stu_spin_unlock(&ch->userlist.lock);
 }
 
 
@@ -359,7 +386,7 @@ stu_websocket_free_request(stu_websocket_request_t *r, stu_int_t rc) {
 
 void
 stu_websocket_close_connection(stu_connection_t *c) {
-	stu_connection_close(c);
+	stu_http_close_connection(c);
 }
 
 

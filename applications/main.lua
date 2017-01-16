@@ -1,6 +1,8 @@
 package.cpath = '/usr/local/lua-5.3.3_Linux35_64_lib/lib/lua/5.3/?.so;'
 
-local cjson = require("cjson");
+local JSON = require("cjson");
+
+local channels = {};
 
 
 function onAppStart()
@@ -13,24 +15,66 @@ end
 
 
 function onConnect(client, ...)
+	local res = {}, users;
+	
 	stu_log('==== onConnect ====')
+	--[[
+	res.raw = 'identity'
+	res.user = { id = client.id, name = client.name }
+	res.channel = { id = client.channel, role = 0, state = 3 }
+	
+	users = channels[client.channel];
+	if (users == nil) then
+		users = {};
+		table.insert(channels, client.channel, users)
+	end
+	
+	table.insert(users, client.id, { interval = 1000, active = 0 });
+	]]--
+	return 101, JSON.encode(res)
 end
 
 function onDisconnect(client)
+	local users;
+	
 	stu_log('==== onDisconnect ====')
+	--[[
+	users = channels[client.channel];
+	if (users == nil) then
+		return
+	end
+	]]--
+	table.remove(users, client.id);
 end
 
 
 function onMessage(client, message)
+	local res = {}, data, users, info;
+	
 	stu_log('onMessage(' .. client.id .. ', ' .. message .. ')')
-	
-	local data = cjson.decode(message);
-	
-	if (data.cmd == 'join') then
-		return true, '{"raw":"identity","user":{"id":' .. client.id .. ',"name":' .. client.id .. '},"channel":{"id":' .. data.channel.id .. ',"state":2}}'
+	--[[
+	data = JSON.decode(message);
+	if (data == nil or data.cmd == nil or data.channel == nil or data.channel.id == nil) then
+		res.raw = 'error'
+		res.error = { code: 400, explain: 'Bad Request' }
+		res.channel = data.channel
+		
+		return res.error.code, JSON.encode(res)
 	end
 	
-	return true, data.text
+	users = channels[data.channel.id]
+	if (client.id ~= data.channel.id or users == nil or users[client.id] == nil) then
+		res.raw = 'error'
+		res.error = { code: 400, explain: 'Bad Request' }
+		res.channel = data.channel
+		
+		return res.error.code, JSON.encode(res)
+	end
+	
+	info = users[client.id]
+	-- check interval & permission
+	]]--
+	return data.type == 'multi' and 200 or 209, data.text
 end
 
 

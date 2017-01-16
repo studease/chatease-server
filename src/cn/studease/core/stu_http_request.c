@@ -12,6 +12,10 @@
 extern stu_cycle_t *stu_cycle;
 extern stu_hash_t   stu_http_headers_in_hash;
 
+extern const stu_str_t STU_LUA_INTERFACE_ONCONNECT;
+
+extern lua_State *L;
+
 static void stu_http_request_handler(stu_event_t *wev);
 static stu_int_t stu_http_switch_protocol(stu_http_request_t *r);
 
@@ -145,7 +149,7 @@ stu_http_process_request(stu_http_request_t *r) {
 	stu_connection_t *c;
 	stu_str_t         channel_id;
 	stu_uint_t        kh;
-	u_char           *last;
+	u_char           *last, *data;
 	stu_channel_t    *ch;
 
 	rc = stu_http_process_request_headers(r);
@@ -216,17 +220,34 @@ stu_http_process_request(stu_http_request_t *r) {
 		}
 
 		c->user.channel = ch;
-
-		rc = STU_HTTP_SWITCHING_PROTOCOLS;
 	}
 
-	stu_http_finalize_request(r, rc);
+	if (stu_lua_onconnect(c) == STU_ERROR) {
+		stu_log_error(0, "Failed to call external interface %s().", STU_LUA_INTERFACE_ONCONNECT.data);
+		goto failed;
+	}
 
-	return;
+	if (!lua_isinteger(L, -2) || !lua_isstring(L, -1)) {
+		stu_log_error(0, "External interface %s() should return integer & string.", STU_LUA_INTERFACE_ONCONNECT.data);
+		goto failed;
+	}
+
+	rc = lua_tointeger(L, -2);
+	data = (u_char *) lua_tostring(L, -1);
+	lua_pop(L, 2);
+
+	r->response_body.start = data;
+	r->response_body.end = r->response_body.start + stu_strlen(data);
+
+	goto done;
 
 failed:
 
-	stu_http_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
+	rc = STU_HTTP_INTERNAL_SERVER_ERROR;
+
+done:
+
+	stu_http_finalize_request(r, rc);
 }
 
 

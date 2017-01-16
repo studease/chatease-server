@@ -109,7 +109,7 @@ struct stu_http_request_s {
 
 	stu_http_headers_in_t   headers_in;
 	stu_http_headers_out_t  headers_out;
-	stu_buf_t              *response_body;
+	stu_buf_t               response_body;
 
 	// used for parsing request.
 	stu_uint_t              state;

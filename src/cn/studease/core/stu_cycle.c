@@ -132,6 +132,7 @@ stu_cycle_create(stu_config_t *cf) {
 
 	if (stu_lua_init() == STU_ERROR) {
 		stu_log_error(0, "Failed to init lua.");
+		return NULL;
 	}
 
 	return cycle;
