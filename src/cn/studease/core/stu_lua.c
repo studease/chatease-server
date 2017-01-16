@@ -37,7 +37,7 @@ stu_lua_init() {
 		return STU_ERROR;
 	}
 
-	lua_getglobal(L, "stu_log");
+	lua_getglobal(L, "log");
 	lua_pushfstring(L, "Message from %s/%s.", __NAME, __VERSION);
 	if (lua_pcall(L, 1, 0, 0)) {
 		stu_log_error(0, lua_tostring(L, -1));
@@ -114,9 +114,6 @@ stu_lua_onconnect(stu_connection_t *c, ...) {
 	lua_pushstring(L, "id");
 	lua_pushinteger(L, c->user.id);
 	lua_settable(L, -3);
-	lua_pushstring(L, "name");
-	lua_pushstring(L, (const char *) c->user.name.data);
-	lua_settable(L, -3);
 	lua_pushstring(L, "channel");
 	lua_pushstring(L, (const char *) c->user.channel->id.data);
 	lua_settable(L, -3);
@@ -149,9 +146,6 @@ stu_lua_ondisconnect(stu_connection_t *c) {
 	lua_pushstring(L, "id");
 	lua_pushinteger(L, c->user.id);
 	lua_settable(L, -3);
-	lua_pushstring(L, "name");
-	lua_pushstring(L, (const char *) c->user.name.data);
-	lua_settable(L, -3);
 	lua_pushstring(L, "channel");
 	lua_pushstring(L, (const char *) c->user.channel->id.data);
 	lua_settable(L, -3);
@@ -177,6 +171,9 @@ stu_lua_onmessage(stu_connection_t *c, u_char *message) {
 	lua_newtable(L);
 	lua_pushstring(L, "id");
 	lua_pushinteger(L, c->user.id);
+	lua_settable(L, -3);
+	lua_pushstring(L, "channel");
+	lua_pushstring(L, (const char *) c->user.channel->id.data);
 	lua_settable(L, -3);
 
 	lua_pushstring(L, (const char *) message);

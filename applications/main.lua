@@ -6,81 +6,98 @@ local channels = {};
 
 
 function onAppStart()
-	stu_log('==== onAppStart ====')
+	log('==== onAppStart ====')
 end
 
 function onAppStop(info)
-	stu_log('==== onAppStop ====')
+	log('==== onAppStop ====')
 end
 
 
 function onConnect(client, ...)
-	local res = {}, users;
+	local res = {}, users, info
 	
-	stu_log('==== onConnect ====')
-	--[[
-	res.raw = 'identity'
-	res.user = { id = client.id, name = client.name }
-	res.channel = { id = client.channel, role = 0, state = 3 }
+	log('==== onConnect ====')
 	
-	users = channels[client.channel];
+	users = channels[client.channel]
 	if (users == nil) then
-		users = {};
-		table.insert(channels, client.channel, users)
+		users = {}
+		channels[client.channel] = users
 	end
 	
-	table.insert(users, client.id, { interval = 1000, active = 0 });
-	]]--
+	info = {
+		properties = { id = client.id, name = 'u' .. client.id },
+		channel = { id = client.channel, role = 0, state = 3 },
+		interval = 1000,
+		active = 0
+	}
+	users[client.id] = info
+	
+	res.raw = 'identity'
+	res.user = info.properties
+	res.channel = info.channel
+	
 	return 101, JSON.encode(res)
 end
 
 function onDisconnect(client)
-	local users;
+	local users
 	
-	stu_log('==== onDisconnect ====')
-	--[[
-	users = channels[client.channel];
+	log('==== onDisconnect ====')
+	
+	users = channels[client.channel]
 	if (users == nil) then
 		return
 	end
-	]]--
-	table.remove(users, client.id);
+	
+	users[client.id] = nil
 end
 
 
 function onMessage(client, message)
-	local res = {}, data, users, info;
+	local res = {}, data, users, info
 	
-	stu_log('onMessage(' .. client.id .. ', ' .. message .. ')')
-	--[[
-	data = JSON.decode(message);
+	log('==== onMessage ====')
+	
+	data = JSON.decode(message)
 	if (data == nil or data.cmd == nil or data.channel == nil or data.channel.id == nil) then
 		res.raw = 'error'
-		res.error = { code: 400, explain: 'Bad Request' }
+		res.error = { code = 400, explain = 'Bad Request' }
 		res.channel = data.channel
 		
 		return res.error.code, JSON.encode(res)
 	end
 	
 	users = channels[data.channel.id]
-	if (client.id ~= data.channel.id or users == nil or users[client.id] == nil) then
+	if (client.channel ~= data.channel.id or users == nil or users[client.id] == nil) then
 		res.raw = 'error'
-		res.error = { code: 400, explain: 'Bad Request' }
+		res.error = { code = 400, explain = 'Bad Request' }
 		res.channel = data.channel
 		
 		return res.error.code, JSON.encode(res)
 	end
 	
 	info = users[client.id]
-	-- check interval & permission
-	]]--
-	return data.type == 'multi' and 200 or 209, data.text
+	if (info == nil or info.properties == nil or info.channel == nil) then
+		res.raw = 'error'
+		res.error = { code = 500, explain = 'Internal Server Error' }
+		
+		return res.error.code, JSON.encode(res)
+	end
+	
+	res.raw = 'message'
+	res.text = data.text
+	res.type = data.type
+	res.user = info.properties
+	res.channel = info.channel
+	
+	return data.type == 'multi' and 200 or 209, JSON.encode(res)
 end
 
 
-function stu_log(fmt, ...)
-	print('[LUA] ' .. string.format(fmt, table.unpack({...})))
+function log(fmt, ...)
+	print('[LUA] ' .. string.format(fmt, table.unpack({ ... })))
 end
 
-stu_log('Loaded script main.lua.')
+log('Loaded script main.lua.')
 
