@@ -1,8 +1,8 @@
 package.cpath = '/usr/local/lua-5.3.3_Linux35_64_lib/lib/lua/5.3/?.so;'
 
-local JSON = require("cjson");
+local JSON = require('cjson')
 
-local channels = {};
+local channels = {}
 
 
 function onAppStart()
