@@ -4,13 +4,15 @@
 
 > [[source] https://github.com/studease/chatease-server](https://github.com/studease/chatease-server)
 
+This is a websocket server for chating, with lua embedded in.
+
 
 ## Build
 --------
 
 ### Lua
 
-[Download lua](http://www.lua.org/download.html)
+[Download lua-5.3.3](http://www.lua.org/download.html)
 
 ```
 curl -R -O http://www.lua.org/ftp/lua-5.3.3.tar.gz
@@ -29,6 +31,8 @@ yum install readline-devel
 
 If you want to run with the sample script applications/main.lua, CJSON is needed.
 
+[Download lua-cjson-2.1.0](https://www.kyne.com.au/~mark/software/download/lua-cjson-2.1.0.tar.gz)
+
 ```
 wget https://www.kyne.com.au/~mark/software/download/lua-cjson-2.1.0.tar.gz
 tar zxf lua-cjson-2.1.0.tar.gz
@@ -46,12 +50,14 @@ cd build
 cmake ..
 ```
 
+
 ## Run
 ------
 
 ```
 sudo ./chatease-server
 ```
+
 
 ## Interface
 ------------
@@ -65,6 +71,7 @@ sudo ./chatease-server
 * **onMessage**
 
 For more details, please check the main.lua and c sources.
+
 
 ## Software License
 -------------------
