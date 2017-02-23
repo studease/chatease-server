@@ -65,6 +65,9 @@ typedef struct {
 	stu_table_elt_t *content_length;
 
 	stu_table_elt_t *sec_websocket_key;
+	stu_table_elt_t *sec_websocket_key1;
+	stu_table_elt_t *sec_websocket_key2;
+	stu_table_elt_t *sec_websocket_key3;
 	stu_table_elt_t *sec_websocket_version;
 	stu_table_elt_t *sec_websocket_extensions;
 	stu_table_elt_t *upgrade;

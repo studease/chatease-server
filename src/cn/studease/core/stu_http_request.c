@@ -25,6 +25,9 @@ static stu_int_t stu_http_process_host(stu_http_request_t *r, stu_table_elt_t *h
 static stu_int_t stu_http_process_connection(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 static stu_int_t stu_http_process_sec_websocket_key(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 
+static stu_int_t stu_http_process_sec_websocket_key_of_safari(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
+static stu_int_t stu_http_process_sec_websocket_key_for_safari(stu_http_request_t *r);
+
 static stu_int_t stu_http_process_header_line(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 static stu_int_t stu_http_process_unique_header_line(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 
@@ -45,6 +48,9 @@ stu_http_header_t  stu_http_headers_in[] = {
 	{ stu_string("Content-Type"), offsetof(stu_http_headers_in_t, content_type), stu_http_process_header_line },
 
 	{ stu_string("Sec-Websocket-Key"), offsetof(stu_http_headers_in_t, sec_websocket_key), stu_http_process_sec_websocket_key },
+	{ stu_string("Sec-Websocket-Key1"), offsetof(stu_http_headers_in_t, sec_websocket_key1), stu_http_process_sec_websocket_key_of_safari },
+	{ stu_string("Sec-Websocket-Key2"), offsetof(stu_http_headers_in_t, sec_websocket_key2), stu_http_process_sec_websocket_key_of_safari },
+	{ stu_string("(Key3)"), offsetof(stu_http_headers_in_t, sec_websocket_key3), stu_http_process_sec_websocket_key_of_safari },
 	{ stu_string("Sec-Websocket-Version"), offsetof(stu_http_headers_in_t, sec_websocket_version), stu_http_process_unique_header_line },
 	{ stu_string("Sec-Websocket-Extensions"), offsetof(stu_http_headers_in_t, sec_websocket_extensions), stu_http_process_unique_header_line },
 	{ stu_string("Upgrade"), offsetof(stu_http_headers_in_t, upgrade), stu_http_process_unique_header_line },
@@ -398,6 +404,101 @@ stu_http_process_sec_websocket_key(stu_http_request_t *r, stu_table_elt_t *h, st
 		return STU_HTTP_INTERNAL_SERVER_ERROR;
 	}
 	elt->obj = h;
+	elt->size = sizeof(stu_table_elt_t);
+	stu_list_push(&r->headers_out.headers, elt);
+
+	return STU_OK;
+}
+
+static stu_int_t
+stu_http_process_sec_websocket_key_of_safari(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset) {
+	stu_table_elt_t  **ph;
+
+	ph = (stu_table_elt_t **) ((char *) &r->headers_in + offset);
+
+	if (*ph == NULL) {
+		*ph = h;
+	}
+
+	stu_http_process_sec_websocket_key_for_safari(r);
+
+	return STU_OK;
+}
+
+static stu_int_t
+stu_http_process_sec_websocket_key_for_safari(stu_http_request_t *r) {
+	stu_table_elt_t *e, *h1, *h2;
+	stu_list_elt_t  *elt;
+	stu_md5_t        md5;
+	stu_str_t        md5_signed;
+	u_char           s1[16], s2[16], key[16], *c, *s;
+	stu_int_t        index, n, k1, k2;
+
+	if (r->headers_in.sec_websocket_key1 == NULL || r->headers_in.sec_websocket_key2 == NULL) {
+		return STU_AGAIN;
+	}
+
+	e = stu_base_pcalloc(r->connection->pool, sizeof(stu_table_elt_t));
+	if (e == NULL) {
+		return STU_HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	h1 = r->headers_in.sec_websocket_key1;
+	h2 = r->headers_in.sec_websocket_key2;
+	stu_memzero(s1, 16);
+	stu_memzero(s2, 16);
+
+	for (index = 0, c = h1->value.data, s = s1, n = 0; index < h1->value.len; index++, c++) {
+		if (*c >= '0' && *c <= '9') {
+			*s++ = *c;
+		} else if (*c == ' ') {
+			n++;
+		}
+	}
+	k1 = atoi((const char *) s1) / n;
+
+	for (index = 0, c = h2->value.data, s = s2, n = 0; index < h2->value.len; index++, c++) {
+		if (*c >= '0' && *c <= '9') {
+			*s++ = *c;
+		} else if (*c == ' ') {
+			n++;
+		}
+	}
+	k2 = atoi((const char *) s2) / n;
+
+	key[0] = k1 >> 24;
+	key[1] = k1 >> 16;
+	key[2] = k1 >> 8;
+	key[3] = k1;
+	key[4] = k2 >> 24;
+	key[5] = k2 >> 16;
+	key[6] = k2 >> 8;
+	key[7] = k2;
+
+	e->key.data = STU_HTTP_HEADER_SEC_WEBSOCKET_ACCEPT.data;
+	e->key.len = STU_HTTP_HEADER_SEC_WEBSOCKET_ACCEPT.len;
+
+	md5_signed.len = 16;
+	md5_signed.data = stu_base_pcalloc(r->connection->pool, md5_signed.len + 1);
+
+	e->value.len = 16;
+	e->value.data = stu_base_pcalloc(r->connection->pool, e->value.len + 1);
+
+	if (md5_signed.data == NULL || e->value.data == NULL) {
+		return STU_HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	stu_md5_init(&md5);
+	stu_md5_update(&md5, key, 16);
+	stu_md5_final(md5_signed.data, &md5);
+
+	r->headers_out.sec_websocket_accept = e;
+
+	elt = stu_base_pcalloc(r->connection->pool, sizeof(stu_list_elt_t));
+	if (elt == NULL) {
+		return STU_HTTP_INTERNAL_SERVER_ERROR;
+	}
+	elt->obj = e;
 	elt->size = sizeof(stu_table_elt_t);
 	stu_list_push(&r->headers_out.headers, elt);
 

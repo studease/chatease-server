@@ -17,6 +17,7 @@ src/chatease-server.d: ../src/chatease-server.c \
  ../src/cn/studease/core/stu_sha1.h /usr/local/ssl/include/openssl/sha.h \
  /usr/local/ssl/include/openssl/e_os2.h \
  /usr/local/ssl/include/openssl/opensslconf.h \
+ ../src/cn/studease/core/stu_md5.h /usr/local/ssl/include/openssl/md5.h \
  ../src/cn/studease/core/stu_lua.h \
  /usr/local/lua-5.3.3_Linux35_64_lib/include/lua.h \
  /usr/local/lua-5.3.3_Linux35_64_lib/include/luaconf.h \
@@ -92,6 +93,10 @@ src/chatease-server.d: ../src/chatease-server.c \
 /usr/local/ssl/include/openssl/e_os2.h:
 
 /usr/local/ssl/include/openssl/opensslconf.h:
+
+../src/cn/studease/core/stu_md5.h:
+
+/usr/local/ssl/include/openssl/md5.h:
 
 ../src/cn/studease/core/stu_lua.h:
 
