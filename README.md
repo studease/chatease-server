@@ -73,6 +73,11 @@ sudo ./chatease-server
 For more details, please check the main.lua and c sources.
 
 
+## Websocket Client
+
+[chatease.js https://github.com/studease/chatease](https://github.com/studease/chatease)
+
+
 ## Software License
 -------------------
 
