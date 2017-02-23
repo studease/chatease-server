@@ -237,7 +237,7 @@ stu_http_process_request(stu_http_request_t *r) {
 	lua_pop(L, 2);
 
 	r->response_body.start = data;
-	r->response_body.end = r->response_body.start + stu_strlen(data);
+	r->response_body.last = r->response_body.end = r->response_body.start + stu_strlen(data);
 
 	goto done;
 
@@ -457,7 +457,7 @@ stu_http_request_handler(stu_event_t *wev) {
 	stu_connection_t   *c;
 	stu_channel_t      *ch;
 	stu_buf_t          *buf;
-	stu_int_t           n;
+	stu_int_t           n, size;
 
 	c = (stu_connection_t *) wev->data;
 
@@ -486,7 +486,30 @@ stu_http_request_handler(stu_event_t *wev) {
 		buf->last = stu_memcpy(buf->last, "HTTP/1.1 400 Bad Request\r\nServer: Chatease-Server/Beta\r\nContent-type: text/html\r\nContent-length: 21\r\n\r\nChatease-Server/Beta\n", 124);
 	}
 
-	n = send(c->fd, buf->start, stu_strlen(buf->start), 0);
+	if (r->response_body.start) {
+		size = r->response_body.last - r->response_body.start;
+		*buf->last++ = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
+		if (size < 126) {
+			*buf->last++ = size;
+		} else if (size < 65536) {
+			*buf->last++ = 0x7E;
+			*buf->last++ = size >> 8;
+			*buf->last++ = size;
+		} else {
+			*buf->last++ = 0x7F;
+			*buf->last++ = size >> 56;
+			*buf->last++ = size >> 48;
+			*buf->last++ = size >> 40;
+			*buf->last++ = size >> 32;
+			*buf->last++ = size >> 24;
+			*buf->last++ = size >> 16;
+			*buf->last++ = size >> 8;
+			*buf->last++ = size;
+		}
+		buf->last = stu_memcpy(buf->last, r->response_body.start, size);
+	}
+
+	n = send(c->fd, buf->start, buf->last - buf->start, 0);
 	if (n == -1) {
 		stu_log_debug(4, "Failed to send data: fd=%d.", c->fd);
 		goto failed;

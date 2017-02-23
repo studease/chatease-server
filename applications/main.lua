@@ -19,6 +19,13 @@ function onConnect(client, ...)
 	
 	log('==== onConnect ====')
 	
+	if (client.id == nil or client.channel == nil) then
+		res.raw = 'error'
+		res.error = { code = 500, explain = 'Internal Server Error' }
+		
+		return res.error.code, JSON.encode(res)
+	end
+	
 	users = channels[client.channel]
 	if (users == nil) then
 		users = {}
@@ -26,14 +33,14 @@ function onConnect(client, ...)
 	end
 	
 	info = {
-		properties = { id = client.id, name = 'u' .. client.id },
-		channel = { id = client.channel, role = 0, state = 3 },
+		properties = { id = client.id, name = 'u' .. client.id, role = 0 },
+		channel = { id = client.channel, state = 0 },
 		interval = 1000,
 		active = 0
 	}
 	users[client.id] = info
 	
-	res.raw = 'identity'
+	res.raw = 'ident'
 	res.user = info.properties
 	res.channel = info.channel
 	
@@ -59,11 +66,24 @@ function onMessage(client, message)
 	
 	log('==== onMessage ====')
 	
+	if (client.id == nil or client.channel == nil) then
+		res.raw = 'error'
+		res.error = { code = 500, explain = 'Internal Server Error' }
+		
+		return res.error.code, JSON.encode(res)
+	end
+	
 	data = JSON.decode(message)
-	if (data == nil or data.cmd == nil or data.channel == nil or data.channel.id == nil) then
+	if (data == nil or data.cmd == nil) then
 		res.raw = 'error'
 		res.error = { code = 400, explain = 'Bad Request' }
-		res.channel = data.channel
+		
+		return res.error.code, JSON.encode(res)
+	end
+	
+	if (data.cmd ~= 'text') then
+		res.raw = 'error'
+		res.error = { code = 501, explain = 'Not Implemented' }
 		
 		return res.error.code, JSON.encode(res)
 	end
@@ -71,7 +91,7 @@ function onMessage(client, message)
 	users = channels[data.channel.id]
 	if (client.channel ~= data.channel.id or users == nil or users[client.id] == nil) then
 		res.raw = 'error'
-		res.error = { code = 400, explain = 'Bad Request' }
+		res.error = { code = 401, explain = 'Unauthorized' }
 		res.channel = data.channel
 		
 		return res.error.code, JSON.encode(res)
@@ -85,11 +105,10 @@ function onMessage(client, message)
 		return res.error.code, JSON.encode(res)
 	end
 	
-	res.raw = 'message'
+	res.raw = 'text'
 	res.text = data.text
 	res.type = data.type
 	res.user = info.properties
-	res.channel = info.channel
 	
 	return data.type == 'multi' and 200 or 209, JSON.encode(res)
 end
