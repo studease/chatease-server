@@ -59,6 +59,7 @@ typedef enum {
 #include "stu_sha1.h"
 #include "stu_md5.h"
 #include "stu_lua.h"
+#include "stu_json.h"
 #include "stu_http.h"
 #include "stu_files.h"
 #include "stu_process.h"
