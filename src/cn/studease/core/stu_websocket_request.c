@@ -166,6 +166,8 @@ stu_websocket_analyze_request(stu_websocket_request_t *r) {
 	u_char                 temp[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE], *data;
 	stu_int_t              sz, rc;
 	uint64_t               size;
+	stu_json_t            *json;
+	u_char                 jstr[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE], *str;
 
 	c = r->connection;
 
@@ -193,6 +195,12 @@ stu_websocket_analyze_request(stu_websocket_request_t *r) {
 	if (size == 0) {
 		return;
 	}
+
+	stu_memzero(jstr, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
+
+	json = stu_json_parse((u_char *) temp, (size_t) size);
+	stu_json_stringify(json, jstr);
+	str = jstr;
 
 	// call lua api.
 	if (stu_lua_onmessage(c, temp) == STU_ERROR) {

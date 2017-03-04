@@ -16,6 +16,7 @@ C_SRCS += \
 ../src/cn/studease/core/stu_http.c \
 ../src/cn/studease/core/stu_http_parse.c \
 ../src/cn/studease/core/stu_http_request.c \
+../src/cn/studease/core/stu_json.c \
 ../src/cn/studease/core/stu_list.c \
 ../src/cn/studease/core/stu_log.c \
 ../src/cn/studease/core/stu_lua.c \
@@ -46,6 +47,7 @@ OBJS += \
 ./src/cn/studease/core/stu_http.o \
 ./src/cn/studease/core/stu_http_parse.o \
 ./src/cn/studease/core/stu_http_request.o \
+./src/cn/studease/core/stu_json.o \
 ./src/cn/studease/core/stu_list.o \
 ./src/cn/studease/core/stu_log.o \
 ./src/cn/studease/core/stu_lua.o \
@@ -76,6 +78,7 @@ C_DEPS += \
 ./src/cn/studease/core/stu_http.d \
 ./src/cn/studease/core/stu_http_parse.d \
 ./src/cn/studease/core/stu_http_request.d \
+./src/cn/studease/core/stu_json.d \
 ./src/cn/studease/core/stu_list.d \
 ./src/cn/studease/core/stu_log.d \
 ./src/cn/studease/core/stu_lua.d \
@@ -98,7 +101,7 @@ C_DEPS += \
 src/cn/studease/core/%.o: ../src/cn/studease/core/%.c
 	@echo 'Building file: $<'
 	@echo 'Invoking: GCC C Compiler'
-	gcc -DCONFIG_SMP=1 -I/usr/local/ssl/include -I/usr/local/lua-5.3.3_Linux35_64_lib/include -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<" -pthread -march=x86-64
+	gcc -DCONFIG_SMP=1 -I/usr/local/ssl/include -I/usr/local/lua-5.3.3_Linux35_64_lib/include -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<" -pthread -lm -march=x86-64
 	@echo 'Finished building: $<'
 	@echo ' '
 

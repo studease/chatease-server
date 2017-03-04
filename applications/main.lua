@@ -6,11 +6,11 @@ local channels = {}
 
 
 function onAppStart()
-	log('==== onAppStart ====')
+  log('==== onAppStart ====')
 end
 
 function onAppStop(info)
-	log('==== onAppStop ====')
+  log('==== onAppStop ====')
 end
 
 
@@ -115,8 +115,9 @@ end
 
 
 function log(fmt, ...)
-	print('[LUA] ' .. string.format(fmt, table.unpack({ ... })))
+  print('[LUA] ' .. string.format(fmt, table.unpack({ ... })))
 end
+
 
 log('Loaded script main.lua.')
 
