@@ -155,8 +155,9 @@ stu_http_process_request(stu_http_request_t *r) {
 	stu_connection_t *c;
 	stu_str_t         channel_id;
 	stu_uint_t        kh;
-	u_char           *last, *data;
+	u_char           *last, *data, temp[STU_HTTP_REQUEST_DEFAULT_SIZE];
 	stu_channel_t    *ch;
+	stu_json_t       *res, *raw, *rschannel, *rscid, *rscstate, *rsuser, *rsuid, *rsuname, *rsurole;
 
 	rc = stu_http_process_request_headers(r);
 	if (rc != STU_OK) {
@@ -171,89 +172,106 @@ stu_http_process_request(stu_http_request_t *r) {
 
 	c = r->connection;
 
-	if (r->headers_in.upgrade) {
-		last = r->uri.data + r->uri.len;
+	if (r->headers_in.upgrade == NULL) {
+		stu_http_finalize_request(r, STU_HTTP_NOT_IMPLEMENTED);
+		return;
+	}
 
-		channel_id.data = stu_strrchr(r->uri.data, last, '/');
-		if (channel_id.data == NULL) {
-			channel_id.data = r->uri.data;
-		} else {
-			channel_id.data++;
-		}
-		channel_id.len = last - channel_id.data;
+	last = r->uri.data + r->uri.len;
 
-		kh = stu_hash_key_lc(channel_id.data, channel_id.len);
+	channel_id.data = stu_strrchr(r->uri.data, last, '/');
+	if (channel_id.data == NULL) {
+		channel_id.data = r->uri.data;
+	} else {
+		channel_id.data++;
+	}
+	channel_id.len = last - channel_id.data;
 
-		stu_spin_lock(&stu_cycle->channels.lock);
+	kh = stu_hash_key_lc(channel_id.data, channel_id.len);
 
-		ch = stu_hash_find_locked(&stu_cycle->channels, kh, channel_id.data, channel_id.len);
+	stu_spin_lock(&stu_cycle->channels.lock);
+
+	ch = stu_hash_find_locked(&stu_cycle->channels, kh, channel_id.data, channel_id.len);
+	if (ch == NULL) {
+		stu_log_debug(4, "channel(\"%s\") not found: kh=%lu, i=%lu, len=%lu.",
+				channel_id.data, kh, kh % stu_cycle->channels.size, stu_cycle->channels.length);
+
+		ch = stu_slab_calloc(stu_cycle->slab_pool, sizeof(stu_channel_t));
 		if (ch == NULL) {
-			stu_log_debug(4, "channel(\"%s\") not found: kh=%lu, i=%lu, len=%lu.",
-					channel_id.data, kh, kh % stu_cycle->channels.size, stu_cycle->channels.length);
-
-			ch = stu_slab_calloc(stu_cycle->slab_pool, sizeof(stu_channel_t));
-			if (ch == NULL) {
-				stu_log_error(0, "Failed to alloc new channel.");
-				goto failed;
-			}
-
-			if (stu_channel_init(ch, &channel_id) == STU_ERROR) {
-				stu_log_error(0, "Failed to init channel.");
-				goto failed;
-			}
-
-			if (stu_hash_init(&ch->userlist, NULL, STU_MAX_USER_N, stu_cycle->slab_pool,
-					(stu_hash_palloc_pt) stu_slab_calloc, (stu_hash_free_pt) stu_slab_free) == STU_ERROR) {
-				stu_log_error(0, "Failed to init userlist.");
-				goto failed;
-			}
-
-			if (stu_hash_insert_locked(&stu_cycle->channels, &channel_id, ch, STU_HASH_LOWCASE_KEY) == STU_ERROR) {
-				stu_log_error(0, "Failed to insert channel.");
-				goto failed;
-			}
-
-			stu_log_debug(4, "new channel(\"%s\"): kh=%lu, total=%lu.",
-					ch->id.data, kh, stu_atomic_read(&stu_cycle->channels.length));
-		}
-
-		stu_spin_unlock(&stu_cycle->channels.lock);
-
-		//stu_hash_test(&ch->userlist);
-
-		if (stu_channel_insert(ch, c) == STU_ERROR) {
+			stu_log_error(0, "Failed to alloc new channel.");
+			stu_spin_unlock(&stu_cycle->channels.lock);
 			goto failed;
 		}
 
-		c->user.channel = ch;
+		if (stu_channel_init(ch, &channel_id) == STU_ERROR) {
+			stu_log_error(0, "Failed to init channel.");
+			stu_spin_unlock(&stu_cycle->channels.lock);
+			goto failed;
+		}
+
+		if (stu_hash_init(&ch->userlist, NULL, STU_MAX_USER_N, stu_cycle->slab_pool,
+				(stu_hash_palloc_pt) stu_slab_calloc, (stu_hash_free_pt) stu_slab_free) == STU_ERROR) {
+			stu_log_error(0, "Failed to init userlist.");
+			stu_spin_unlock(&stu_cycle->channels.lock);
+			goto failed;
+		}
+
+		if (stu_hash_insert_locked(&stu_cycle->channels, &channel_id, ch, STU_HASH_LOWCASE_KEY) == STU_ERROR) {
+			stu_log_error(0, "Failed to insert channel.");
+			stu_spin_unlock(&stu_cycle->channels.lock);
+			goto failed;
+		}
+
+		stu_log_debug(4, "new channel(\"%s\"): kh=%lu, total=%lu.",
+				ch->id.data, kh, stu_atomic_read(&stu_cycle->channels.length));
 	}
 
-	if (stu_lua_onconnect(c) == STU_ERROR) {
-		stu_log_error(0, "Failed to call external interface %s().", STU_LUA_INTERFACE_ONCONNECT.data);
+	stu_spin_unlock(&stu_cycle->channels.lock);
+
+	if (stu_channel_insert(ch, c) == STU_ERROR) {
 		goto failed;
 	}
 
-	if (!lua_isinteger(L, -2) || !lua_isstring(L, -1)) {
-		stu_log_error(0, "External interface %s() should return integer & string.", STU_LUA_INTERFACE_ONCONNECT.data);
-		goto failed;
-	}
+	c->user.channel = ch;
 
-	rc = lua_tointeger(L, -2);
-	data = (u_char *) lua_tostring(L, -1);
-	lua_pop(L, 2);
+	res = stu_json_create_object(NULL);
+	raw = stu_json_create_string(&STU_PROTOCOL_RAW, STU_PROTOCOL_RAWS_IDENT.data, STU_PROTOCOL_RAWS_IDENT.len);
+	rschannel = stu_json_create_object(&STU_PROTOCOL_CHANNEL);
+	rsuser = stu_json_create_object(&STU_PROTOCOL_USER);
 
-	r->response_body.start = data;
-	r->response_body.last = r->response_body.end = r->response_body.start + stu_strlen(data);
+	rscid = stu_json_create_string(&STU_PROTOCOL_ID, ch->id.data, ch->id.len);
+	rscstate = stu_json_create_number(&STU_PROTOCOL_STATE, (stu_double_t) ch->state);
 
-	goto done;
+	rsuid = stu_json_create_string(&STU_PROTOCOL_ID, c->user.strid.data, c->user.strid.len);
+	rsuname = stu_json_create_string(&STU_PROTOCOL_NAME, c->user.name.data, c->user.name.len);
+	rsurole = stu_json_create_number(&STU_PROTOCOL_ROLE, (stu_double_t) c->user.role);
+
+	stu_json_add_item_to_object(rschannel, rscid);
+	stu_json_add_item_to_object(rschannel, rscstate);
+
+	stu_json_add_item_to_object(rsuser, rsuid);
+	stu_json_add_item_to_object(rsuser, rsuname);
+	stu_json_add_item_to_object(rsuser, rsurole);
+
+	stu_json_add_item_to_object(res, raw);
+	stu_json_add_item_to_object(res, rschannel);
+	stu_json_add_item_to_object(res, rsuser);
+
+	stu_memzero(temp, STU_HTTP_REQUEST_DEFAULT_SIZE);
+	data = stu_json_stringify(res, (u_char *) temp);
+
+	r->response_body.start = temp;
+	r->response_body.end = r->response_body.last = data;
+
+	stu_http_finalize_request(r, STU_HTTP_SWITCHING_PROTOCOLS);
+
+	stu_json_delete(res);
+
+	return;
 
 failed:
 
-	rc = STU_HTTP_INTERNAL_SERVER_ERROR;
-
-done:
-
-	stu_http_finalize_request(r, rc);
+	stu_http_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
 }
 
 

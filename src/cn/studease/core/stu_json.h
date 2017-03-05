@@ -39,7 +39,7 @@ typedef struct {
 
 void  stu_json_init_hooks(stu_json_hooks_t *hooks);
 
-stu_json_t *stu_json_create(u_char type);
+stu_json_t *stu_json_create(u_char type, stu_str_t *key);
 stu_json_t *stu_json_create_null(stu_str_t *key);
 stu_json_t *stu_json_create_bool(stu_str_t *key, stu_bool_t bool);
 stu_json_t *stu_json_create_true(stu_str_t *key);
@@ -48,6 +48,8 @@ stu_json_t *stu_json_create_string(stu_str_t *key, u_char *value, size_t len);
 stu_json_t *stu_json_create_number(stu_str_t *key, stu_double_t num);
 stu_json_t *stu_json_create_array(stu_str_t *key);
 stu_json_t *stu_json_create_object(stu_str_t *key);
+
+stu_json_t *stu_json_duplicate(stu_json_t *item, stu_bool_t recurse);
 
 void  stu_json_add_item_to_array(stu_json_t *array, stu_json_t *item);
 void  stu_json_add_item_to_object(stu_json_t *object, stu_json_t *item);

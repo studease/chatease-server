@@ -11,7 +11,7 @@
 #include "stu_core.h"
 
 static stu_int_t stu_websocket_process_request_frames(stu_websocket_request_t *r);
-static void stu_websocket_analyze_request(stu_websocket_request_t *r);
+static void stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t size);
 
 extern lua_State *L;
 
@@ -108,9 +108,19 @@ stu_websocket_create_request(stu_connection_t *c) {
 
 void
 stu_websocket_process_request(stu_websocket_request_t *r) {
-	stu_int_t         rc;
-	stu_connection_t *c;
-	stu_channel_t    *ch;
+	stu_websocket_frame_t *f;
+	stu_connection_t      *c;
+	stu_int_t              rc;
+	stu_buf_t              buf;
+	u_char                 temp[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE];
+	uint64_t               len, size;
+
+	c = r->connection;
+	if (c->user.channel == NULL) {
+		stu_log_error(0, "Failed to process request: channel not found.");
+		stu_websocket_finalize_request(r, STU_HTTP_UNAUTHORIZED);
+		return;
+	}
 
 	rc = stu_websocket_process_request_frames(r);
 	if (rc != STU_DONE) {
@@ -119,16 +129,34 @@ stu_websocket_process_request(stu_websocket_request_t *r) {
 		return;
 	}
 
-	c = r->connection;
-	ch = c->user.channel;
+	// concat keyframe string
+	stu_memzero(temp, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
 
-	if (ch == NULL) {
-		stu_log_error(0, "Failed to process request: channel not found.");
-		stu_websocket_finalize_request(r, STU_HTTP_FORBIDDEN);
+	buf.start = buf.last = temp;
+	buf.end = buf.start + STU_WEBSOCKET_REQUEST_DEFAULT_SIZE;
+
+	for (f = &r->frames_in; f; f = f->next) {
+		if (f->opcode != STU_WEBSOCKET_OPCODE_TEXT) {
+			continue;
+		}
+
+		len = f->payload_data.end - f->payload_data.start;
+		if (len == 0) {
+			continue;
+		}
+
+		buf.last = stu_memcpy(buf.last, f->payload_data.start, len);
+
+		f->payload_data.end = f->payload_data.start;
+	}
+
+	size = buf.last - buf.start;
+	if (size == 0) {
+		stu_log_error(0, "Failed to concat keyframe string: size=0.");
 		return;
 	}
 
-	stu_websocket_analyze_request(r);
+	stu_websocket_analyze_request(r, (u_char *) temp, size);
 }
 
 static stu_int_t
@@ -159,77 +187,88 @@ stu_websocket_process_request_frames(stu_websocket_request_t *r) {
 }
 
 static void
-stu_websocket_analyze_request(stu_websocket_request_t *r) {
+stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t size) {
 	stu_connection_t      *c;
-	stu_websocket_frame_t *f, *out;
-	stu_buf_t              buf;
-	u_char                 temp[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE], *data;
-	stu_int_t              sz, rc;
-	uint64_t               size;
-	stu_json_t            *json;
-	u_char                 jstr[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE], *str;
+	stu_channel_t         *ch;
+	stu_json_t            *req, *cmd, *rqdata, *rqtype, *rqchannel;
+	stu_json_t            *res, *raw, *rsdata, *rstype, *rschannel, *rsuser, *rsuid, *rsuname, *rsurole;
+	stu_str_t             *str;
+	stu_double_t          *num;
+	stu_websocket_frame_t *out;
+	u_char                *data, temp[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE];
 
 	c = r->connection;
+	ch = c->user.channel;
 
-	stu_memzero(temp, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
+	req = stu_json_parse((u_char *) text, size);
+	if (req == NULL || req->type != STU_JSON_TYPE_OBJECT) {
+		stu_log_error(0, "Failed to parse request.");
+		stu_websocket_finalize_request(r, STU_HTTP_BAD_REQUEST);
+		return;
+	}
 
-	buf.start = buf.last = temp;
-	buf.end = buf.start + STU_WEBSOCKET_REQUEST_DEFAULT_SIZE;
+	cmd = stu_json_get_object_item_by(req, &STU_PROTOCOL_CMD);
+	if (cmd == NULL || cmd->type != STU_JSON_TYPE_STRING) {
+		stu_log_error(0, "Failed to analyze request: \"cmd\" not found.");
+		stu_json_delete(req);
+		stu_websocket_finalize_request(r, STU_HTTP_BAD_REQUEST);
+		return;
+	}
 
-	for (f = &r->frames_in; f; f = f->next) {
-		if (f->opcode != STU_WEBSOCKET_OPCODE_TEXT) {
-			continue;
+	str = (stu_str_t *) cmd->value;
+	if (stu_strncmp(str->data, STU_PROTOCOL_CMDS_TEXT.data, STU_PROTOCOL_CMDS_TEXT.len) == 0) {
+		rqdata = stu_json_get_object_item_by(req, &STU_PROTOCOL_DATA);
+		rqtype = stu_json_get_object_item_by(req, &STU_PROTOCOL_TYPE);
+		rqchannel = stu_json_get_object_item_by(req, &STU_PROTOCOL_CHANNEL);
+		if (rqdata == NULL || rqdata->type != STU_JSON_TYPE_STRING
+				|| rqtype == NULL || rqtype->type != STU_JSON_TYPE_STRING
+				|| rqchannel == NULL || rqchannel->type != STU_JSON_TYPE_OBJECT) {
+			stu_log_error(0, "Failed to analyze request: necessary param[s] not found.");
+			stu_json_delete(req);
+			stu_websocket_finalize_request(r, STU_HTTP_BAD_REQUEST);
+			return;
 		}
 
-		sz = f->payload_data.end - f->payload_data.start;
-		if (sz == 0) {
-			continue;
-		}
+		res = stu_json_create_object(NULL);
+		raw = stu_json_create_string(&STU_PROTOCOL_RAW, STU_PROTOCOL_RAWS_TEXT.data, STU_PROTOCOL_RAWS_TEXT.len);
+		rsdata = stu_json_duplicate(rqdata, FALSE);
+		rstype = stu_json_duplicate(rqtype, FALSE);
+		rschannel = stu_json_duplicate(rqchannel, TRUE);
+		rsuser = stu_json_create_object(&STU_PROTOCOL_USER);
 
-		buf.last = stu_memcpy(buf.last, f->payload_data.start, sz);
+		rsuid = stu_json_create_string(&STU_PROTOCOL_ID, c->user.strid.data, c->user.strid.len);
+		rsuname = stu_json_create_string(&STU_PROTOCOL_NAME, c->user.name.data, c->user.name.len);
+		rsurole = stu_json_create_number(&STU_PROTOCOL_ROLE, (stu_double_t) c->user.role);
 
-		f->payload_data.end = f->payload_data.start;
-	}
+		stu_json_add_item_to_object(rsuser, rsuid);
+		stu_json_add_item_to_object(rsuser, rsuname);
+		stu_json_add_item_to_object(rsuser, rsurole);
 
-	size = buf.last - buf.start;
-	if (size == 0) {
+		stu_json_add_item_to_object(res, raw);
+		stu_json_add_item_to_object(res, rsdata);
+		stu_json_add_item_to_object(res, rstype);
+		stu_json_add_item_to_object(res, rschannel);
+		stu_json_add_item_to_object(res, rsuser);
+
+		stu_memzero(temp, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
+		data = stu_json_stringify(res, (u_char *) temp);
+
+		// setup out frame.
+		out = &r->frames_out;
+		out->opcode = STU_WEBSOCKET_OPCODE_TEXT;
+		out->extended = data - temp;
+		out->payload_data.start = temp;
+		out->payload_data.end = out->payload_data.last = data;
+
+		stu_websocket_finalize_request(r, STU_HTTP_OK);
+
+		stu_json_delete(req);
+		stu_json_delete(res);
+
 		return;
 	}
 
-	stu_memzero(jstr, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
-
-	json = stu_json_parse((u_char *) temp, (size_t) size);
-	stu_json_stringify(json, jstr);
-	str = jstr;
-
-	// call lua api.
-	if (stu_lua_onmessage(c, temp) == STU_ERROR) {
-		stu_log_error(0, lua_tostring(L, -1));
-		stu_websocket_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
-		return;
-	}
-
-	// get returned value[s].
-	if (!lua_isinteger(L, -2) || !lua_isstring(L, -1)) {
-		stu_log_error(0, "LUA.onMessage() should return integer & string.");
-		stu_websocket_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
-		return;
-	}
-
-	rc = lua_tointeger(L, -2);
-	data = (u_char *) lua_tostring(L, -1);
-	lua_pop(L, 2);
-
-	// setup out frame.
-	out = &r->frames_out;
-	out->opcode = STU_WEBSOCKET_OPCODE_TEXT;
-	out->extended = stu_strlen(data);
-	out->payload_data.start = data;
-	out->payload_data.end = data + out->extended;
-
-	stu_log_debug(5, "LUA.onMessage() returned: %d, %s.", rc, data);
-
-	stu_websocket_finalize_request(r, rc);
+	stu_websocket_finalize_request(r, STU_HTTP_METHOD_NOT_ALLOWED);
 }
 
 void

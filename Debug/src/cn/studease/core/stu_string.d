@@ -23,7 +23,9 @@ src/cn/studease/core/stu_string.d: ../src/cn/studease/core/stu_string.c \
  /usr/local/lua-5.3.3_Linux35_64_lib/include/lualib.h \
  /usr/local/lua-5.3.3_Linux35_64_lib/include/lua.h \
  /usr/local/lua-5.3.3_Linux35_64_lib/include/lauxlib.h \
- ../src/cn/studease/core/stu_json.h ../src/cn/studease/core/stu_http.h \
+ ../src/cn/studease/core/stu_json.h \
+ ../src/cn/studease/core/stu_protocol.h \
+ ../src/cn/studease/core/stu_http.h \
  ../src/cn/studease/core/stu_http_request.h \
  ../src/cn/studease/core/stu_http_parse.h \
  ../src/cn/studease/core/stu_websocket_request.h \
@@ -106,6 +108,8 @@ src/cn/studease/core/stu_string.d: ../src/cn/studease/core/stu_string.c \
 /usr/local/lua-5.3.3_Linux35_64_lib/include/lauxlib.h:
 
 ../src/cn/studease/core/stu_json.h:
+
+../src/cn/studease/core/stu_protocol.h:
 
 ../src/cn/studease/core/stu_http.h:
 

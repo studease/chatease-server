@@ -22,6 +22,7 @@ C_SRCS += \
 ../src/cn/studease/core/stu_lua.c \
 ../src/cn/studease/core/stu_palloc.c \
 ../src/cn/studease/core/stu_process.c \
+../src/cn/studease/core/stu_protocol.c \
 ../src/cn/studease/core/stu_ram.c \
 ../src/cn/studease/core/stu_shmem.c \
 ../src/cn/studease/core/stu_slab.c \
@@ -53,6 +54,7 @@ OBJS += \
 ./src/cn/studease/core/stu_lua.o \
 ./src/cn/studease/core/stu_palloc.o \
 ./src/cn/studease/core/stu_process.o \
+./src/cn/studease/core/stu_protocol.o \
 ./src/cn/studease/core/stu_ram.o \
 ./src/cn/studease/core/stu_shmem.o \
 ./src/cn/studease/core/stu_slab.o \
@@ -84,6 +86,7 @@ C_DEPS += \
 ./src/cn/studease/core/stu_lua.d \
 ./src/cn/studease/core/stu_palloc.d \
 ./src/cn/studease/core/stu_process.d \
+./src/cn/studease/core/stu_protocol.d \
 ./src/cn/studease/core/stu_ram.d \
 ./src/cn/studease/core/stu_shmem.d \
 ./src/cn/studease/core/stu_slab.d \

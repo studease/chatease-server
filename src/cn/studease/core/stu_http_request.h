@@ -23,18 +23,22 @@
 
 #define STU_HTTP_SWITCHING_PROTOCOLS       101
 #define STU_HTTP_OK                        200
+#define STU_HTTP_NOTIFICATION              209
 #define STU_HTTP_MOVED_TEMPORARILY         302
 
 #define STU_HTTP_BAD_REQUEST               400
 #define STU_HTTP_UNAUTHORIZED              401
 #define STU_HTTP_FORBIDDEN                 403
 #define STU_HTTP_NOT_FOUND                 404
-#define STU_HTTP_NOT_ALLOWED               405
-#define STU_HTTP_REQUEST_TIME_OUT          408
+#define STU_HTTP_METHOD_NOT_ALLOWED        405
+#define STU_HTTP_REQUEST_TIMEOUT           408
+#define STU_HTTP_CONFLICT                  409
 
 #define STU_HTTP_INTERNAL_SERVER_ERROR     500
 #define STU_HTTP_NOT_IMPLEMENTED           501
+#define STU_HTTP_BAD_GATEWAY               502
 #define STU_HTTP_SERVICE_UNAVAILABLE       503
+#define STU_HTTP_GATEWAY_TIMEOUT           504
 
 #define STU_HTTP_CONNECTION_CLOSE          1
 #define STU_HTTP_CONNECTION_KEEP_ALIVE     2

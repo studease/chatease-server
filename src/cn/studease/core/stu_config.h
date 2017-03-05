@@ -32,6 +32,7 @@
 typedef signed long         stu_int_t;
 typedef unsigned long       stu_uint_t;
 typedef unsigned char       stu_bool_t;
+typedef short               stu_short_t;
 typedef double              stu_double_t;
 
 #define TRUE                1

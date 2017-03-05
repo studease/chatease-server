@@ -1,4 +1,5 @@
-src/cn/studease/core/stu_user.d: ../src/cn/studease/core/stu_user.c \
+src/cn/studease/core/stu_protocol.d: \
+ ../src/cn/studease/core/stu_protocol.c \
  ../src/cn/studease/core/stu_config.h ../src/cn/studease/core/stu_core.h \
  ../src/cn/studease/core/stu_string.h ../src/cn/studease/core/stu_buf.h \
  ../src/cn/studease/core/stu_queue.h ../src/cn/studease/core/stu_errno.h \

@@ -10,7 +10,7 @@
 #include "stu_core.h"
 
 static void *(*stu_json_malloc)(size_t size) = malloc;
-static void  (*stu_json_free)(void *ptr) = free;
+static void (*stu_json_free)(void *ptr) = free;
 
 static const stu_str_t  STU_JSON_VALUE_NULL = stu_string("null");
 static const stu_str_t  STU_JSON_VALUE_TRUE = stu_string("true");
@@ -51,7 +51,7 @@ stu_json_init_hooks(stu_json_hooks_t *hooks) {
 }
 
 stu_json_t *
-stu_json_create(u_char type) {
+stu_json_create(u_char type, stu_str_t *key) {
 	stu_json_t *item;
 	size_t      size;
 
@@ -65,6 +65,11 @@ stu_json_create(u_char type) {
 	item->prev = item;
 	item->type = type;
 
+	if (stu_json_set_key(item, key) != STU_OK) {
+		stu_json_delete(item);
+		return NULL;
+	}
+
 	return item;
 }
 
@@ -72,13 +77,8 @@ stu_json_t *
 stu_json_create_null(stu_str_t *key) {
 	stu_json_t *item;
 
-	item = stu_json_create(STU_JSON_TYPE_NULL);
+	item = stu_json_create(STU_JSON_TYPE_NULL, key);
 	if (item == NULL) {
-		return NULL;
-	}
-
-	if (stu_json_set_key(item, key) != STU_OK) {
-		stu_json_delete(item);
 		return NULL;
 	}
 
@@ -89,13 +89,8 @@ stu_json_t *
 stu_json_create_bool(stu_str_t *key, stu_bool_t bool) {
 	stu_json_t *item;
 
-	item = stu_json_create(bool ? STU_JSON_TYPE_TRUE : STU_JSON_TYPE_FALSE);
+	item = stu_json_create(bool ? STU_JSON_TYPE_TRUE : STU_JSON_TYPE_FALSE, key);
 	if (item == NULL) {
-		return NULL;
-	}
-
-	if (stu_json_set_key(item, key) != STU_OK) {
-		stu_json_delete(item);
 		return NULL;
 	}
 
@@ -118,31 +113,27 @@ stu_json_create_string(stu_str_t *key, u_char *value, size_t len) {
 	size_t      size;
 	stu_str_t  *str;
 
-	item = stu_json_create(STU_JSON_TYPE_STRING);
+	item = stu_json_create(STU_JSON_TYPE_STRING, key);
 	if (item == NULL) {
 		return NULL;
 	}
 
-	if (stu_json_set_key(item, key) != STU_OK) {
+	size = sizeof(stu_str_t);
+	item->value = stu_json_malloc(size);
+	if (item->value == NULL) {
 		stu_json_delete(item);
 		return NULL;
 	}
 
-	if (len) {
-		size = sizeof(stu_str_t);
-		item->value = stu_json_malloc(size + len + 1);
-		if (item->value == NULL) {
-			stu_json_delete(item);
-			return NULL;
-		}
-
-		str = (stu_str_t *) item->value;
-
-		str->data = (u_char *) item->value + size;
-		str->len = len;
-
-		stu_strncpy(str->data, value, len);
+	str = (stu_str_t *) item->value;
+	str->data = stu_json_malloc(len + 1);
+	if (str->data == NULL) {
+		stu_json_delete(item);
+		return NULL;
 	}
+
+	stu_strncpy(str->data, value, len);
+	str->len = len;
 
 	return item;
 }
@@ -151,13 +142,8 @@ stu_json_t *
 stu_json_create_number(stu_str_t *key, stu_double_t num) {
 	stu_json_t *item;
 
-	item = stu_json_create(STU_JSON_TYPE_NUMBER);
+	item = stu_json_create(STU_JSON_TYPE_NUMBER, key);
 	if (item == NULL) {
-		return NULL;
-	}
-
-	if (stu_json_set_key(item, key) != STU_OK) {
-		stu_json_delete(item);
 		return NULL;
 	}
 
@@ -176,13 +162,8 @@ stu_json_t *
 stu_json_create_array(stu_str_t *key) {
 	stu_json_t *item;
 
-	item = stu_json_create(STU_JSON_TYPE_ARRAY);
+	item = stu_json_create(STU_JSON_TYPE_ARRAY, key);
 	if (item == NULL) {
-		return NULL;
-	}
-
-	if (stu_json_set_key(item, key) != STU_OK) {
-		stu_json_delete(item);
 		return NULL;
 	}
 
@@ -193,24 +174,69 @@ stu_json_t *
 stu_json_create_object(stu_str_t *key) {
 	stu_json_t *item;
 
-	item = stu_json_create(STU_JSON_TYPE_OBJECT);
+	item = stu_json_create(STU_JSON_TYPE_OBJECT, key);
 	if (item == NULL) {
-		return NULL;
-	}
-
-	if (stu_json_set_key(item, key) != STU_OK) {
-		stu_json_delete(item);
 		return NULL;
 	}
 
 	return item;
 }
 
+stu_json_t *
+stu_json_duplicate(stu_json_t *item, stu_bool_t recurse) {
+	stu_json_t   *copy, *child, *newchild;
+	stu_str_t    *str;
+	stu_double_t *num;
+
+	if (item == NULL) {
+		return NULL;
+	}
+
+	switch (item->type) {
+	case STU_JSON_TYPE_STRING:
+		str = (stu_str_t *) item->value;
+		copy = stu_json_create_string(&item->key, str->data, str->len);
+		break;
+
+	case STU_JSON_TYPE_NUMBER:
+		num = (stu_double_t *) item->value;
+		copy = stu_json_create_number(&item->key, *num);
+		break;
+
+	case STU_JSON_TYPE_ARRAY:
+	case STU_JSON_TYPE_OBJECT:
+		copy = stu_json_create(item->type, &item->key);
+		if (recurse == TRUE && copy != NULL) {
+			for (child = (stu_json_t *) item->value; child; child = child->next) {
+				newchild = stu_json_duplicate(child, recurse);
+				if (newchild == NULL) {
+					goto failed;
+				}
+
+				stu_json_add_item_to_object(copy, newchild);
+			}
+		}
+		break;
+
+	default:
+		copy = stu_json_create(item->type, &item->key);
+		break;
+	}
+
+	return copy;
+
+failed:
+
+	stu_json_delete(copy);
+
+	return NULL;
+}
+
 static stu_int_t
 stu_json_set_key(stu_json_t *item, stu_str_t *key) {
 	if (key != NULL) {
 		if (item->key.len < key->len) {
-			if (item->key.data == NULL) {
+			if (item->key.data != NULL) {
 				stu_json_free(item->key.data);
 			}
 
@@ -221,6 +247,7 @@ stu_json_set_key(stu_json_t *item, stu_str_t *key) {
 		}
 
 		stu_strncpy(item->key.data, key->data, key->len);
+		item->key.len = key->len;
 	}
 
 	return STU_OK;
@@ -329,26 +356,35 @@ stu_json_remove_item_from_object(stu_json_t *object, stu_str_t *key) {
 
 void
 stu_json_delete(stu_json_t *item) {
+	stu_json_t *child;
+	stu_str_t  *str;
+
 	if (item == NULL) {
 		return;
 	}
 
 	switch (item->type) {
 	case STU_JSON_TYPE_STRING:
+		str = (stu_str_t *) item->value;
+		if (str != NULL && str->data != NULL) {
+			stu_json_free(str->data);
+		}
 	case STU_JSON_TYPE_NUMBER:
-		stu_json_free(item->value);
+		if (item->value != NULL) {
+			stu_json_free(item->value);
+		}
 		break;
 	case STU_JSON_TYPE_ARRAY:
 	case STU_JSON_TYPE_OBJECT:
-		if (item->value != NULL) {
-			stu_json_delete((stu_json_t *) item->value);
+		for (child = (stu_json_t *) item->value; child; child = child->next) {
+			stu_json_delete(child);
 		}
 		break;
 	default:
 		break;
 	}
 
-	if (item->key.data == NULL) {
+	if (item->key.data != NULL) {
 		stu_json_free(item->key.data);
 	}
 
@@ -379,7 +415,7 @@ stu_json_parse(u_char *data, size_t len) {
 
 	err = NULL;
 
-	item = stu_json_create(STU_JSON_TYPE_NONE);
+	item = stu_json_create(STU_JSON_TYPE_NONE, NULL);
 	if (item == NULL) {
 		return NULL;
 	}
@@ -485,8 +521,9 @@ failed:
 
 static size_t
 stu_json_parse_string(stu_json_t *item, u_char *data, size_t len, u_char **err) {
-	size_t  pos;
-	u_char *p, c;
+	size_t     pos;
+	u_char    *p, *s, c;
+	stu_str_t *str;
 	enum {
 		sw_start = 0,
 		sw_str_start,
@@ -516,11 +553,13 @@ stu_json_parse_string(stu_json_t *item, u_char *data, size_t len, u_char **err) 
 				goto failed;
 			}
 
-			((stu_str_t *) item->value)->data = p;
+			str = (stu_str_t *) item->value;
+			str->data = s = p;
 
 			if (c == '\"') {
+				str->data = NULL;
+				str->len = 0;
 				state = sw_str_end;
-				((stu_str_t *) item->value)->len = 0;
 			} else {
 				state = sw_str;
 			}
@@ -528,7 +567,16 @@ stu_json_parse_string(stu_json_t *item, u_char *data, size_t len, u_char **err) 
 
 		case sw_str:
 			if (c == '\"') {
-				((stu_str_t *) item->value)->len = p - ((stu_str_t *) item->value)->data;
+				str = (stu_str_t *) item->value;
+				str->len = p - s;
+
+				str->data = stu_json_malloc(str->len + 1);
+				if (str->data == NULL) {
+					goto failed;
+				}
+
+				stu_strncpy(str->data, s, str->len);
+
 				state = sw_str_end;
 			} else {
 				// appending
@@ -620,7 +668,7 @@ stu_json_parse_array(stu_json_t *array, u_char *data, size_t len, u_char **err) 
 			break;
 
 		case sw_arr_start:
-			item = stu_json_create(STU_JSON_TYPE_NONE);
+			item = stu_json_create(STU_JSON_TYPE_NONE, NULL);
 			if (item == NULL) {
 				goto failed;
 			}
@@ -677,7 +725,7 @@ failed:
 static size_t
 stu_json_parse_object(stu_json_t *object, u_char *data, size_t len, u_char **err) {
 	size_t      pos, n;
-	u_char     *p, c;
+	u_char     *p, *s, c;
 	stu_json_t *item;
 	enum {
 		sw_start = 0,
@@ -716,16 +764,17 @@ stu_json_parse_object(stu_json_t *object, u_char *data, size_t len, u_char **err
 			break;
 
 		case sw_key_start:
-			item = stu_json_create(STU_JSON_TYPE_NONE);
+			item = stu_json_create(STU_JSON_TYPE_NONE, NULL);
 			if (item == NULL) {
 				goto failed;
 			}
 
-			item->key.data = p;
+			item->key.data = s = p;
 
 			if (c == '\"') {
-				state = sw_key_end;
+				item->key.data = NULL;
 				item->key.len = 0;
+				state = sw_key_end;
 			} else {
 				state = sw_key;
 			}
@@ -733,7 +782,15 @@ stu_json_parse_object(stu_json_t *object, u_char *data, size_t len, u_char **err
 
 		case sw_key:
 			if (c == '\"') {
-				item->key.len = p - item->key.data;
+				item->key.len = p - s;
+
+				item->key.data = stu_json_malloc(item->key.len + 1);
+				if (item->key.data == NULL) {
+					goto failed;
+				}
+
+				stu_strncpy(item->key.data, s, item->key.len);
+
 				state = sw_key_end;
 			} else {
 				// appending

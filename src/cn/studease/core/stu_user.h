@@ -12,13 +12,23 @@
 #include "stu_core.h"
 
 typedef struct {
-	stu_int_t            id;
-	stu_str_t            name;
+	u_char      code;
+	stu_uint_t  time;
+} stu_punishment_t;
 
-	stu_str_t            strid;
-	u_char               idstr[8];
+typedef struct {
+	stu_int_t         id;
+	stu_str_t         name;
 
-	stu_channel_t       *channel;
+	stu_str_t         strid;
+	u_char            idstr[8];
+
+	u_char            role;
+	stu_short_t       interval;
+	stu_uint_t        active;
+	stu_punishment_t  punishment;
+
+	stu_channel_t    *channel;
 } stu_user_t;
 
 stu_int_t stu_user_init(stu_user_t *usr, stu_int_t id, stu_str_t *name, stu_base_pool_t *pool);
