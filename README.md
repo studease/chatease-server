@@ -4,7 +4,7 @@
 
 > [[source] https://github.com/studease/chatease-server](https://github.com/studease/chatease-server)
 
-This is a websocket server for chatting, with lua embedded in.
+This is a websocket server for chatting.
 
 
 ## Build
