@@ -11,26 +11,36 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
-typedef struct {
-	stu_queue_t      queue;
+typedef void (*stu_list_foreach_pt) (stu_str_t *key, void *value);
 
-	void            *obj;
-	size_t           size;
+typedef void *(*stu_list_palloc_pt)(void *pool, size_t size);
+typedef void (*stu_list_free_pt)(void *pool, void *p);
+
+typedef struct {
+	stu_queue_t  queue;
+
+	void        *obj;
+	size_t       size;
 } stu_list_elt_t;
 
 typedef struct {
-	stu_spinlock_t   lock;
+	stu_spinlock_t      lock;
 
-	stu_slab_pool_t *pool;
-	stu_list_elt_t   elts;
+	stu_list_elt_t      elts;
+	stu_uint_t          length;
+
+	void               *pool;
+	stu_list_palloc_pt  palloc;
+	stu_list_free_pt    free;
 } stu_list_t;
 
 
-stu_list_t *stu_list_create(stu_slab_pool_t *pool);
-void stu_list_init(stu_list_t *list, stu_slab_pool_t *pool);
+void stu_list_init(stu_list_t *list, void *pool, stu_list_palloc_pt palloc, stu_list_free_pt free);
 void stu_list_destroy(stu_list_t *list);
 
-void stu_list_push(stu_list_t *list, stu_list_elt_t *elt);
+stu_int_t stu_list_push(stu_list_t *list, void *obj, size_t size);
 void stu_list_remove(stu_list_t *list, stu_list_elt_t *elt);
+
+void stu_list_foreach(stu_list_t *list, stu_list_foreach_pt cb);
 
 #endif /* STU_LIST_H_ */

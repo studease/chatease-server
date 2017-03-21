@@ -102,16 +102,9 @@ done:
 	c->pool->data.end = (u_char *) c->pool + STU_RAM_BLOCK_SIZE;
 	c->pool->prev = c->pool->next = NULL;
 
-	c->read = (stu_event_t *) stu_base_pcalloc(c->pool, sizeof(stu_event_t));
-	c->read->data = (void *) c;
-	c->read->active = FALSE;
-
-	c->write = (stu_event_t *) stu_base_pcalloc(c->pool, sizeof(stu_event_t));
-	c->write->data = (void *) c;
-	c->write->active = TRUE;
-
-	// protect events from resetting pool.
-	c->pool->data.start = c->pool->data.last;
+	c->read.data = c->write.data = (void *) c;
+	c->read.active = FALSE;
+	c->write.active = TRUE;
 
 	stu_log_debug(2, "Got connection: c=%p, fd=%d.", c, c->fd);
 
@@ -126,7 +119,7 @@ stu_connection_free(stu_connection_t *c) {
 
 	fd = c->fd;
 	c->fd = (stu_socket_t) -1;
-	c->read = c->write = NULL;
+	c->read.active = c->write.active = FALSE;
 
 	c->queue.next->prev = c->queue.prev;
 	c->queue.prev->next = c->queue.next;
@@ -165,7 +158,7 @@ stu_connection_init(stu_connection_t *c, stu_socket_t s) {
 
 	c->buffer.start = c->buffer.last = c->buffer.end = NULL;
 	c->data = NULL;
-	c->read = c->write = NULL;
+	c->read.active = c->write.active = FALSE;
 
 	c->error = STU_CONNECTION_ERROR_NONE;
 }
@@ -175,7 +168,6 @@ stu_connection_page_create(stu_connection_pool_t *pool) {
 	size_t                 size;
 	stu_connection_page_t *page;
 	stu_shm_t             *shm = NULL;
-	stu_list_elt_t        *elt;
 
 	if (pool->pages.length >= STU_CONNECTION_PAGE_MAX_N) {
 		stu_log_error(0, "Failed to alloc connection page: Page length limited.");
@@ -197,10 +189,7 @@ stu_connection_page_create(stu_connection_pool_t *pool) {
 		goto failed;
 	}
 
-	elt = stu_slab_calloc(stu_cycle->slab_pool, sizeof(stu_list_elt_t));
-	elt->obj = (void *) shm;
-	elt->size = sizeof(stu_shm_t);
-	stu_list_push(&stu_cycle->shared_memory, elt);
+	stu_list_push(&stu_cycle->shared_memory, shm, sizeof(stu_shm_t));
 
 	stu_connection_page_init(page);
 	page->data.start = page->data.last = (u_char *) page + sizeof(stu_connection_page_t);

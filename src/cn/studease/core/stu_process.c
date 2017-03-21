@@ -407,12 +407,12 @@ stu_worker_thread_cycle(void *data) {
 				continue;
 			}
 
-			if ((ev->events & EPOLLIN) && c->read && c->read->active) {
-				c->read->handler(c->read);
+			if ((ev->events & EPOLLIN) && c->read.active) {
+				c->read.handler(&c->read);
 			}
 
-			if ((ev->events & EPOLLOUT) && c->write && c->write->active) {
-				c->write->handler(c->write);
+			if ((ev->events & EPOLLOUT) && c->write.active) {
+				c->write.handler(&c->write);
 			}
 		}
 	}

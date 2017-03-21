@@ -27,6 +27,8 @@ typedef struct {
 	stu_int_t      worker_processes;
 	stu_int_t      worker_threads;
 
+	stu_hash_t     upstreams;        // => stu_list_t => stu_http_upstream_server_t
+
 	stu_str_t      pid;
 } stu_config_t;
 
@@ -37,7 +39,7 @@ struct stu_cycle_s {
 	stu_ram_pool_t         ram_pool;
 
 	stu_config_t           config;
-	stu_list_t             shared_memory;   //type: stu_shm_t
+	stu_list_t             shared_memory;   // => stu_shm_t
 
 	stu_hash_t             channels;
 	stu_uint_t             connection_n;

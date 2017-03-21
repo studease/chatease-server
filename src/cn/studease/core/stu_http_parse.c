@@ -129,6 +129,94 @@ done:
 }
 
 stu_int_t
+stu_http_parse_status_line(stu_http_request_t *r, stu_buf_t *b) {
+	u_char  ch, *p, *s, *v;
+	enum {
+		sw_start = 0,
+		sw_version,
+		sw_spaces_before_status,
+		sw_status,
+		sw_spaces_before_explain,
+		sw_explain,
+		sw_almost_done
+	} state;
+
+	state = r->state;
+
+	for (p = b->last; p < b->end; p++) {
+		ch = *p;
+
+		switch (state) {
+		case sw_start:
+			r->headers_out.status_line.data = p;
+			state = sw_version;
+			break;
+		case sw_version:
+			if (ch == ' ') {
+				if (stu_strncmp(v, "HTTP/1.1", 8) == 0) {
+					r->http_version = STU_HTTP_VERSION_11;
+					state = sw_spaces_before_status;
+					break;
+				}
+				if (stu_strncmp(v, "HTTP/1.0", 8) == 0) {
+					r->http_version = STU_HTTP_VERSION_10;
+					state = sw_spaces_before_status;
+					break;
+				}
+				return STU_ERROR;
+				break;
+			}
+			break;
+		case sw_spaces_before_status:
+			s = p;
+			state = sw_status;
+			break;
+		case sw_status:
+			if (ch == ' ') {
+				r->header_end = p;
+				// TODO: switch string to int
+				state = sw_spaces_before_explain;
+				break;
+			}
+			if (p - s >= 3) {
+				return STU_ERROR;
+				break;
+			}
+			break;
+		case sw_spaces_before_explain:
+			state = sw_explain;
+			break;
+		case sw_explain:
+			if (ch == CR) {
+				state = sw_almost_done;
+				break;
+			}
+			break;
+		case sw_almost_done:
+			switch (ch) {
+			case LF:
+				goto done;
+			default:
+				return STU_ERROR;
+			}
+			break;
+		}
+	}
+
+	b->last = p;
+	r->state = state;
+
+	return STU_AGAIN;
+
+done:
+
+	b->last = p + 1;
+	r->state = sw_start;
+
+	return STU_OK;
+}
+
+stu_int_t
 stu_http_parse_header_line(stu_http_request_t *r, stu_buf_t *b, stu_uint_t allow_underscores) {
 	u_char      c, ch, *p;
 	stu_uint_t  hash, i;
@@ -166,7 +254,7 @@ stu_http_parse_header_line(stu_http_request_t *r, stu_buf_t *b, stu_uint_t allow
 		/* first char */
 		case sw_start:
 			r->header_name_start = p;
-			r->invalid_header = 0;
+			r->invalid_header = FALSE;
 
 			switch (ch) {
 			case CR:
@@ -193,7 +281,7 @@ stu_http_parse_header_line(stu_http_request_t *r, stu_buf_t *b, stu_uint_t allow
 						r->lowcase_header[0] = ch;
 						i = 1;
 					} else {
-						r->invalid_header = 1;
+						r->invalid_header = TRUE;
 					}
 					break;
 				}
@@ -202,7 +290,7 @@ stu_http_parse_header_line(stu_http_request_t *r, stu_buf_t *b, stu_uint_t allow
 					return STU_ERROR;
 				}
 
-				r->invalid_header = 1;
+				r->invalid_header = TRUE;
 				break;
 			}
 			break;
@@ -223,7 +311,7 @@ stu_http_parse_header_line(stu_http_request_t *r, stu_buf_t *b, stu_uint_t allow
 					r->lowcase_header[i++] = ch;
 					i &= (STU_HTTP_LC_HEADER_LEN - 1);
 				} else {
-					r->invalid_header = 1;
+					r->invalid_header = TRUE;
 				}
 				break;
 			}
@@ -261,7 +349,7 @@ stu_http_parse_header_line(stu_http_request_t *r, stu_buf_t *b, stu_uint_t allow
 				return STU_ERROR;
 			}
 
-			r->invalid_header = 1;
+			r->invalid_header = TRUE;
 			break;
 
 		/* space* before header value */

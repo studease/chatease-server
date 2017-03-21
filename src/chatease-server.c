@@ -12,7 +12,6 @@
 #include "cn/studease/core/stu_core.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 
 extern stu_cycle_t *stu_cycle;
 

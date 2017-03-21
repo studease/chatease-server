@@ -49,7 +49,7 @@ stu_hash_init(stu_hash_t *hash, stu_hash_elt_t **buckets, stu_uint_t size, void 
 
 	stu_spinlock_init(&hash->lock);
 
-	stu_list_init(&hash->keys, pool);
+	stu_list_init(&hash->keys, pool, palloc, free);
 
 	hash->buckets = b;
 	hash->size = size;

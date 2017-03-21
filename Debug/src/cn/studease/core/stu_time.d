@@ -1,4 +1,4 @@
-src/cn/studease/core/stu_slab.d: ../src/cn/studease/core/stu_slab.c \
+src/cn/studease/core/stu_time.d: ../src/cn/studease/core/stu_time.c \
  ../src/cn/studease/core/stu_config.h ../src/cn/studease/core/stu_core.h \
  ../src/cn/studease/core/stu_string.h ../src/cn/studease/core/stu_buf.h \
  ../src/cn/studease/core/stu_queue.h ../src/cn/studease/core/stu_errno.h \

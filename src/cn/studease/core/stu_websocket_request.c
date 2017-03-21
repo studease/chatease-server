@@ -13,8 +13,6 @@
 static stu_int_t stu_websocket_process_request_frames(stu_websocket_request_t *r);
 static void stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t size);
 
-extern lua_State *L;
-
 
 void
 stu_websocket_wait_request_handler(stu_event_t *rev) {
@@ -75,8 +73,8 @@ again:
 
 failed:
 
-	c->read->active = FALSE;
-	stu_epoll_del_event(c->read, STU_READ_EVENT);
+	c->read.active = FALSE;
+	stu_epoll_del_event(&c->read, STU_READ_EVENT);
 
 	ch = c->user.channel;
 	stu_channel_remove(ch, c);
@@ -189,16 +187,13 @@ stu_websocket_process_request_frames(stu_websocket_request_t *r) {
 static void
 stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t size) {
 	stu_connection_t      *c;
-	stu_channel_t         *ch;
 	stu_json_t            *req, *cmd, *rqdata, *rqtype, *rqchannel;
 	stu_json_t            *res, *raw, *rsdata, *rstype, *rschannel, *rsuser, *rsuid, *rsuname, *rsurole;
 	stu_str_t             *str;
-	stu_double_t          *num;
 	stu_websocket_frame_t *out;
 	u_char                *data, temp[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE];
 
 	c = r->connection;
-	ch = c->user.channel;
 
 	req = stu_json_parse((u_char *) text, size);
 	if (req == NULL || req->type != STU_JSON_TYPE_OBJECT) {
@@ -253,6 +248,9 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 		stu_memzero(temp, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
 		data = stu_json_stringify(res, (u_char *) temp);
 
+		stu_json_delete(req);
+		stu_json_delete(res);
+
 		// setup out frame.
 		out = &r->frames_out;
 		out->opcode = STU_WEBSOCKET_OPCODE_TEXT;
@@ -262,11 +260,10 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 
 		stu_websocket_finalize_request(r, STU_HTTP_OK);
 
-		stu_json_delete(req);
-		stu_json_delete(res);
-
 		return;
 	}
+
+	stu_json_delete(req);
 
 	stu_websocket_finalize_request(r, STU_HTTP_METHOD_NOT_ALLOWED);
 }
@@ -284,27 +281,7 @@ stu_websocket_finalize_request(stu_websocket_request_t *r, stu_int_t rc) {
 		return;
 	}*/
 
-	stu_websocket_request_handler(c->write);
-}
-
-int
-stu_broadcast(lua_State *L) {
-	//stu_connection_t *c;
-	int   id;
-	char *message;
-
-	//stu_log_debug(5, "type: %d", lua_type(L, -3));
-
-	//c = (stu_connection_t *) lua_touserdata(L, -3);
-
-	id = lua_getfield(L, -2, "id");
-	message = (char *) lua_tostring(L, -1);
-
-	stu_log_debug(5, "LUA calling stu_broadcast(%d, %s).", id, message);
-
-	//stu_websocket_request_handler(c->write);
-
-	return 0;
+	stu_websocket_request_handler(&c->write);
 }
 
 void
@@ -407,7 +384,7 @@ stu_websocket_request_handler(stu_event_t *wev) {
 
 		gettimeofday(&end, NULL);
 		cost = 1000000 * (end.tv_sec - start.tv_sec) + end.tv_usec - start.tv_usec;
-		stu_log_debug(4, "sent: fd=%d, bytes=%d, cost=%ld.", c->fd, n, cost);
+		stu_log_debug(4, "sent: fd=%d, bytes=%d, cost=%ldms.", c->fd, n, cost);
 	}
 }
 

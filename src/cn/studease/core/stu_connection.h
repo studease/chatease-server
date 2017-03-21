@@ -33,8 +33,10 @@ typedef struct {
 
 	stu_buf_t              buffer;
 	void                  *data;
-	stu_event_t           *read;
-	stu_event_t           *write;
+	stu_event_t            read;
+	stu_event_t            write;
+
+	stu_upstream_t        *upstream;
 
 	stu_uint_t             error;  // timed out, inner error, destroyed
 } stu_connection_t;

@@ -6,6 +6,7 @@
  */
 
 #include <float.h>
+#include <limits.h>
 #include "stu_config.h"
 #include "stu_core.h"
 
@@ -369,6 +370,7 @@ stu_json_delete(stu_json_t *item) {
 		if (str != NULL && str->data != NULL) {
 			stu_json_free(str->data);
 		}
+		/* no break */
 	case STU_JSON_TYPE_NUMBER:
 		if (item->value != NULL) {
 			stu_json_free(item->value);

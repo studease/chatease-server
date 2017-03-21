@@ -63,7 +63,9 @@ typedef struct {
 
 	stu_table_elt_t *accept;
 	stu_table_elt_t *accept_language;
+#if (STU_HTTP_GZIP)
 	stu_table_elt_t *accept_encoding;
+#endif
 
 	stu_table_elt_t *content_type;
 	stu_table_elt_t *content_length;
@@ -104,8 +106,8 @@ typedef struct {
 struct stu_http_request_s {
 	stu_connection_t       *connection;
 
-	stu_uint_t              method;
-	stu_uint_t              http_version;
+	stu_short_t             method;
+	uint8_t                 http_version;
 
 	stu_str_t               request_line;
 	stu_str_t               uri;
@@ -119,12 +121,12 @@ struct stu_http_request_s {
 	stu_buf_t               response_body;
 
 	// used for parsing request.
-	stu_uint_t              state;
+	uint8_t                 state;
 	stu_uint_t              header_hash;
 	stu_uint_t              lowcase_index;
 	u_char                  lowcase_header[STU_HTTP_LC_HEADER_LEN];
 
-	u_char                  invalid_header;
+	stu_bool_t              invalid_header;
 
 	u_char                 *header_name_start;
 	u_char                 *header_name_end;

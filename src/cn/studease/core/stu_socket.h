@@ -12,6 +12,8 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
+#define STU_SOCKET_INVALID -1
+
 typedef int  stu_socket_t;
 
 #define stu_nonblocking(s)  fcntl(s, F_SETFL, fcntl(s, F_GETFL) | O_NONBLOCK)

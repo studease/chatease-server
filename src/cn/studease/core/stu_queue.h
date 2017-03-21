@@ -39,8 +39,8 @@ struct stu_queue_s {
 
 #define stu_queue_insert_tail(h, x)                                          \
 	(x)->prev = (h)->prev;                                                    \
-	(x)->prev->next = x;                                                      \
 	(x)->next = h;                                                            \
+	(h)->prev->next = x;                                                      \
 	(h)->prev = x
 
 

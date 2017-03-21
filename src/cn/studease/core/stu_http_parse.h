@@ -12,6 +12,7 @@
 #include "stu_core.h"
 
 stu_int_t stu_http_parse_request_line(stu_http_request_t *r, stu_buf_t *b);
+stu_int_t stu_http_parse_status_line(stu_http_request_t *r, stu_buf_t *b);
 stu_int_t stu_http_parse_header_line(stu_http_request_t *r, stu_buf_t *b, stu_uint_t allow_underscores);
 
 stu_int_t stu_http_parse_uri(stu_http_request_t *r);

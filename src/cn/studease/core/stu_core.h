@@ -8,9 +8,10 @@
 #ifndef STU_CORE_H_
 #define STU_CORE_H_
 
-typedef struct stu_cycle_s      stu_cycle_t;
-typedef struct stu_pool_s       stu_pool_t;
-typedef struct stu_chain_s      stu_chain_t;
+typedef struct stu_cycle_s    stu_cycle_t;
+typedef struct stu_pool_s     stu_pool_t;
+typedef struct stu_chain_s    stu_chain_t;
+typedef struct stu_upstream_s stu_upstream_t;
 
 typedef enum {
 	STANDALONE = 0,
@@ -46,9 +47,12 @@ typedef enum {
 #include "stu_ram.h"
 #include "stu_slab.h"
 #include "stu_list.h"
+#include "stu_rbtree.h"
+#include "stu_time.h"
 #include "stu_socket.h"
 #include "stu_event.h"
 #include "stu_hash.h"
+#include "stu_inet.h"
 #include "stu_channel.h"
 #include "stu_user.h"
 #include "stu_connection.h"
@@ -58,11 +62,12 @@ typedef enum {
 #include "stu_base64.h"
 #include "stu_sha1.h"
 #include "stu_md5.h"
-#include "stu_lua.h"
 #include "stu_json.h"
 #include "stu_protocol.h"
 #include "stu_http.h"
-#include "stu_files.h"
+#include "stu_upstream.h"
+#include "stu_upstream_ident.h"
+#include "stu_file.h"
 #include "stu_process.h"
 #include "stu_filedes.h"
 #include "stu_utils.h"

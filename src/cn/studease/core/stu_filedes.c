@@ -140,7 +140,7 @@ stu_filedes_add_event(stu_fd_t fd, uint32_t event, stu_event_handler_pt handler)
 		return STU_ERROR;
 	}
 
-	ev = event == STU_READ_EVENT ? c->read : c->write;
+	ev = event == STU_READ_EVENT ? &c->read : &c->write;
 	if (ev == NULL) {
 		stu_log_error(0, "Failed to add filedes event: fd=%d, ev=%d.", fd, event);
 		return STU_ERROR;

@@ -12,6 +12,8 @@
 stu_uint_t   stu_ncpu;
 stu_cycle_t *stu_cycle;
 
+extern stu_hash_t *stu_upstreams;
+
 
 static void stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool);
 
@@ -38,7 +40,6 @@ stu_cycle_create(stu_config_t *cf) {
 	stu_ram_pool_t        *ram_pool;
 	stu_cycle_t           *cycle;
 	stu_shm_t             *shm;
-	stu_list_elt_t        *elt;
 
 	stu_strerror_init();
 
@@ -82,7 +83,7 @@ stu_cycle_create(stu_config_t *cf) {
 	//stu_ram_test(&cycle->ram_pool);
 
 	stu_config_copy(&cycle->config, cf, pool);
-	stu_list_init(&cycle->shared_memory, slab_pool);
+	stu_list_init(&cycle->shared_memory, slab_pool, (stu_list_palloc_pt) stu_slab_alloc, (stu_list_free_pt) stu_slab_free);
 
 	shm = stu_pcalloc(pool, sizeof(stu_shm_t));
 	shm->addr = (u_char *) pool;
@@ -90,10 +91,7 @@ stu_cycle_create(stu_config_t *cf) {
 	if (stu_shm_alloc(shm) == STU_ERROR) {
 		return NULL;
 	}
-	elt = stu_pcalloc(pool, sizeof(stu_list_elt_t));
-	elt->obj = (void *) shm;
-	elt->size = sizeof(stu_shm_t);
-	stu_list_push(&cycle->shared_memory, elt);
+	stu_list_push(&cycle->shared_memory, shm, sizeof(stu_shm_t));
 
 	shm = stu_pcalloc(pool, sizeof(stu_shm_t));
 	shm->addr = (u_char *) slab_pool;
@@ -101,10 +99,7 @@ stu_cycle_create(stu_config_t *cf) {
 	if (stu_shm_alloc(shm) == STU_ERROR) {
 		return NULL;
 	}
-	elt = stu_pcalloc(pool, sizeof(stu_list_elt_t));
-	elt->obj = (void *) shm;
-	elt->size = sizeof(stu_shm_t);
-	stu_list_push(&cycle->shared_memory, elt);
+	stu_list_push(&cycle->shared_memory, shm, sizeof(stu_shm_t));
 
 	shm = stu_pcalloc(pool, sizeof(stu_shm_t));
 	shm->addr = (u_char *) ram_pool;
@@ -112,10 +107,7 @@ stu_cycle_create(stu_config_t *cf) {
 	if (stu_shm_alloc(shm) == STU_ERROR) {
 		return NULL;
 	}
-	elt = stu_pcalloc(pool, sizeof(stu_list_elt_t));
-	elt->obj = (void *) shm;
-	elt->size = sizeof(stu_shm_t);
-	stu_list_push(&cycle->shared_memory, elt);
+	stu_list_push(&cycle->shared_memory, shm, sizeof(stu_shm_t));
 
 	if (stu_hash_init(&cycle->channels, NULL, STU_MAX_CHANNEL_N, slab_pool,
 			(stu_hash_palloc_pt) stu_slab_alloc, (stu_hash_free_pt) stu_slab_free) == STU_ERROR) {
@@ -129,13 +121,6 @@ stu_cycle_create(stu_config_t *cf) {
 		stu_log_error(0, "Failed to init epoll.");
 		return NULL;
 	}
-
-	/*
-	if (stu_lua_init() == STU_ERROR) {
-		stu_log_error(0, "Failed to init lua.");
-		return NULL;
-	}
-	*/
 
 	return cycle;
 }
@@ -153,20 +138,23 @@ stu_pidfile_delete(stu_str_t *name) {
 
 static void
 stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool) {
+	stu_list_t            *upstream;
+	stu_upstream_server_t *server;
+
 	dst->daemon = src->daemon;
 	dst->runmode = src->runmode;
 	dst->port = src->port;
 
 	if (src->hostname.len > 0) {
 		dst->hostname.data = stu_pcalloc(pool, src->hostname.len + 1);
-		memcpy(dst->hostname.data, src->hostname.data, src->hostname.len);
 		dst->hostname.len = src->hostname.len;
+		memcpy(dst->hostname.data, src->hostname.data, src->hostname.len);
 	}
 
 	if (src->runmode == ORIGIN) {
 		dst->origin_addr.data = stu_pcalloc(pool, src->origin_addr.len + 1);
-		memcpy(dst->origin_addr.data, src->origin_addr.data, src->origin_addr.len);
 		dst->origin_addr.len = src->origin_addr.len;
+		memcpy(dst->origin_addr.data, src->origin_addr.data, src->origin_addr.len);
 
 		dst->origin_port = src->origin_port;
 	}
@@ -176,7 +164,46 @@ stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool) {
 	dst->worker_threads = src->worker_threads;
 
 	dst->pid.data = stu_pcalloc(pool, src->pid.len + 1);
-	memcpy(dst->pid.data, src->pid.data, src->pid.len);
 	dst->pid.len = src->pid.len;
+	memcpy(dst->pid.data, src->pid.data, src->pid.len);
+
+	// init upstream
+	upstream = stu_pcalloc(pool, sizeof(stu_list_t));
+	if (upstream == NULL) {
+		stu_log_error(0, "Failed to pcalloc upstream list.");
+		return;
+	}
+
+	stu_list_init(upstream, pool, (stu_list_palloc_pt) stu_pcalloc, NULL);
+
+	// add server
+	server = stu_pcalloc(pool, sizeof(stu_upstream_server_t));
+	if (server == NULL) {
+		stu_log_error(0, "Failed to pcalloc upstream server.");
+		return;
+	}
+
+	server->name.data = stu_pcalloc(pool, 6);
+	server->name.len = 5;
+	memcpy(server->name.data, "ident", 5);
+
+	server->addr.name.data = stu_pcalloc(pool, 14);
+	server->addr.name.len = 13;
+	memcpy(server->addr.name.data, "192.168.1.202", 13);
+
+	server->port = 80;
+	server->weight = 32;
+
+	stu_list_push(upstream, server, sizeof(stu_upstream_server_t));
+
+	// init upstreams
+	if (stu_hash_init(&dst->upstreams, NULL, STU_UPSTREAM_MAXIMUM, pool, (stu_hash_palloc_pt) stu_pcalloc, NULL) == STU_ERROR) {
+		stu_log_error(0, "Failed to init upstream hash.");
+		return;
+	}
+
+	stu_hash_insert(&dst->upstreams, &server->name, upstream, STU_HASH_LOWCASE_KEY);
+
+	stu_upstreams = &dst->upstreams;
 }
 
