@@ -218,7 +218,7 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 		if (rqdata == NULL || rqdata->type != STU_JSON_TYPE_STRING
 				|| rqtype == NULL || rqtype->type != STU_JSON_TYPE_STRING
 				|| rqchannel == NULL || rqchannel->type != STU_JSON_TYPE_OBJECT) {
-			stu_log_error(0, "Failed to analyze request: necessary param[s] not found.");
+			stu_log_error(0, "Failed to analyze request: necessary item[s] not found.");
 			stu_json_delete(req);
 			stu_websocket_finalize_request(r, STU_HTTP_BAD_REQUEST);
 			return;

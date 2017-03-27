@@ -148,7 +148,7 @@ stu_http_parse_status_line(stu_http_request_t *r, stu_buf_t *b) {
 
 		switch (state) {
 		case sw_start:
-			r->headers_out.status_line.data = p;
+			r->headers_out.status_line.data = v = p;
 			state = sw_version;
 			break;
 		case sw_version:
@@ -173,8 +173,7 @@ stu_http_parse_status_line(stu_http_request_t *r, stu_buf_t *b) {
 			break;
 		case sw_status:
 			if (ch == ' ') {
-				r->header_end = p;
-				// TODO: switch string to int
+				r->headers_out.status = atol((const char *) s);
 				state = sw_spaces_before_explain;
 				break;
 			}

@@ -10,6 +10,28 @@
 
 stu_hash_t *stu_upstreams;
 
+static stu_int_t stu_http_upstream_process_content_length(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
+static stu_int_t stu_http_upstream_process_connection(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
+static stu_int_t stu_http_upstream_process_header_line(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
+static stu_int_t stu_http_upstream_process_unique_header_line(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
+
+stu_hash_t  stu_http_upstream_headers_in_hash;
+
+stu_http_header_t  stu_http_upstream_headers_in[] = {
+	{ stu_string("Server"), offsetof(stu_http_headers_out_t, server), stu_http_upstream_process_unique_header_line },
+
+	{ stu_string("Content-Length"), offsetof(stu_http_headers_out_t, content_length), stu_http_upstream_process_content_length },
+	{ stu_string("Content-Type"), offsetof(stu_http_headers_out_t, content_type), stu_http_upstream_process_header_line },
+#if (STU_HTTP_GZIP)
+	{ stu_string("Content-Encoding"), offsetof(stu_http_headers_out_t, content_encoding), stu_http_upstream_process_header_line },
+#endif
+
+	{ stu_string("Connection"), offsetof(stu_http_headers_out_t, connection), stu_http_upstream_process_connection },
+	{ stu_string("Date"), offsetof(stu_http_headers_out_t, date), stu_http_upstream_process_header_line },
+
+	{ stu_null_string, 0, NULL }
+};
+
 static stu_int_t stu_upstream_connect(stu_connection_t *c);
 static stu_int_t stu_upstream_next(stu_connection_t *c);
 
@@ -110,7 +132,7 @@ stu_upstream_connect(stu_connection_t *c) {
 
 	u = c->upstream;
 
-	fd = socket(AF_INET, SOCK_STREAM, 0);
+	fd = socket(u->server->addr.sockaddr.sin_family, SOCK_STREAM, 0);
 	if (fd == (stu_socket_t) STU_SOCKET_INVALID) {
 		stu_log_error(stu_errno, "Failed to create socket for upstream %s, fd=%d.", u->server->name.data, c->fd);
 		return STU_ERROR;
@@ -135,8 +157,6 @@ stu_upstream_connect(stu_connection_t *c) {
 		}
 	}
 
-	u->peer.connection->read.data = u->peer.connection->write.data = c;
-
 	u->peer.connection->read.handler = u->read_event_handler;
 	if (stu_epoll_add_event(&u->peer.connection->read, STU_READ_EVENT|EPOLLET) == STU_ERROR) {
 		stu_log_error(0, "Failed to add read event of upstream %s, fd=%d.", u->server->name.data, c->fd);
@@ -147,8 +167,9 @@ stu_upstream_connect(stu_connection_t *c) {
 		stu_log_error(0, "Failed to add write event of upstream %s, fd=%d.", u->server->name.data, c->fd);
 		return STU_ERROR;
 	}
+	u->peer.connection->read.data = u->peer.connection->write.data = c;
 
-	rc = connect(fd, &u->server->addr.sockaddr, u->server->addr.socklen);
+	rc = connect(fd, (struct sockaddr *) &u->server->addr.sockaddr, u->server->addr.socklen);
 	if (rc == -1) {
 		err = stu_errno;
 		if (err != EINPROGRESS
@@ -194,7 +215,7 @@ stu_upstream_next(stu_connection_t *c) {
 }
 
 
-stu_http_request_t *
+void *
 stu_upstream_create_http_request(stu_connection_t *c) {
 	stu_http_request_t *r;
 	stu_upstream_t     *u;
@@ -229,4 +250,54 @@ stu_upstream_reinit_http_request(stu_connection_t *c) {
 void
 stu_upstream_cleanup(stu_connection_t *c) {
 
+}
+
+
+static stu_int_t
+stu_http_upstream_process_content_length(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset) {
+	stu_int_t  length;
+
+	length = atol((const char *) h->value.data);
+	r->headers_out.content_length_n = length;
+
+	return stu_http_upstream_process_header_line(r, h, offset);
+}
+
+static stu_int_t
+stu_http_upstream_process_connection(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset) {
+	if (stu_strnstr(h->value.data, "Keep-Alive", h->value.len)) {
+		r->headers_out.connection_type = STU_HTTP_CONNECTION_KEEP_ALIVE;
+	} else {
+		r->headers_out.connection_type = STU_HTTP_CONNECTION_CLOSE;
+	}
+
+	return STU_OK;
+}
+
+static stu_int_t
+stu_http_upstream_process_header_line(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset) {
+	stu_table_elt_t  **ph;
+
+	ph = (stu_table_elt_t **) ((char *) &r->headers_out + offset);
+	if (*ph == NULL) {
+		*ph = h;
+	}
+
+	return STU_OK;
+}
+
+static stu_int_t
+stu_http_upstream_process_unique_header_line(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset) {
+	stu_table_elt_t  **ph;
+
+	ph = (stu_table_elt_t **) ((char *) &r->headers_out + offset);
+	if (*ph == NULL) {
+		*ph = h;
+		return STU_OK;
+	}
+
+	stu_log_error(0, "http upstream sent duplicate header line = > \"%s: %s\", "
+			"previous value => \"%s: %s\"", h->key.data, h->value.data, &(*ph)->key.data, &(*ph)->value.data);
+
+	return STU_HTTP_BAD_GATEWAY;
 }

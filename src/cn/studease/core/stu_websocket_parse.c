@@ -48,13 +48,11 @@ stu_websocket_parse_frame(stu_websocket_request_t *r, stu_buf_t *b) {
 			}
 			break;
 		case sw_extended_2:
-			r->frame->extended = *((uint16_t *) p);
-			p++;
+			r->frame->extended = *p++ << 8 | *p;
 			state = r->frame->mask ? sw_masking_key : sw_payload_data;
 			break;
 		case sw_extended_8:
-			r->frame->extended = *((uint64_t *) p);
-			p += 5;
+			r->frame->extended = *p++ << 56 | *p++ << 48 | *p++ << 40 | *p++ << 32 | *p++ << 24 | *p++ << 16 | *p++ << 8 | *p;
 			state = r->frame->mask ? sw_masking_key : sw_payload_data;
 			break;
 		case sw_masking_key:

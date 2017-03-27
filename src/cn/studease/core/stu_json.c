@@ -90,10 +90,12 @@ stu_json_t *
 stu_json_create_bool(stu_str_t *key, stu_bool_t bool) {
 	stu_json_t *item;
 
-	item = stu_json_create(bool ? STU_JSON_TYPE_TRUE : STU_JSON_TYPE_FALSE, key);
+	item = stu_json_create(STU_JSON_TYPE_BOOLEAN, key);
 	if (item == NULL) {
 		return NULL;
 	}
+
+	item->value = bool;
 
 	return item;
 }
@@ -120,8 +122,8 @@ stu_json_create_string(stu_str_t *key, u_char *value, size_t len) {
 	}
 
 	size = sizeof(stu_str_t);
-	item->value = stu_json_malloc(size);
-	if (item->value == NULL) {
+	item->value = (uintptr_t) stu_json_malloc(size);
+	if ((void *) item->value == NULL) {
 		stu_json_delete(item);
 		return NULL;
 	}
@@ -148,8 +150,8 @@ stu_json_create_number(stu_str_t *key, stu_double_t num) {
 		return NULL;
 	}
 
-	item->value = stu_json_malloc(8);
-	if (item->value == NULL) {
+	item->value = (uintptr_t) stu_json_malloc(8);
+	if ((void *) item->value == NULL) {
 		stu_json_delete(item);
 		return NULL;
 	}
@@ -268,8 +270,8 @@ stu_json_add_item_to_object(stu_json_t *object, stu_json_t *item) {
 		return;
 	}
 
-	if (object->value == NULL) {
-		object->value = item;
+	if ((void *) object->value == NULL) {
+		object->value = (uintptr_t) item;
 		item->prev = item; // already set when creating
 		return;
 	}
@@ -372,8 +374,8 @@ stu_json_delete(stu_json_t *item) {
 		}
 		/* no break */
 	case STU_JSON_TYPE_NUMBER:
-		if (item->value != NULL) {
-			stu_json_free(item->value);
+		if ((void *) item->value != NULL) {
+			stu_json_free((void *) item->value);
 		}
 		break;
 	case STU_JSON_TYPE_ARRAY:
@@ -443,7 +445,7 @@ stu_json_parse_value(stu_json_t *item, u_char *data, size_t len, u_char **err) {
 	p = data;
 
 	// skip blank spaces
-	for (c = *p; c == ' '; p++, pos++) {
+	for (c = *p; c == ' ' || c == CR || c == LF || c == '\t'; p++, pos++, c = *p) {
 		/* void */
 	}
 
@@ -465,9 +467,6 @@ stu_json_parse_value(stu_json_t *item, u_char *data, size_t len, u_char **err) {
 
 		n = stu_json_parse_array(item, p, len - pos, err);
 		pos += n;
-		break;
-	case ' ':
-		// skip
 		break;
 	default:
 		if (c == '-' || (c >= '0' && c <= '9')) {
@@ -493,7 +492,7 @@ stu_json_parse_specific(stu_json_t *item, u_char *data, size_t len, u_char **err
 	pos = 0;
 	p = data;
 
-	for (c = *p; c == ' '; p++, pos++) {
+	for (c = *p; c == ' ' || c == CR || c == LF || c == '\t'; p++, pos++, c = *p) {
 		/* void */
 	}
 
@@ -501,10 +500,12 @@ stu_json_parse_specific(stu_json_t *item, u_char *data, size_t len, u_char **err
 		item->type = STU_JSON_TYPE_NULL;
 		n = 4;
 	} else if (stu_strncmp(p, STU_JSON_VALUE_TRUE.data, STU_JSON_VALUE_TRUE.len) == 0) {
-		item->type = STU_JSON_TYPE_TRUE;
+		item->type = STU_JSON_TYPE_BOOLEAN;
+		item->value = TRUE;
 		n = 4;
 	} else if (stu_strncmp(p, STU_JSON_VALUE_FALSE.data, STU_JSON_VALUE_FALSE.len) == 0) {
-		item->type = STU_JSON_TYPE_FALSE;
+		item->type = STU_JSON_TYPE_BOOLEAN;
+		item->value = FALSE;
 		n = 5;
 	} else {
 		goto failed;
@@ -542,7 +543,7 @@ stu_json_parse_string(stu_json_t *item, u_char *data, size_t len, u_char **err) 
 		case sw_start:
 			if (c == '\"') {
 				state = sw_str_start;
-			} else if (c == ' ') {
+			} else if (c == ' ' || c == CR || c == LF || c == '\t') {
 				// skip
 			} else {
 				goto failed;
@@ -550,8 +551,8 @@ stu_json_parse_string(stu_json_t *item, u_char *data, size_t len, u_char **err) 
 			break;
 
 		case sw_str_start:
-			item->value = stu_json_malloc(sizeof(stu_str_t));
-			if (item->value == NULL) {
+			item->value = (uintptr_t) stu_json_malloc(sizeof(stu_str_t));
+			if ((void *) item->value == NULL) {
 				goto failed;
 			}
 
@@ -615,7 +616,7 @@ stu_json_parse_number(stu_json_t *item, u_char *data, size_t len, u_char **err) 
 	p = data;
 	endptr = NULL;
 
-	for (c = *p; c == ' '; p++, pos++) {
+	for (c = *p; c == ' ' || c == CR || c == LF || c == '\t'; p++, pos++, c = *p) {
 		/* void */
 	}
 
@@ -624,8 +625,8 @@ stu_json_parse_number(stu_json_t *item, u_char *data, size_t len, u_char **err) 
 		goto failed;
 	}
 
-	item->value = stu_json_malloc(8);
-	if (item->value == NULL) {
+	item->value = (uintptr_t) stu_json_malloc(8);
+	if ((void *) item->value == NULL) {
 		goto failed;
 	}
 
@@ -662,7 +663,7 @@ stu_json_parse_array(stu_json_t *array, u_char *data, size_t len, u_char **err) 
 		case sw_start:
 			if (c == '[') {
 				state = sw_arr_start;
-			} else if (c == ' ') {
+			} else if (c == ' ' || c == CR || c == LF || c == '\t') {
 				// skip
 			} else {
 				goto failed;
@@ -688,7 +689,7 @@ stu_json_parse_array(stu_json_t *array, u_char *data, size_t len, u_char **err) 
 			for (p += n; pos < len; pos++, p++) {
 				c = *p;
 
-				if (c == ' ') {
+				if (c == ' ' || c == CR || c == LF || c == '\t') {
 					continue;
 				}
 
@@ -748,7 +749,7 @@ stu_json_parse_object(stu_json_t *object, u_char *data, size_t len, u_char **err
 		case sw_start:
 			if (c == '{') {
 				state = sw_obj_start;
-			} else if (c == ' ') {
+			} else if (c == ' ' || c == CR || c == LF || c == '\t') {
 				// skip
 			} else {
 				goto failed;
@@ -758,7 +759,7 @@ stu_json_parse_object(stu_json_t *object, u_char *data, size_t len, u_char **err
 		case sw_obj_start:
 			if (c == '\"') {
 				state = sw_key_start;
-			} else if (c == ' ') {
+			} else if (c == ' ' || c == CR || c == LF || c == '\t') {
 				// skip
 			} else {
 				goto failed;
@@ -802,7 +803,7 @@ stu_json_parse_object(stu_json_t *object, u_char *data, size_t len, u_char **err
 		case sw_key_end:
 			if (c == ':') {
 				state = sw_val;
-			} else if (c == ' ') {
+			} else if (c == ' ' || c == CR || c == LF || c == '\t') {
 				// skip
 			} else {
 				goto failed;
@@ -823,7 +824,7 @@ stu_json_parse_object(stu_json_t *object, u_char *data, size_t len, u_char **err
 			for (p += n; pos < len; pos++, p++) {
 				c = *p;
 
-				if (c == ' ') {
+				if (c == ' ' || c == CR || c == LF || c == '\t') {
 					continue;
 				}
 
@@ -874,12 +875,12 @@ stu_json_print_value(stu_json_t *item, u_char *dst) {
 		p = stu_json_print_null(item, dst);
 		break;
 
-	case STU_JSON_TYPE_TRUE:
-		p = stu_json_print_true(item, dst);
-		break;
-
-	case STU_JSON_TYPE_FALSE:
-		p = stu_json_print_false(item, dst);
+	case STU_JSON_TYPE_BOOLEAN:
+		if (item->value == FALSE) {
+			p = stu_json_print_false(item, dst);
+		} else {
+			p = stu_json_print_true(item, dst);
+		}
 		break;
 
 	case STU_JSON_TYPE_STRING:
@@ -944,16 +945,16 @@ stu_json_print_number(stu_json_t *item, u_char *dst) {
 	if (d == 0) {
 		*dst++ = '0';
 	} else if ((fabs(d - (stu_double_t) i) <= DBL_EPSILON) && (d <= INT_MAX) && (d >= INT_MIN)) {
-		stu_sprintf(dst, "%d", i);
+		dst = stu_sprintf(dst, "%d", i);
 	} else {
 		if ((d * 0) != 0) { // NaN or Infinity
 			dst = stu_strncpy(dst, STU_JSON_VALUE_NULL.data, STU_JSON_VALUE_NULL.len);
 		} else if ((fabs(floor(d) - d) <= DBL_EPSILON) && (fabs(d) < 1.0e60)) {
-			stu_sprintf(dst, "%.0f", d);
+			dst = stu_sprintf(dst, "%.0f", d);
 		} else if ((fabs(d) < 1.0e-6) || (fabs(d) > 1.0e9)) {
-			stu_sprintf(dst, "%e", d);
+			dst = stu_sprintf(dst, "%e", d);
 		} else {
-			stu_sprintf(dst, "%f", d);
+			dst = stu_sprintf(dst, "%f", d);
 		}
 	}
 

@@ -160,6 +160,8 @@ stu_connection_init(stu_connection_t *c, stu_socket_t s) {
 	c->data = NULL;
 	c->read.active = c->write.active = FALSE;
 
+	c->upstream = NULL;
+
 	c->error = STU_CONNECTION_ERROR_NONE;
 }
 

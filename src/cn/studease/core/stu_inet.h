@@ -12,9 +12,9 @@
 #include "stu_core.h"
 
 typedef struct {
-	struct sockaddr  sockaddr;
-	socklen_t        socklen;
-	stu_str_t        name;
+	struct sockaddr_in  sockaddr;
+	socklen_t           socklen;
+	stu_str_t           name;
 } stu_addr_t;
 
 #endif /* STU_INET_H_ */

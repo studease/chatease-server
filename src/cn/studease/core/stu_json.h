@@ -11,21 +11,20 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
-#define STU_JSON_TYPE_NONE   0x00
-#define STU_JSON_TYPE_NULL   0x01
-#define STU_JSON_TYPE_TRUE   0x02
-#define STU_JSON_TYPE_FALSE  0x04
-#define STU_JSON_TYPE_STRING 0x08
-#define STU_JSON_TYPE_NUMBER 0x10
-#define STU_JSON_TYPE_ARRAY  0x20
-#define STU_JSON_TYPE_OBJECT 0x40
+#define STU_JSON_TYPE_NONE    0x00
+#define STU_JSON_TYPE_NULL    0x01
+#define STU_JSON_TYPE_BOOLEAN 0x02
+#define STU_JSON_TYPE_STRING  0x04
+#define STU_JSON_TYPE_NUMBER  0x08
+#define STU_JSON_TYPE_ARRAY   0x10
+#define STU_JSON_TYPE_OBJECT  0x20
 
 typedef struct stu_json_s stu_json_t;
 
 struct stu_json_s {
-	u_char      type;
+	uint8_t     type;
 	stu_str_t   key;
-	void       *value;
+	uintptr_t   value;
 
 	stu_json_t *prev;
 	stu_json_t *next;

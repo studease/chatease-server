@@ -11,7 +11,7 @@
 #include <errno.h>
 #include <stddef.h>
 #include <math.h>
-#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <stdint.h>
 #include <sys/types.h>
 #include <time.h>

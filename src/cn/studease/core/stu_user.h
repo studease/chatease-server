@@ -23,7 +23,7 @@ typedef struct {
 	stu_str_t         strid;
 	u_char            idstr[8];
 
-	u_char            role;
+	uint8_t           role;
 	stu_short_t       interval;
 	stu_uint_t        active;
 	stu_punishment_t  punishment;

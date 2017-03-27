@@ -59,13 +59,13 @@ struct stu_upstream_s {
 	stu_int_t              (*reinit_request)(stu_connection_t *c);
 	stu_int_t              (*process_response)(stu_connection_t *c);
 	stu_int_t              (*analyze_response)(stu_connection_t *c);
-	void                   (*finalize_handler)(stu_connection_t *c, ...);
+	void                   (*finalize_handler)(stu_connection_t *c, stu_int_t rc);
 };
 
 stu_int_t stu_upstream_create(stu_connection_t *c, u_char *name, size_t len);
 stu_int_t stu_upstream_init(stu_connection_t *c);
 
-stu_http_request_t *stu_upstream_create_http_request(stu_connection_t *c);
+void     *stu_upstream_create_http_request(stu_connection_t *c);
 stu_int_t stu_upstream_reinit_http_request(stu_connection_t *c);
 
 void stu_upstream_cleanup(stu_connection_t *c);

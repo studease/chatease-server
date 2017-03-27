@@ -187,12 +187,18 @@ stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool) {
 	server->name.len = 5;
 	memcpy(server->name.data, "ident", 5);
 
-	server->addr.name.data = stu_pcalloc(pool, 14);
-	server->addr.name.len = 13;
-	memcpy(server->addr.name.data, "192.168.1.202", 13);
-
 	server->port = 80;
 	server->weight = 32;
+
+	server->addr.name.data = stu_pcalloc(pool, 14);
+	server->addr.name.len = 13;
+	memcpy(server->addr.name.data, "192.168.1.104", 13);
+
+	server->addr.sockaddr.sin_family = AF_INET;
+	server->addr.sockaddr.sin_addr.s_addr = inet_addr((const char *) server->addr.name.data);
+	server->addr.sockaddr.sin_port = htons(server->port);
+	bzero(&(server->addr.sockaddr.sin_zero), 8);
+	server->addr.socklen = sizeof(struct sockaddr);
 
 	stu_list_push(upstream, server, sizeof(stu_upstream_server_t));
 

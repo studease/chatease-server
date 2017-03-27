@@ -12,9 +12,13 @@
 #include "stu_core.h"
 
 extern stu_cycle_t       *stu_cycle;
+
+extern stu_hash_t         stu_http_headers_in_hash;
 extern stu_http_header_t  stu_http_headers_in[];
 
-stu_hash_t                stu_http_headers_in_hash;
+extern stu_hash_t         stu_http_upstream_headers_in_hash;
+extern stu_http_header_t  stu_http_upstream_headers_in[];
+
 static stu_socket_t       stu_httpfd;
 
 static stu_int_t stu_http_init_headers_in_hash(stu_config_t *cf);
@@ -134,6 +138,7 @@ stu_http_init_headers_in_hash(stu_config_t *cf) {
 	stu_str_t          lc;
 	u_char             data[STU_HTTP_LC_HEADER_LEN];
 
+	//
 	if (stu_hash_init(&stu_http_headers_in_hash, NULL, STU_HTTP_HEADERS_MAX_SIZE, stu_cycle->pool,
 			(stu_hash_palloc_pt) stu_pcalloc, NULL) == STU_ERROR) {
 		return STU_ERROR;
@@ -148,6 +153,24 @@ stu_http_init_headers_in_hash(stu_config_t *cf) {
 		data[lc.len] = '\0';
 
 		if (stu_hash_insert(&stu_http_headers_in_hash, &lc, header, STU_HASH_LOWCASE_KEY) == STU_ERROR) {
+			return STU_ERROR;
+		}
+	}
+
+	if (stu_hash_init(&stu_http_upstream_headers_in_hash, NULL, STU_HTTP_HEADERS_MAX_SIZE, stu_cycle->pool,
+			(stu_hash_palloc_pt) stu_pcalloc, NULL) == STU_ERROR) {
+		return STU_ERROR;
+	}
+
+	for (header = stu_http_upstream_headers_in; header->name.len; header++) {
+		stu_strlow(data, header->name.data, header->name.len);
+
+		lc.data = data;
+		lc.len = header->name.len;
+
+		data[lc.len] = '\0';
+
+		if (stu_hash_insert(&stu_http_upstream_headers_in_hash, &lc, header, STU_HASH_LOWCASE_KEY) == STU_ERROR) {
 			return STU_ERROR;
 		}
 	}

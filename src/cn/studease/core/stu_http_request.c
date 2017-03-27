@@ -9,9 +9,6 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
-extern stu_cycle_t *stu_cycle;
-extern stu_hash_t   stu_http_headers_in_hash;
-
 static void stu_http_request_handler(stu_event_t *wev);
 static stu_int_t stu_http_switch_protocol(stu_http_request_t *r);
 
@@ -19,6 +16,7 @@ static stu_int_t stu_http_process_request_headers(stu_http_request_t *r);
 
 static stu_int_t stu_http_process_host(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 static stu_int_t stu_http_process_connection(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
+static stu_int_t stu_http_process_content_length(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 static stu_int_t stu_http_process_sec_websocket_key(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 
 static stu_int_t stu_http_process_sec_websocket_key_of_safari(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
@@ -32,6 +30,8 @@ static const stu_str_t  STU_HTTP_HEADER_SEC_WEBSOCKET_ACCEPT = stu_string("Sec-W
 static const stu_str_t  STU_HTTP_WEBSOCKET_SIGN_KEY = stu_string("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
 
 
+stu_hash_t  stu_http_headers_in_hash;
+
 stu_http_header_t  stu_http_headers_in[] = {
 	{ stu_string("Host"), offsetof(stu_http_headers_in_t, host), stu_http_process_host },
 	{ stu_string("User-Agent"), offsetof(stu_http_headers_in_t, user_agent),  stu_http_process_header_line },
@@ -42,7 +42,7 @@ stu_http_header_t  stu_http_headers_in[] = {
 	{ stu_string("Accept-Encoding"), offsetof(stu_http_headers_in_t, accept_encoding), stu_http_process_header_line },
 #endif
 
-	{ stu_string("Content-Length"), offsetof(stu_http_headers_in_t, content_length), stu_http_process_unique_header_line },
+	{ stu_string("Content-Length"), offsetof(stu_http_headers_in_t, content_length), stu_http_process_content_length },
 	{ stu_string("Content-Type"), offsetof(stu_http_headers_in_t, content_type), stu_http_process_header_line },
 
 	{ stu_string("Sec-Websocket-Key"), offsetof(stu_http_headers_in_t, sec_websocket_key), stu_http_process_sec_websocket_key },
@@ -51,7 +51,7 @@ stu_http_header_t  stu_http_headers_in[] = {
 	{ stu_string("(Key3)"), offsetof(stu_http_headers_in_t, sec_websocket_key3), stu_http_process_sec_websocket_key_of_safari },
 	{ stu_string("Sec-Websocket-Version"), offsetof(stu_http_headers_in_t, sec_websocket_version), stu_http_process_unique_header_line },
 	{ stu_string("Sec-Websocket-Extensions"), offsetof(stu_http_headers_in_t, sec_websocket_extensions), stu_http_process_unique_header_line },
-	{ stu_string("Upgrade"), offsetof(stu_http_headers_in_t, upgrade), stu_http_process_unique_header_line },
+	{ stu_string("Upgrade"), offsetof(stu_http_headers_in_t, upgrade), stu_http_process_header_line },
 
 	{ stu_string("Connection"), offsetof(stu_http_headers_in_t, connection), stu_http_process_connection },
 
@@ -146,8 +146,8 @@ stu_http_create_request(stu_connection_t *c) {
 
 	r->connection = c;
 	r->header_in = &c->buffer;
-	stu_queue_init(&r->headers_in.headers.elts.queue);
-	stu_queue_init(&r->headers_out.headers.elts.queue);
+	stu_list_init(&r->headers_in.headers, c->pool, (stu_list_palloc_pt) stu_base_pcalloc, NULL);
+	stu_list_init(&r->headers_out.headers, c->pool, (stu_list_palloc_pt) stu_base_pcalloc, NULL);
 
 	return r;
 }
@@ -292,13 +292,25 @@ stu_http_process_host(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offs
 
 static stu_int_t
 stu_http_process_connection(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset) {
-	if (stu_strnstr(h->value.data, "Upgrade", h->value.len)) {
+	if (stu_strnstr(h->value.data, "Keep-Alive", h->value.len)) {
+		r->headers_in.connection_type = STU_HTTP_CONNECTION_KEEP_ALIVE;
+	} else if (stu_strnstr(h->value.data, "Upgrade", h->value.len)) {
 		r->headers_in.connection_type = STU_HTTP_CONNECTION_UPGRADE;
 	} else {
-		return STU_HTTP_NOT_IMPLEMENTED;
+		r->headers_in.connection_type = STU_HTTP_CONNECTION_CLOSE;
 	}
 
 	return STU_OK;
+}
+
+static stu_int_t
+stu_http_process_content_length(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset) {
+	stu_int_t  length;
+
+	length = atol((const char *) h->value.data);
+	r->headers_in.content_length_n = length;
+
+	return stu_http_process_header_line(r, h, offset);
 }
 
 static stu_int_t
@@ -436,7 +448,6 @@ stu_http_process_header_line(stu_http_request_t *r, stu_table_elt_t *h, stu_uint
 	stu_table_elt_t  **ph;
 
 	ph = (stu_table_elt_t **) ((char *) &r->headers_in + offset);
-
 	if (*ph == NULL) {
 		*ph = h;
 	}
@@ -449,7 +460,6 @@ stu_http_process_unique_header_line(stu_http_request_t *r, stu_table_elt_t *h, s
 	stu_table_elt_t  **ph;
 
 	ph = (stu_table_elt_t **) ((char *) &r->headers_in + offset);
-
 	if (*ph == NULL) {
 		*ph = h;
 		return STU_OK;
@@ -459,112 +469,6 @@ stu_http_process_unique_header_line(stu_http_request_t *r, stu_table_elt_t *h, s
 			"previous value => \"%s: %s\"", h->key.data, h->value.data, &(*ph)->key.data, &(*ph)->value.data);
 
 	return STU_HTTP_BAD_REQUEST;
-}
-
-
-stu_int_t
-stu_upstream_ident_analyze_response(stu_connection_t *c) {
-	stu_http_request_t *r;
-	stu_uint_t          kh;
-	stu_str_t           channel_id;
-	u_char             *last, *data, temp[STU_HTTP_REQUEST_DEFAULT_SIZE];
-	stu_channel_t      *ch;
-	stu_json_t         *res, *raw, *rschannel, *rscid, *rscstate, *rsuser, *rsuid, *rsuname, *rsurole;
-
-	r = (stu_http_request_t *) c->data;
-	last = r->uri.data + r->uri.len;
-
-	channel_id.data = stu_strrchr(r->uri.data, last, '/');
-	if (channel_id.data == NULL) {
-		channel_id.data = r->uri.data;
-	} else {
-		channel_id.data++;
-	}
-	channel_id.len = last - channel_id.data;
-
-	kh = stu_hash_key_lc(channel_id.data, channel_id.len);
-
-	stu_spin_lock(&stu_cycle->channels.lock);
-
-	ch = stu_hash_find_locked(&stu_cycle->channels, kh, channel_id.data, channel_id.len);
-	if (ch == NULL) {
-		stu_log_debug(4, "channel(\"%s\") not found: kh=%lu, i=%lu, len=%lu.",
-				channel_id.data, kh, kh % stu_cycle->channels.size, stu_cycle->channels.length);
-
-		ch = stu_slab_calloc(stu_cycle->slab_pool, sizeof(stu_channel_t));
-		if (ch == NULL) {
-			stu_log_error(0, "Failed to alloc new channel.");
-			stu_spin_unlock(&stu_cycle->channels.lock);
-			goto failed;
-		}
-
-		if (stu_channel_init(ch, &channel_id) == STU_ERROR) {
-			stu_log_error(0, "Failed to init channel.");
-			stu_spin_unlock(&stu_cycle->channels.lock);
-			goto failed;
-		}
-
-		if (stu_hash_init(&ch->userlist, NULL, STU_MAX_USER_N, stu_cycle->slab_pool,
-				(stu_hash_palloc_pt) stu_slab_calloc, (stu_hash_free_pt) stu_slab_free) == STU_ERROR) {
-			stu_log_error(0, "Failed to init userlist.");
-			stu_spin_unlock(&stu_cycle->channels.lock);
-			goto failed;
-		}
-
-		if (stu_hash_insert_locked(&stu_cycle->channels, &channel_id, ch, STU_HASH_LOWCASE_KEY) == STU_ERROR) {
-			stu_log_error(0, "Failed to insert channel.");
-			stu_spin_unlock(&stu_cycle->channels.lock);
-			goto failed;
-		}
-
-		stu_log_debug(4, "new channel(\"%s\"): kh=%lu, total=%lu.",
-				ch->id.data, kh, stu_atomic_read(&stu_cycle->channels.length));
-	}
-
-	stu_spin_unlock(&stu_cycle->channels.lock);
-
-	if (stu_channel_insert(ch, c) == STU_ERROR) {
-		goto failed;
-	}
-
-	c->user.channel = ch;
-
-	res = stu_json_create_object(NULL);
-	raw = stu_json_create_string(&STU_PROTOCOL_RAW, STU_PROTOCOL_RAWS_IDENT.data, STU_PROTOCOL_RAWS_IDENT.len);
-	rschannel = stu_json_create_object(&STU_PROTOCOL_CHANNEL);
-	rsuser = stu_json_create_object(&STU_PROTOCOL_USER);
-
-	rscid = stu_json_create_string(&STU_PROTOCOL_ID, ch->id.data, ch->id.len);
-	rscstate = stu_json_create_number(&STU_PROTOCOL_STATE, (stu_double_t) ch->state);
-
-	rsuid = stu_json_create_string(&STU_PROTOCOL_ID, c->user.strid.data, c->user.strid.len);
-	rsuname = stu_json_create_string(&STU_PROTOCOL_NAME, c->user.name.data, c->user.name.len);
-	rsurole = stu_json_create_number(&STU_PROTOCOL_ROLE, (stu_double_t) c->user.role);
-
-	stu_json_add_item_to_object(rschannel, rscid);
-	stu_json_add_item_to_object(rschannel, rscstate);
-
-	stu_json_add_item_to_object(rsuser, rsuid);
-	stu_json_add_item_to_object(rsuser, rsuname);
-	stu_json_add_item_to_object(rsuser, rsurole);
-
-	stu_json_add_item_to_object(res, raw);
-	stu_json_add_item_to_object(res, rschannel);
-	stu_json_add_item_to_object(res, rsuser);
-
-	stu_memzero(temp, STU_HTTP_REQUEST_DEFAULT_SIZE);
-	data = stu_json_stringify(res, (u_char *) temp);
-
-	stu_json_delete(res);
-
-	r->response_body.start = temp;
-	r->response_body.end = r->response_body.last = data;
-
-	return STU_OK;
-
-failed:
-
-	return STU_ERROR;
 }
 
 

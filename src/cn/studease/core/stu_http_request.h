@@ -40,9 +40,9 @@
 #define STU_HTTP_SERVICE_UNAVAILABLE       503
 #define STU_HTTP_GATEWAY_TIMEOUT           504
 
-#define STU_HTTP_CONNECTION_CLOSE          1
-#define STU_HTTP_CONNECTION_KEEP_ALIVE     2
-#define STU_HTTP_CONNECTION_UPGRADE        4
+#define STU_HTTP_CONNECTION_CLOSE          0
+#define STU_HTTP_CONNECTION_KEEP_ALIVE     1
+#define STU_HTTP_CONNECTION_UPGRADE        2
 
 typedef struct {
 	stu_str_t                   name;
@@ -80,7 +80,8 @@ typedef struct {
 
 	stu_table_elt_t *connection;
 
-	u_char           connection_type;
+	stu_int_t        content_length_n;
+	uint8_t          connection_type;
 } stu_http_headers_in_t;
 
 typedef struct {
@@ -101,6 +102,9 @@ typedef struct {
 
 	stu_table_elt_t *connection;
 	stu_table_elt_t *date;
+
+	stu_int_t        content_length_n;
+	uint8_t          connection_type;
 } stu_http_headers_out_t;
 
 struct stu_http_request_s {
