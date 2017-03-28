@@ -12,7 +12,7 @@ stu_int_t
 stu_websocket_parse_frame(stu_websocket_request_t *r, stu_buf_t *b) {
 	u_char    *p;
 	stu_buf_t *buf;
-	uint64_t   i;
+	uint64_t   n, i;
 	enum {
 		sw_fin = 0,
 		sw_mask,
@@ -48,11 +48,19 @@ stu_websocket_parse_frame(stu_websocket_request_t *r, stu_buf_t *b) {
 			}
 			break;
 		case sw_extended_2:
-			r->frame->extended = *p++ << 8 | *p;
+			r->frame->extended = *(uint16_t *) p >> 8 | *(uint16_t *) p << 8;
 			state = r->frame->mask ? sw_masking_key : sw_payload_data;
 			break;
 		case sw_extended_8:
-			r->frame->extended = *p++ << 56 | *p++ << 48 | *p++ << 40 | *p++ << 32 | *p++ << 24 | *p++ << 16 | *p++ << 8 | *p;
+			n = *(uint64_t *) p;
+			r->frame->extended = (n & 0xFF00000000000000) >> 56
+					| (n & 0x00FF000000000000) >> 40
+					| (n & 0x0000FF0000000000) >> 24
+					| (n & 0x000000FF00000000) >> 8
+					| (n & 0x00000000FF000000) << 8
+					| (n & 0x0000000000FF0000) << 24
+					| (n & 0x000000000000FF00) << 40
+					| (n & 0x00000000000000FF) << 56;
 			state = r->frame->mask ? sw_masking_key : sw_payload_data;
 			break;
 		case sw_masking_key:

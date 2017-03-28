@@ -423,7 +423,7 @@ stu_upstream_ident_write_handler(stu_event_t *ev) {
 		stu_log_error(stu_errno, "Failed to send ident request, c->fd=%d, u->fd=%d.", c->fd, c->upstream->peer.connection->fd);
 	}
 
-	stu_log_debug(4, "sent to upstream %s: fd=%d, bytes=%d.", u->server->name.data, c->fd, n);
+	stu_log_debug(4, "sent to upstream %s: fd=%d, bytes=%d.", u->server->name.data, pc->fd, n);
 
 	u->peer.state = STU_UPSTREAM_PEER_LOADING;
 
