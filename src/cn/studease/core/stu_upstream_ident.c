@@ -14,7 +14,14 @@ extern stu_cycle_t *stu_cycle;
 extern stu_hash_t   stu_http_upstream_headers_in_hash;
 
 static const stu_str_t  STU_UPSTREAM_IDENT_REQUEST = stu_string(
-		//"GET /websocket/data/userinfo.json?channel=%s&token=%s HTTP/1.1" CRLF
+
+		"GET /websocket/data/userinfo.json?channel=%s&token=%s HTTP/1.1" CRLF
+		"Host: localhost" CRLF
+		"User-Agent: " __NAME "/" __VERSION CRLF
+		"Accept: text/html" CRLF
+		"Accept-Language: zh-CN,zh;q=0.8" CRLF
+		"Connection: keep-alive" CRLF CRLF
+		/*
 		"POST /live/method=httpChatRoom HTTP/1.1" CRLF
 		"Host: www.qcus.cn" CRLF
 		"User-Agent: " __NAME "/" __VERSION CRLF
@@ -24,6 +31,7 @@ static const stu_str_t  STU_UPSTREAM_IDENT_REQUEST = stu_string(
 		"Content-Length: %ld" CRLF
 		"Connection: keep-alive" CRLF CRLF
 		"{\"channel\":\"%s\",\"token\":\"%s\"}"
+		*/
 	);
 
 static stu_int_t stu_upstream_ident_process_response_headers(stu_http_request_t *r);
@@ -429,7 +437,8 @@ stu_upstream_ident_write_handler(stu_event_t *ev) {
 	}
 	stu_strncpy(tokenstr, token.data, token.len);
 
-	data = stu_sprintf(temp, (const char *) STU_UPSTREAM_IDENT_REQUEST.data, 25 + stu_strlen(channel_id) + stu_strlen(tokenstr), channel_id, tokenstr);
+	data = stu_sprintf(temp, (const char *) STU_UPSTREAM_IDENT_REQUEST.data, channel_id, tokenstr);
+	//data = stu_sprintf(temp, (const char *) STU_UPSTREAM_IDENT_REQUEST.data, 25 + stu_strlen(channel_id) + stu_strlen(tokenstr), channel_id, tokenstr);
 
 	n = send(c->upstream->peer.connection->fd, temp, data - temp, 0);
 	if (n == -1) {
