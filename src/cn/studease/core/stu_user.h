@@ -12,7 +12,7 @@
 #include "stu_core.h"
 
 typedef struct {
-	u_char      code;
+	uint8_t     code;
 	stu_uint_t  time;
 } stu_punishment_t;
 

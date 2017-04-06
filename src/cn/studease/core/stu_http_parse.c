@@ -60,20 +60,35 @@ stu_http_parse_request_line(stu_http_request_t *r, stu_buf_t *b) {
 			}
 			break;
 		case sw_spaces_before_uri:
-			r->uri.data = p;
+			r->uri.data = r->target.data = p;
 			state = sw_uri;
 			break;
 		case sw_uri:
 			if (ch == '?') {
 				r->uri.len = p - r->uri.data;
+
+				if (*r->target.data == '/') {
+					r->target.data++;
+				}
+				r->target.len = p - r->target.data;
+
 				r->args.data = p + 1;
 				state = sw_args;
 				break;
 			}
 			if (ch == ' ') {
 				r->uri.len = p - r->uri.data;
+
+				if (*r->target.data == '/') {
+					r->target.data++;
+				}
+				r->target.len = p - r->target.data;
+
 				state = sw_spaces_before_ver;
 				break;
+			}
+			if (ch == '/') {
+				r->target.data = p;
 			}
 			break;
 		case sw_args:
@@ -484,6 +499,33 @@ stu_http_split_args(stu_http_request_t *r, stu_str_t *uri, stu_str_t *args) {
 
 stu_int_t
 stu_http_arg(stu_http_request_t *r, u_char *name, size_t len, stu_str_t *value) {
-	return STU_ERROR;
+	u_char  *p, *last;
+
+	if (r->args.len == 0) {
+		return STU_DECLINED;
+	}
+
+	last = r->args.data + r->args.len;
+	for (p = r->args.data; p < last; p++) {
+		p = stu_strnstr(p, (char *) name, len - 1);
+		if (p == NULL) {
+			return STU_DECLINED;
+		}
+
+		if ((p == r->args.data || *(p - 1) == '&') && *(p + len) == '=') {
+			value->data = p + len + 1;
+
+			p = stu_strlchr(p, last, '&');
+			if (p == NULL) {
+				p = r->args.data + r->args.len;
+			}
+
+			value->len = p - value->data;
+
+			return STU_OK;
+		}
+	}
+
+	return STU_DECLINED;
 }
 

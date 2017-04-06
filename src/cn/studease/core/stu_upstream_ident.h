@@ -11,6 +11,8 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
+#define STU_UPSTREAM_IDENT_TOKEN_MAX_LEN 128
+
 void stu_upstream_ident_read_handler(stu_event_t *ev);
 void stu_upstream_ident_write_handler(stu_event_t *ev);
 

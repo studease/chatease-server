@@ -79,7 +79,7 @@ stu_hash_insert_locked(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t
 	stu_hash_elt_t *elts, *e, *elt;
 	stu_queue_t    *q;
 
-	if (flags) {
+	if (flags & STU_HASH_LOWCASE) {
 		kh = stu_hash_key_lc(key->data, key->len);
 	} else {
 		kh = stu_hash_key(key->data, key->len);
@@ -97,14 +97,16 @@ stu_hash_insert_locked(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t
 		hash->buckets[i] = elts;
 	}
 
-	for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
-		e = stu_queue_data(q, stu_hash_elt_t, queue);
-		if (e->key_hash != kh || e->key.len != key->len) {
-			continue;
-		}
-		if (stu_strncmp(e->key.data, key->data, key->len) == 0) {
-			e->value = value;
-			goto done;
+	if (flags & STU_HASH_REPLACE) {
+		for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
+			e = stu_queue_data(q, stu_hash_elt_t, queue);
+			if (e->key_hash != kh || e->key.len != key->len) {
+				continue;
+			}
+			if (stu_strncmp(e->key.data, key->data, key->len) == 0) {
+				e->value = value;
+				goto done;
+			}
 		}
 	}
 
@@ -124,12 +126,9 @@ stu_hash_insert_locked(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t
 	elt->key_hash = kh;
 	elt->value = value;
 
-	stu_queue_init(&elt->queue);
 	stu_queue_insert_tail(&elts->queue, &elt->queue);
-	hash->length++;
-
-	stu_queue_init(&elt->q);
 	stu_queue_insert_tail(&hash->keys.elts.queue, &elt->q);
+	hash->length++;
 
 done:
 
@@ -225,7 +224,7 @@ stu_hash_remove_locked(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t le
 
 			stu_log_debug(1, "Removed %p from hash: key=%lu, i=%lu, name=%s.", e->value, key, i, name);
 
-			break;
+			//break; // don't break here.
 		}
 	}
 
@@ -242,7 +241,22 @@ stu_hash_remove_locked(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t le
 
 void
 stu_hash_foreach(stu_hash_t *hash, stu_hash_foreach_pt cb) {
+	stu_spin_lock(&hash->lock);
+	stu_hash_foreach_locked(hash, cb);
+	stu_spin_unlock(&hash->lock);
+}
 
+void
+stu_hash_foreach_locked(stu_hash_t *hash, stu_hash_foreach_pt cb) {
+	stu_list_elt_t *elts;
+	stu_hash_elt_t *e;
+	stu_queue_t    *q;
+
+	elts = &hash->keys.elts;
+	for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
+		e = stu_queue_data(q, stu_hash_elt_t, q);
+		cb(&e->key, e->value);
+	}
 }
 
 void
@@ -267,7 +281,7 @@ stu_hash_test(stu_hash_t *hash) {
 		key.data = idstr;
 		key.len = stu_strlen(idstr);
 
-		stu_hash_insert(hash, &key, &value[n], STU_HASH_LOWCASE_KEY);
+		stu_hash_insert(hash, &key, &value[n], STU_HASH_LOWCASE);
 	}
 
 	stu_log_debug(1, "hash remove starting...");

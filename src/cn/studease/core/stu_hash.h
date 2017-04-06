@@ -11,7 +11,8 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
-#define STU_HASH_LOWCASE_KEY  1
+#define STU_HASH_LOWCASE  1
+#define STU_HASH_REPLACE  2
 
 typedef void (*stu_hash_foreach_pt) (stu_str_t *key, void *value);
 
@@ -69,6 +70,7 @@ void  stu_hash_remove(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t len
 void  stu_hash_remove_locked(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t len);
 
 void  stu_hash_foreach(stu_hash_t *hash, stu_hash_foreach_pt cb);
+void  stu_hash_foreach_locked(stu_hash_t *hash, stu_hash_foreach_pt cb);
 
 void  stu_hash_free_empty_pt(void *pool, void *p);
 

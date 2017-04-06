@@ -18,7 +18,7 @@
 #include <unistd.h>
 
 #define __NAME    "chatease-server"
-#define __VERSION "0.0.01"
+#define __VERSION "1.0.10"
 #define __LOGGER  4 // debug: 0 - 7, log: 8, error: 9
 
 #define STU_LINUX 1
@@ -33,7 +33,7 @@
 #define stu_signal_value(n)      stu_signal_helper(n)
 
 #define STU_SHUTDOWN_SIGNAL      QUIT
-#define STU_CHANGEBIN_SIGNAL     USR2
+#define STU_CHANGEBIN_SIGNAL     XCPU
 
 typedef signed long         stu_int_t;
 typedef unsigned long       stu_uint_t;

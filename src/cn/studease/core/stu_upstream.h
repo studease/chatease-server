@@ -19,11 +19,10 @@
 #define STU_UPSTREAM_SERVER_DOWN    0x04
 
 #define STU_UPSTREAM_PEER_IDLE      0x00
-#define STU_UPSTREAM_PEER_BUSY      0x10
-#define STU_UPSTREAM_PEER_CONNECTED 0x11
-#define STU_UPSTREAM_PEER_LOADING   0x12
-#define STU_UPSTREAM_PEER_LOADED    0x14
-#define STU_UPSTREAM_PEER_COMPLETED 0x18
+#define STU_UPSTREAM_PEER_CONNECTED 0x01
+#define STU_UPSTREAM_PEER_LOADING   0x02
+#define STU_UPSTREAM_PEER_LOADED    0x04
+#define STU_UPSTREAM_PEER_COMPLETED 0x08
 
 typedef void (*stu_upstream_handler_pt)(stu_event_t *c);
 
@@ -36,15 +35,12 @@ typedef struct {
 	stu_uint_t  max_fails;
 	time_t      fail_timeout;
 
+	stu_uint_t  fails;
 	uint8_t     state;
 } stu_upstream_server_t;
 
 typedef struct {
 	stu_connection_t *connection;
-
-	stu_uint_t        tries;
-	stu_msec_t        start_time;
-
 	uint8_t           state;
 } stu_peer_connection_t;
 

@@ -21,7 +21,8 @@ int main(int argc, char **argv) {
 	char          val;
 	stu_config_t  cf;
 
-	stu_log("GCC version: %s", __VERSION__);
+	stu_log("GCC %s", __VERSION__);
+	stu_log(__NAME "/" __VERSION);
 
 	stu_config_default(&cf);
 	while ((arg = getopt(argc, argv, ":m:p:w:t:c:")) != -1) {

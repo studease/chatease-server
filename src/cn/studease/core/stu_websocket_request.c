@@ -341,7 +341,7 @@ stu_websocket_request_handler(stu_event_t *wev) {
 			extened = 8;
 		}
 
-		stu_log_debug(4, "frame header: %d %d %d %d %d %d %d %d %d %d",
+		stu_log_debug(3, "frame header: %d %d %d %d %d %d %d %d %d %d",
 				buf.start[0], buf.start[1], buf.start[2], buf.start[3], buf.start[4],
 				buf.start[5], buf.start[6], buf.start[7], buf.start[8], buf.start[9]);
 
@@ -384,7 +384,7 @@ stu_websocket_request_handler(stu_event_t *wev) {
 
 		gettimeofday(&end, NULL);
 		cost = 1000000 * (end.tv_sec - start.tv_sec) + end.tv_usec - start.tv_usec;
-		stu_log_debug(4, "sent: fd=%d, bytes=%d, cost=%ldms.", c->fd, n, cost);
+		stu_log_debug(4, "sent: fd=%d, bytes=%d, cost=%.3fms.", c->fd, n, cost / 1000.0f);
 	}
 }
 

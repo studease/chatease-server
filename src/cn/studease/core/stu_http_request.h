@@ -115,6 +115,7 @@ struct stu_http_request_s {
 
 	stu_str_t               request_line;
 	stu_str_t               uri;
+	stu_str_t               target;
 	stu_str_t               args;
 
 	stu_buf_t              *header_in;

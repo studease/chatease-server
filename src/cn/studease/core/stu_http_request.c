@@ -511,16 +511,16 @@ stu_http_request_handler(stu_event_t *wev) {
 
 	r = (stu_http_request_t *) c->data;
 	if (r->headers_out.status == STU_HTTP_SWITCHING_PROTOCOLS) {
-		buf->last = stu_memcpy(buf->last, "HTTP/1.1 101 Switching Protocols\r\n", 34);
-		buf->last = stu_memcpy(buf->last, "Server: Chatease-Server/Beta\r\n", 30);
-		buf->last = stu_memcpy(buf->last, "Upgrade: websocket\r\n", 20);
-		buf->last = stu_memcpy(buf->last, "Connection: upgrade\r\n", 21);
+		buf->last = stu_memcpy(buf->last, "HTTP/1.1 101 Switching Protocols" CRLF, 34);
+		buf->last = stu_memcpy(buf->last, "Server: " __NAME "/" __VERSION CRLF, 32);
+		buf->last = stu_memcpy(buf->last, "Upgrade: websocket" CRLF, 20);
+		buf->last = stu_memcpy(buf->last, "Connection: upgrade" CRLF, 21);
 		buf->last = stu_memcpy(buf->last, r->headers_out.sec_websocket_accept->key.data, r->headers_out.sec_websocket_accept->key.len);
 		buf->last = stu_memcpy(buf->last, ": ", 2);
 		buf->last = stu_memcpy(buf->last, r->headers_out.sec_websocket_accept->value.data, r->headers_out.sec_websocket_accept->value.len);
-		buf->last = stu_memcpy(buf->last, "\r\n\r\n", 4);
+		buf->last = stu_memcpy(buf->last, CRLF CRLF, 4);
 	} else {
-		buf->last = stu_memcpy(buf->last, "HTTP/1.1 400 Bad Request\r\nServer: Chatease-Server/Beta\r\nContent-type: text/html\r\nContent-length: 21\r\n\r\nChatease-Server/Beta\n", 124);
+		buf->last = stu_memcpy(buf->last, "HTTP/1.1 400 Bad Request\r\nServer: " __NAME "/" __VERSION "\r\nContent-type: text/html\r\nContent-length: 23\r\n\r\n" __NAME "/" __VERSION "\n", 124);
 	}
 
 	if (r->response_body.start) {

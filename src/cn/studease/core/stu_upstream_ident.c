@@ -13,13 +13,17 @@ stu_list_t *stu_ident_upstream;
 extern stu_cycle_t *stu_cycle;
 extern stu_hash_t   stu_http_upstream_headers_in_hash;
 
-static const stu_str_t STU_UPSTREAM_IDENT_REQUEST = stu_string(
-		"GET /websocket/data/userinfo.json?token=%s HTTP/1.1" CRLF
-		"Host: 192.168.1.202" CRLF
-		"Connection: keep-alive" CRLF
-		"User-Agent: " __NAME CRLF
+static const stu_str_t  STU_UPSTREAM_IDENT_REQUEST = stu_string(
+		//"GET /websocket/data/userinfo.json?channel=%s&token=%s HTTP/1.1" CRLF
+		"POST /live/method=httpChatRoom HTTP/1.1" CRLF
+		"Host: www.qcus.cn" CRLF
+		"User-Agent: " __NAME "/" __VERSION CRLF
 		"Accept: text/html" CRLF
-		"Accept-Language: zh-CN,zh;q=0.8" CRLF CRLF
+		"Accept-Language: zh-CN,zh;q=0.8" CRLF
+		"Content-Type: application/json" CRLF
+		"Content-Length: %ld" CRLF
+		"Connection: keep-alive" CRLF CRLF
+		"{\"channel\":\"%s\",\"token\":\"%s\"}"
 	);
 
 static stu_int_t stu_upstream_ident_process_response_headers(stu_http_request_t *r);
@@ -83,14 +87,10 @@ again:
 
 failed:
 
+	stu_upstream_cleanup(c);
+
 	u->peer.connection = NULL;
 	u->peer.state = STU_UPSTREAM_PEER_IDLE;
-
-	pc->read.active = FALSE;
-	ev->data = pc;
-	stu_epoll_del_event(&pc->read, STU_READ_EVENT);
-
-	stu_http_close_connection(pc);
 
 done:
 
@@ -114,12 +114,10 @@ stu_upstream_ident_process_response(stu_connection_t *c) {
 	}
 
 	if (u->analyze_response(c) == STU_ERROR) {
-		stu_log_error(0, "Failed to analyze upstream ident response.");
+		//stu_log_error(0, "Failed to analyze upstream ident response.");
 		u->finalize_handler(c, STU_HTTP_INTERNAL_SERVER_ERROR);
 		return STU_ERROR;
 	}
-
-	u->finalize_handler(c, STU_HTTP_SWITCHING_PROTOCOLS);
 
 	return STU_OK;
 }
@@ -217,8 +215,8 @@ stu_upstream_ident_analyze_response(stu_connection_t *c) {
 	stu_connection_t   *pc;
 	stu_http_request_t *r, *pr;
 	stu_uint_t          kh;
-	stu_str_t          *cid, *uid, *uname, channel_id;
-	u_char             *last, *data, temp[STU_HTTP_REQUEST_DEFAULT_SIZE];
+	stu_str_t          *cid, *uid, *uname, *channel_id;
+	u_char             *data, temp[STU_HTTP_REQUEST_DEFAULT_SIZE];
 	stu_channel_t      *ch;
 	stu_json_t         *idt, *sta, *idchannel, *idcid, *idcstate, *iduser, *iduid, *iduname, *idurole;
 	stu_json_t         *res, *raw, *rschannel, *rsuser;
@@ -242,12 +240,12 @@ stu_upstream_ident_analyze_response(stu_connection_t *c) {
 
 	sta = stu_json_get_object_item_by(idt, &STU_PROTOCOL_STATUS);
 	if (sta == NULL || sta->type != STU_JSON_TYPE_BOOLEAN) {
-		stu_log_error(0, "Failed to analyze ident response: item status not found.");
+		stu_log_error(0, "Failed to analyze ident response: item status not found, fd=%d.", c->fd);
 		goto failed;
 	}
 
 	if (sta->value == FALSE) {
-		stu_log_error(0, "Access denied while joining channel.");
+		stu_log_error(0, "Access denied while joining channel, fd=%d.", c->fd);
 		goto failed;
 	}
 
@@ -276,18 +274,11 @@ stu_upstream_ident_analyze_response(stu_connection_t *c) {
 	}
 
 	// get channel ID
-	last = r->uri.data + r->uri.len;
-	channel_id.data = stu_strrchr(r->uri.data, last, '/');
-	if (channel_id.data == NULL) {
-		channel_id.data = r->uri.data;
-	} else {
-		channel_id.data++;
-	}
-	channel_id.len = last - channel_id.data;
+	channel_id = &r->target;
 
 	cid = (stu_str_t *) idcid->value;
-	if (stu_strncmp(cid->data, channel_id.data, channel_id.len) != 0) {
-		stu_log_error(0, "Failed to analyze ident response: channel (%s != %s) not match.", idcid->value, channel_id.data);
+	if (stu_strncmp(cid->data, channel_id->data, channel_id->len) != 0) {
+		stu_log_error(0, "Failed to analyze ident response: channel (%s != %s) not match.", cid->data, channel_id->data);
 		goto failed;
 	}
 
@@ -309,14 +300,14 @@ stu_upstream_ident_analyze_response(stu_connection_t *c) {
 	c->user.role = *(stu_double_t *) idurole->value;
 
 	// insert user into channel
-	kh = stu_hash_key_lc(channel_id.data, channel_id.len);
+	kh = stu_hash_key_lc(cid->data, cid->len);
 
 	stu_spin_lock(&stu_cycle->channels.lock);
 
-	ch = stu_hash_find_locked(&stu_cycle->channels, kh, channel_id.data, channel_id.len);
+	ch = stu_hash_find_locked(&stu_cycle->channels, kh, cid->data, cid->len);
 	if (ch == NULL) {
-		stu_log_debug(4, "channel(\"%s\") not found: kh=%lu, i=%lu, len=%lu.",
-				channel_id.data, kh, kh % stu_cycle->channels.size, stu_cycle->channels.length);
+		stu_log_debug(4, "channel \"%s\" not found: kh=%lu, i=%lu, len=%lu.",
+				cid->data, kh, kh % stu_cycle->channels.size, stu_cycle->channels.length);
 
 		ch = stu_slab_calloc(stu_cycle->slab_pool, sizeof(stu_channel_t));
 		if (ch == NULL) {
@@ -325,7 +316,7 @@ stu_upstream_ident_analyze_response(stu_connection_t *c) {
 			goto failed;
 		}
 
-		if (stu_channel_init(ch, &channel_id) == STU_ERROR) {
+		if (stu_channel_init(ch, cid) == STU_ERROR) {
 			stu_log_error(0, "Failed to init channel.");
 			stu_spin_unlock(&stu_cycle->channels.lock);
 			goto failed;
@@ -338,13 +329,13 @@ stu_upstream_ident_analyze_response(stu_connection_t *c) {
 			goto failed;
 		}
 
-		if (stu_hash_insert_locked(&stu_cycle->channels, &channel_id, ch, STU_HASH_LOWCASE_KEY) == STU_ERROR) {
+		if (stu_hash_insert_locked(&stu_cycle->channels, cid, ch, STU_HASH_LOWCASE|STU_HASH_REPLACE) == STU_ERROR) {
 			stu_log_error(0, "Failed to insert channel.");
 			stu_spin_unlock(&stu_cycle->channels.lock);
 			goto failed;
 		}
 
-		stu_log_debug(4, "new channel(\"%s\"): kh=%lu, total=%lu.",
+		stu_log_debug(4, "new channel \"%s\": kh=%lu, total=%lu.",
 				ch->id.data, kh, stu_atomic_read(&stu_cycle->channels.length));
 	}
 
@@ -370,11 +361,13 @@ stu_upstream_ident_analyze_response(stu_connection_t *c) {
 	stu_memzero(temp, STU_HTTP_REQUEST_DEFAULT_SIZE);
 	data = stu_json_stringify(res, (u_char *) temp);
 
+	stu_json_delete(idt);
+	stu_json_delete(res);
+
 	r->response_body.start = temp;
 	r->response_body.end = r->response_body.last = data;
 
-	stu_json_delete(idt);
-	stu_json_delete(res);
+	u->finalize_handler(c, STU_HTTP_SWITCHING_PROTOCOLS);
 
 	return STU_OK;
 
@@ -389,8 +382,15 @@ failed:
 void
 stu_upstream_ident_finalize_handler(stu_connection_t *c, stu_int_t rc) {
 	stu_http_request_t *r;
+	stu_upstream_t     *u;
 
 	r = (stu_http_request_t *) c->data;
+	u = c->upstream;
+
+	stu_upstream_cleanup(c);
+
+	u->peer.connection = NULL;
+	u->peer.state = STU_UPSTREAM_PEER_IDLE;
 
 	stu_http_finalize_request(r, rc);
 }
@@ -398,12 +398,15 @@ stu_upstream_ident_finalize_handler(stu_connection_t *c, stu_int_t rc) {
 
 void
 stu_upstream_ident_write_handler(stu_event_t *ev) {
-	stu_connection_t *c, *pc;
-	stu_upstream_t   *u;
-	u_char           *data, temp[STU_HTTP_REQUEST_DEFAULT_SIZE];
-	stu_int_t         n;
+	stu_connection_t   *c, *pc;
+	stu_http_request_t *r;
+	stu_upstream_t     *u;
+	u_char             *data, temp[STU_HTTP_REQUEST_DEFAULT_SIZE], channel_id[8], tokenstr[STU_UPSTREAM_IDENT_TOKEN_MAX_LEN];
+	stu_str_t           token;
+	stu_int_t           n;
 
 	c = (stu_connection_t *) ev->data;
+	r = (stu_http_request_t *) c->data;
 	u = c->upstream;
 	pc = u->peer.connection;
 
@@ -416,11 +419,22 @@ stu_upstream_ident_write_handler(stu_event_t *ev) {
 	}
 
 	stu_memzero(temp, STU_HTTP_REQUEST_DEFAULT_SIZE);
-	data = stu_sprintf(temp, (const char *) STU_UPSTREAM_IDENT_REQUEST.data, "ch1");
+
+	stu_strncpy(channel_id, r->target.data, r->target.len);
+
+	stu_str_null(&token);
+	if (stu_http_arg(r, (u_char *) "token", 5, &token) != STU_OK) {
+		stu_log_debug(4, "\"token\" not found while sending upstream %s: fd=%d.", u->server->name.data, pc->fd);
+		*tokenstr = '\0';
+	}
+	stu_strncpy(tokenstr, token.data, token.len);
+
+	data = stu_sprintf(temp, (const char *) STU_UPSTREAM_IDENT_REQUEST.data, 25 + stu_strlen(channel_id) + stu_strlen(tokenstr), channel_id, tokenstr);
 
 	n = send(c->upstream->peer.connection->fd, temp, data - temp, 0);
 	if (n == -1) {
 		stu_log_error(stu_errno, "Failed to send ident request, c->fd=%d, u->fd=%d.", c->fd, c->upstream->peer.connection->fd);
+		goto failed;
 	}
 
 	stu_log_debug(4, "sent to upstream %s: fd=%d, bytes=%d.", u->server->name.data, pc->fd, n);
@@ -430,6 +444,15 @@ stu_upstream_ident_write_handler(stu_event_t *ev) {
 	ev->data = pc;
 	stu_epoll_del_event(&pc->write, STU_WRITE_EVENT);
 	ev->active = FALSE;
+
+	goto done;
+
+failed:
+
+	stu_upstream_cleanup(c);
+
+	u->peer.connection = NULL;
+	u->peer.state = STU_UPSTREAM_PEER_IDLE;
 
 done:
 

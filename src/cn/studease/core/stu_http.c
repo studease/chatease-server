@@ -152,7 +152,7 @@ stu_http_init_headers_in_hash(stu_config_t *cf) {
 
 		data[lc.len] = '\0';
 
-		if (stu_hash_insert(&stu_http_headers_in_hash, &lc, header, STU_HASH_LOWCASE_KEY) == STU_ERROR) {
+		if (stu_hash_insert(&stu_http_headers_in_hash, &lc, header, STU_HASH_LOWCASE|STU_HASH_REPLACE) == STU_ERROR) {
 			return STU_ERROR;
 		}
 	}
@@ -170,7 +170,7 @@ stu_http_init_headers_in_hash(stu_config_t *cf) {
 
 		data[lc.len] = '\0';
 
-		if (stu_hash_insert(&stu_http_upstream_headers_in_hash, &lc, header, STU_HASH_LOWCASE_KEY) == STU_ERROR) {
+		if (stu_hash_insert(&stu_http_upstream_headers_in_hash, &lc, header, STU_HASH_LOWCASE|STU_HASH_REPLACE) == STU_ERROR) {
 			return STU_ERROR;
 		}
 	}
