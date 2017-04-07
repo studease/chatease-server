@@ -191,7 +191,7 @@ stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool) {
 
 	server->addr.name.data = stu_pcalloc(pool, 14);
 	server->addr.name.len = 13;
-	memcpy(server->addr.name.data, "192.168.1.104", 13);
+	memcpy(server->addr.name.data, "192.168.1.202", 13);
 
 	server->addr.sockaddr.sin_family = AF_INET;
 	server->addr.sockaddr.sin_addr.s_addr = inet_addr((const char *) server->addr.name.data);

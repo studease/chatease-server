@@ -212,7 +212,12 @@ stu_hash_remove_locked(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t le
 			continue;
 		}
 		if (stu_strncmp(e->key.data, name, len) == 0) {
-			stu_queue_remove(&e->queue);
+			/*
+			 * stu_queue_remove(&e->queue);
+			 * Don't use stu_queue_remove here, avoid resetting "q".
+			 */
+			e->queue.next->prev = e->queue.prev;
+			e->queue.prev->next = e->queue.next;
 			stu_queue_remove(&e->q);
 
 			if (hash->free) {

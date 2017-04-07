@@ -17,7 +17,6 @@ static void stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *te
 void
 stu_websocket_wait_request_handler(stu_event_t *rev) {
 	stu_connection_t *c;
-	stu_channel_t    *ch;
 	stu_int_t         n, err;
 
 	c = (stu_connection_t *) rev->data;
@@ -73,11 +72,6 @@ again:
 
 failed:
 
-	c->read.active = FALSE;
-	stu_epoll_del_event(&c->read, STU_READ_EVENT);
-
-	ch = c->user.channel;
-	stu_channel_remove(ch, c);
 	stu_websocket_close_connection(c);
 
 done:
@@ -112,6 +106,7 @@ stu_websocket_process_request(stu_websocket_request_t *r) {
 	stu_buf_t              buf;
 	u_char                 temp[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE];
 	uint64_t               len, size;
+	stu_bool_t             close;
 
 	c = r->connection;
 	if (c->user.channel == NULL) {
@@ -133,8 +128,12 @@ stu_websocket_process_request(stu_websocket_request_t *r) {
 	buf.start = buf.last = temp;
 	buf.end = buf.start + STU_WEBSOCKET_REQUEST_DEFAULT_SIZE;
 
+	close = FALSE;
 	for (f = &r->frames_in; f; f = f->next) {
 		if (f->opcode != STU_WEBSOCKET_OPCODE_TEXT) {
+			if (f->opcode == STU_WEBSOCKET_OPCODE_CLOSE) {
+				close = TRUE;
+			}
 			continue;
 		}
 
@@ -149,12 +148,15 @@ stu_websocket_process_request(stu_websocket_request_t *r) {
 	}
 
 	size = buf.last - buf.start;
-	if (size == 0) {
-		stu_log_error(0, "Failed to concat keyframe string: size=0.");
-		return;
+	if (size > 0) {
+		stu_websocket_analyze_request(r, (u_char *) temp, size);
+	} else {
+		stu_log_debug(4, "Failed to concat keyframe string: size=%lu.", size);
 	}
 
-	stu_websocket_analyze_request(r, (u_char *) temp, size);
+	if (close == TRUE) {
+		stu_websocket_close_connection(c);
+	}
 }
 
 static stu_int_t
@@ -392,14 +394,10 @@ stu_websocket_request_handler(stu_event_t *wev) {
 void
 stu_websocket_close_request(stu_websocket_request_t *r, stu_int_t rc) {
 	stu_connection_t *c;
-	stu_channel_t    *ch;
-
-	stu_websocket_free_request(r, rc);
 
 	c = r->connection;
-	ch = c->user.channel;
 
-	stu_channel_remove(ch, c);
+	stu_websocket_free_request(r, rc);
 	stu_websocket_close_connection(c);
 }
 
@@ -410,6 +408,14 @@ stu_websocket_free_request(stu_websocket_request_t *r, stu_int_t rc) {
 
 void
 stu_websocket_close_connection(stu_connection_t *c) {
+	stu_channel_t *ch;
+
+	c->read.active = FALSE;
+	stu_epoll_del_event(&c->read, STU_READ_EVENT);
+
+	ch = c->user.channel;
+	stu_channel_remove(ch, c);
+
 	stu_http_close_connection(c);
 }
 
