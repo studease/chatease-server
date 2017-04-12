@@ -30,7 +30,7 @@ all: chatease-server
 chatease-server: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C Linker'
-	gcc -L/usr/local/ssl/lib -L/usr/local/lua-5.3.3_Linux35_64_lib -o "chatease-server" $(OBJS) $(USER_OBJS) $(LIBS) -pthread -lm -march=x86-64
+	gcc -L/usr/local/ssl/lib -o "chatease-server" $(OBJS) $(USER_OBJS) $(LIBS) -pthread -lm -march=x86-64
 	@echo 'Finished building target: $@'
 	@echo ' '
 

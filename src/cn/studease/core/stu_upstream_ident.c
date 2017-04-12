@@ -45,11 +45,16 @@ stu_upstream_ident_read_handler(stu_event_t *ev) {
 
 	c = (stu_connection_t *) ev->data;
 	u = c->upstream;
+
+	stu_spin_lock(&c->lock);
+
+	if (u == NULL) {
+		goto done;
+	}
 	pc = u->peer.connection;
 
-	stu_spin_lock(&pc->lock);
 	if (pc->fd == (stu_socket_t) STU_SOCKET_INVALID) {
-		stu_log_error(0, "upstream %s waited a invalid fd=%d.", u->server->name.data, pc->fd);
+		stu_log_error(0, "upstream ident waited a invalid fd=%d.", pc->fd);
 		goto done;
 	}
 
@@ -102,7 +107,7 @@ failed:
 
 done:
 
-	stu_spin_unlock(&pc->lock);
+	stu_spin_unlock(&c->lock);
 }
 
 stu_int_t
@@ -227,7 +232,7 @@ stu_upstream_ident_analyze_response(stu_connection_t *c) {
 	u_char             *data, temp[STU_HTTP_REQUEST_DEFAULT_SIZE];
 	stu_channel_t      *ch;
 	stu_json_t         *idt, *sta, *idchannel, *idcid, *idcstate, *iduser, *iduid, *iduname, *idurole;
-	stu_json_t         *res, *raw, *rschannel, *rsuser;
+	stu_json_t         *res, *raw, *rschannel, *rsctotal, *rsuser;
 
 	u = c->upstream;
 	pc = u->peer.connection;
@@ -362,6 +367,10 @@ stu_upstream_ident_analyze_response(stu_connection_t *c) {
 	rschannel = stu_json_duplicate(idchannel, TRUE);
 	rsuser = stu_json_duplicate(iduser, TRUE);
 
+	rsctotal = stu_json_create_number(&STU_PROTOCOL_TOTAL, (stu_double_t) ch->userlist.length);
+
+	stu_json_add_item_to_object(rschannel, rsctotal);
+
 	stu_json_add_item_to_object(res, raw);
 	stu_json_add_item_to_object(res, rschannel);
 	stu_json_add_item_to_object(res, rsuser);
@@ -416,17 +425,19 @@ stu_upstream_ident_write_handler(stu_event_t *ev) {
 	c = (stu_connection_t *) ev->data;
 	r = (stu_http_request_t *) c->data;
 	u = c->upstream;
-	pc = u->peer.connection;
 
 	// Lock pc rather than c
-	stu_spin_lock(&pc->lock);
+	stu_spin_lock(&c->lock);
+
+	if (u == NULL) {
+		goto done;
+	}
+	pc = u->peer.connection;
 
 	if (u->peer.state >= STU_UPSTREAM_PEER_LOADING) {
 		stu_log_debug(5, "upstream request already sent.");
 		goto done;
 	}
-
-	stu_memzero(temp, STU_HTTP_REQUEST_DEFAULT_SIZE);
 
 	stu_strncpy(channel_id, r->target.data, r->target.len);
 
@@ -437,6 +448,7 @@ stu_upstream_ident_write_handler(stu_event_t *ev) {
 	}
 	stu_strncpy(tokenstr, token.data, token.len);
 
+	stu_memzero(temp, STU_HTTP_REQUEST_DEFAULT_SIZE);
 	data = stu_sprintf(temp, (const char *) STU_UPSTREAM_IDENT_REQUEST.data, channel_id, tokenstr);
 	//data = stu_sprintf(temp, (const char *) STU_UPSTREAM_IDENT_REQUEST.data, 25 + stu_strlen(channel_id) + stu_strlen(tokenstr), channel_id, tokenstr);
 
@@ -465,5 +477,5 @@ failed:
 
 done:
 
-	stu_spin_unlock(&pc->lock);
+	stu_spin_unlock(&c->lock);
 }

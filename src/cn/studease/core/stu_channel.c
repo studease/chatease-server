@@ -140,6 +140,82 @@ stu_channel_remove_user_locked(stu_channel_t *ch, stu_connection_t *c) {
 
 void
 stu_channel_broadcast(stu_str_t *id, void *ch) {
-	stu_log_debug(4, "broadcast in channel \"%s\".", id->data);
+	stu_channel_t    *channel;
+	stu_list_elt_t   *elts;
+	stu_hash_elt_t   *e;
+	stu_queue_t      *q;
+	stu_connection_t *c;
+	stu_json_t       *res, *raw, *rschannel, *rscid, *rscstate, *rsctotal, *rscusers, *rsuser, *rsuid, *rsuname, *rsurole;
+	u_char           *data, temp[STU_CHANNEL_USERS_BUF_MAXIMUM];
+	uint64_t          size;
+	stu_int_t         extened, n;
+
+	channel = (stu_channel_t *) ch;
+
+	stu_log_debug(4, "broadcasting in channel \"%s\".", id->data);
+
+	stu_spin_lock(&channel->userlist.lock);
+
+	res = stu_json_create_object(NULL);
+	raw = stu_json_create_string(&STU_PROTOCOL_RAW, STU_PROTOCOL_RAWS_USERS.data, STU_PROTOCOL_RAWS_USERS.len);
+
+	rschannel = stu_json_create_object(&STU_PROTOCOL_CHANNEL);
+
+	rscid = stu_json_create_string(&STU_PROTOCOL_ID, id->data, id->len);
+	rscstate = stu_json_create_number(&STU_PROTOCOL_STATE, (stu_double_t) channel->state);
+	rsctotal = stu_json_create_number(&STU_PROTOCOL_TOTAL, (stu_double_t) channel->userlist.length);
+	rscusers = stu_json_create_array(&STU_PROTOCOL_USERS);
+
+	stu_json_add_item_to_object(rschannel, rscid);
+	stu_json_add_item_to_object(rschannel, rscstate);
+	stu_json_add_item_to_object(rschannel, rsctotal);
+	stu_json_add_item_to_object(rschannel, rscusers);
+
+	stu_json_add_item_to_object(res, raw);
+	stu_json_add_item_to_object(res, rschannel);
+
+	elts = &channel->userlist.keys.elts;
+	for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
+		e = stu_queue_data(q, stu_hash_elt_t, q);
+		c = (stu_connection_t *) e->value;
+
+		rsuser = stu_json_create_object(NULL);
+
+		rsuid = stu_json_create_string(&STU_PROTOCOL_ID, c->user.strid.data, c->user.strid.len);
+		rsuname = stu_json_create_string(&STU_PROTOCOL_NAME, c->user.name.data, c->user.name.len);
+		rsurole = stu_json_create_number(&STU_PROTOCOL_ROLE, (stu_double_t) c->user.role);
+
+		stu_json_add_item_to_object(rsuser, rsuid);
+		stu_json_add_item_to_object(rsuser, rsuname);
+		stu_json_add_item_to_object(rsuser, rsurole);
+
+		stu_json_add_item_to_object(rscusers, rsuser);
+	}
+
+	stu_memzero(temp, STU_CHANNEL_USERS_BUF_MAXIMUM);
+	data = stu_json_stringify(res, (u_char *) temp + 10);
+
+	stu_json_delete(res);
+
+	size = data - temp - 10;
+	data = stu_websocket_encode_frame(temp, size, &extened);
+
+	for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
+		e = stu_queue_data(q, stu_hash_elt_t, q);
+		c = (stu_connection_t *) e->value;
+
+		stu_spin_lock(&c->lock);
+
+		n = send(c->fd, data, size + 2 + extened, 0);
+		if (n == -1) {
+			stu_log_error(stu_errno, "Failed to broadcast in channel \"%s\": , fd=%d.", id->data, c->fd);
+			stu_spin_unlock(&c->lock);
+			continue;
+		}
+
+		stu_spin_unlock(&c->lock);
+	}
+
+	stu_spin_unlock(&channel->userlist.lock);
 }
 

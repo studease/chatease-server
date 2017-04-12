@@ -7,6 +7,15 @@
 This is a websocket server for chatting.
 
 
+## Prepare
+----------
+
+Supply an interface to return a JSON object formatted as /data/userinfo.json.
+
+While the client is connecting to upgrade protocol, we send an identify upstream request to get the user info,
+which decides whether the operation will be satisfied.
+
+
 ## Build
 --------
 

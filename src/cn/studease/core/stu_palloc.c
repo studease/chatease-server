@@ -15,12 +15,15 @@ static void *stu_palloc_large(stu_pool_t *pool, size_t size);
 stu_pool_t *
 stu_pool_create(size_t size) {
 	stu_pool_t *p;
+	stu_shm_t   shm;
 
-	p = stu_alloc(size);
-	if (p == NULL) {
+	shm.size = size;
+	if (stu_shm_alloc(&shm) != STU_OK) {
 		stu_log_error(0, "Failed to create pool, size=%zu.", size);
 		return NULL;
 	}
+
+	p = (stu_pool_t *) shm.addr;
 
 	stu_spinlock_init(&p->lock);
 

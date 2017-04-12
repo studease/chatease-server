@@ -17,12 +17,15 @@ stu_ram_pool_create() {
 	stu_ram_pool_t *p;
 	stu_uint_t      size, n;
 	u_char         *c;
+	stu_shm_t       shm;
 
 	size = 1024 + 8 * STU_RAM_PAGE_SIZE;
-	p = stu_alloc(size);
-	if (p == NULL) {
+	shm.size = size;
+	if (stu_shm_alloc(&shm) != STU_OK) {
 		return NULL;
 	}
+
+	p = (stu_ram_pool_t *) shm.addr;
 
 	stu_spinlock_init(&p->lock);
 	p->data.end = (u_char *) p + size;

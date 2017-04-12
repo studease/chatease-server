@@ -22,6 +22,8 @@ extern stu_str_t  STU_PROTOCOL_NAME;
 extern stu_str_t  STU_PROTOCOL_ROLE;
 extern stu_str_t  STU_PROTOCOL_STATE;
 extern stu_str_t  STU_PROTOCOL_STATUS;
+extern stu_str_t  STU_PROTOCOL_TOTAL;
+extern stu_str_t  STU_PROTOCOL_USERS;
 
 extern stu_str_t  STU_PROTOCOL_CMDS_TEXT;
 extern stu_str_t  STU_PROTOCOL_CMDS_MUTE;
@@ -32,6 +34,7 @@ extern stu_str_t  STU_PROTOCOL_RAWS_IDENT;
 extern stu_str_t  STU_PROTOCOL_RAWS_TEXT;
 extern stu_str_t  STU_PROTOCOL_RAWS_JOIN;
 extern stu_str_t  STU_PROTOCOL_RAWS_LEFT;
+extern stu_str_t  STU_PROTOCOL_RAWS_USERS;
 extern stu_str_t  STU_PROTOCOL_RAWS_MUTE;
 extern stu_str_t  STU_PROTOCOL_RAWS_KICKOUT;
 extern stu_str_t  STU_PROTOCOL_RAWS_ERROR;

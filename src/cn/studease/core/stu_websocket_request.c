@@ -292,10 +292,8 @@ stu_websocket_request_handler(stu_event_t *wev) {
 	stu_connection_t        *c, *t;
 	stu_channel_t           *ch;
 	stu_websocket_frame_t   *f;
-	stu_buf_t                buf;
 	u_char                   temp[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE], *data;
 	stu_int_t                extened, n;
-	uint64_t                 size;
 	stu_list_elt_t          *elts;
 	stu_hash_elt_t          *e;
 	stu_queue_t             *q;
@@ -306,46 +304,14 @@ stu_websocket_request_handler(stu_event_t *wev) {
 	r = (stu_websocket_request_t *) c->data;
 	ch = c->user.channel;
 
-	stu_memzero(temp, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
-
-	buf.start = temp;
-	buf.end = buf.start + STU_WEBSOCKET_REQUEST_DEFAULT_SIZE;
-
 	for (f = &r->frames_out; f; f = f->next) {
-		buf.last = buf.start + 10;
-		buf.last = stu_memcpy(buf.last, f->payload_data.start, f->extended);
+		stu_memzero(temp, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
+		memcpy((u_char *) temp + 10, f->payload_data.start, f->extended);
 
-		data = buf.start;
-		size = f->extended;
-		if (size < 126) {
-			data += 8;
-			data[0] = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
-			data[1] = size;
-			extened = 0;
-		} else if (size < 65536) {
-			data += 6;
-			data[0] = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
-			data[1] = 0x7E;
-			data[2] = size >> 8;
-			data[3] = size;
-			extened = 2;
-		} else {
-			data[0] = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
-			data[1] = 0x7F;
-			data[2] = size >> 56;
-			data[3] = size >> 48;
-			data[4] = size >> 40;
-			data[5] = size >> 32;
-			data[6] = size >> 24;
-			data[7] = size >> 16;
-			data[8] = size >> 8;
-			data[9] = size;
-			extened = 8;
-		}
-
+		data = stu_websocket_encode_frame(temp, f->extended, &extened);
 		stu_log_debug(3, "frame header: %d %d %d %d %d %d %d %d %d %d",
-				buf.start[0], buf.start[1], buf.start[2], buf.start[3], buf.start[4],
-				buf.start[5], buf.start[6], buf.start[7], buf.start[8], buf.start[9]);
+				temp[0], temp[1], temp[2], temp[3], temp[4],
+				temp[5], temp[6], temp[7], temp[8], temp[9]);
 
 		gettimeofday(&start, NULL);
 
@@ -357,30 +323,18 @@ stu_websocket_request_handler(stu_event_t *wev) {
 				e = stu_queue_data(q, stu_hash_elt_t, q);
 				t = (stu_connection_t *) e->value;
 
-				n = send(t->fd, data, size + 2 + extened, 0);
+				n = send(t->fd, data, f->extended + 2 + extened, 0);
 				if (n == -1) {
 					stu_log_error(stu_errno, "Failed to send data: from=%d, to=%d.", c->fd, t->fd);
-					/*
-					q = stu_queue_prev(q);
-
-					stu_channel_remove_locked(ch, t);
-					stu_websocket_close_connection(t);
-					*/
 					continue;
 				}
-
-				//stu_log_debug(4, "sent to fd=%d, bytes=%d.", t->fd, n);
 			}
 
 			stu_spin_unlock(&ch->userlist.lock);
 		} else {
-			n = send(c->fd, data, size + 2 + extened, 0);
+			n = send(c->fd, data, f->extended + 2 + extened, 0);
 			if (n == -1) {
 				stu_log_error(stu_errno, "Failed to send data: to=%d.", c->fd);
-				/*
-				stu_channel_remove(ch, c);
-				stu_websocket_close_connection(c);
-				*/
 			}
 		}
 
@@ -388,6 +342,37 @@ stu_websocket_request_handler(stu_event_t *wev) {
 		cost = 1000000 * (end.tv_sec - start.tv_sec) + end.tv_usec - start.tv_usec;
 		stu_log_debug(4, "sent: fd=%d, bytes=%d, cost=%.3fms.", c->fd, n, cost / 1000.0f);
 	}
+}
+
+u_char *
+stu_websocket_encode_frame(u_char *data, uint64_t size, stu_int_t *extened) {
+	if (size < 126) {
+		data += 8;
+		data[0] = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
+		data[1] = size;
+		*extened = 0;
+	} else if (size < 65536) {
+		data += 6;
+		data[0] = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
+		data[1] = 0x7E;
+		data[2] = size >> 8;
+		data[3] = size;
+		*extened = 2;
+	} else {
+		data[0] = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
+		data[1] = 0x7F;
+		data[2] = size >> 56;
+		data[3] = size >> 48;
+		data[4] = size >> 40;
+		data[5] = size >> 32;
+		data[6] = size >> 24;
+		data[7] = size >> 16;
+		data[8] = size >> 8;
+		data[9] = size;
+		*extened = 8;
+	}
+
+	return data;
 }
 
 

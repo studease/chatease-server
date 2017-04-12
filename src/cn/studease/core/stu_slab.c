@@ -17,11 +17,14 @@ stu_slab_pool_create(size_t size) {
 	stu_slab_pool_t *p;
 	u_char          *c;
 	stu_uint_t       n, i, page_n;
+	stu_shm_t        shm;
 
-	p = stu_alloc(size);
-	if (p == NULL) {
+	shm.size = size;
+	if (stu_shm_alloc(&shm) != STU_OK) {
 		return NULL;
 	}
+
+	p = (stu_slab_pool_t *) shm.addr;
 
 	stu_spinlock_init(&p->lock);
 	p->data.end = (u_char *) p + size;

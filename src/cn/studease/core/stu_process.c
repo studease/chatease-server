@@ -29,7 +29,7 @@ stu_int_t      stu_threads_n;
 
 extern stu_cycle_t *stu_cycle;
 
-static void  stu_signal_online_user_broadcast(int signo);
+static void  stu_signal_online_users_handler(int signo);
 static void  stu_signal_worker_processes(stu_cycle_t *cycle, int signo);
 static void  stu_pass_open_filedes(stu_cycle_t *cycle, stu_filedes_t *fds);
 static void  stu_worker_process_cycle(stu_cycle_t *cycle, void *data);
@@ -59,9 +59,6 @@ stu_process_master_cycle(stu_cycle_t *cycle) {
 	}
 
 	sigemptyset(&set);
-
-	signal(SIGALRM, stu_signal_online_user_broadcast);
-	alarm(5);
 
 	for ( ;; ) {
 		stu_log_debug(3, "sigsuspending...");
@@ -196,9 +193,9 @@ stu_spawn_process(stu_cycle_t *cycle, stu_spawn_proc_pt proc, void *data, char *
 
 
 static void
-stu_signal_online_user_broadcast(int signo) {
+stu_signal_online_users_handler(int signo) {
 	stu_hash_foreach(&stu_cycle->channels, stu_channel_broadcast);
-	alarm(5);
+	alarm(STU_TIME_ONLINE_USERS_DELAY);
 }
 
 static void
@@ -289,6 +286,9 @@ stu_worker_process_cycle(stu_cycle_t *cycle, void *data) {
 			exit(2);
 		}
 	}
+
+	signal(SIGALRM, stu_signal_online_users_handler);
+	alarm(STU_TIME_ONLINE_USERS_DELAY);
 
 	// main thread of sub process, wait for signal
 	for ( ;; ) {

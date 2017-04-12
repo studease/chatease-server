@@ -23,12 +23,15 @@
 
 #endif
 
+#define STU_CHANNEL_USERS_BUF_MAXIMUM 2048
+#define STU_TIME_ONLINE_USERS_DELAY   30
+
 typedef struct {
 	stu_base_pool_t *pool; // not used currently.
 
 	stu_str_t        id;
 	stu_int_t        message_n;
-	u_char           state;
+	uint8_t          state;
 
 	stu_hash_t       userlist;
 } stu_channel_t;

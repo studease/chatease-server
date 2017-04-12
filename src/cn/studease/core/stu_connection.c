@@ -169,7 +169,10 @@ static stu_connection_page_t *
 stu_connection_page_create(stu_connection_pool_t *pool) {
 	size_t                 size;
 	stu_connection_page_t *page;
-	stu_shm_t             *shm = NULL;
+	stu_shm_t             *shm;
+
+	page = NULL;
+	shm = NULL;
 
 	if (pool->pages.length >= STU_CONNECTION_PAGE_MAX_N) {
 		stu_log_error(0, "Failed to alloc connection page: Page length limited.");
@@ -177,21 +180,17 @@ stu_connection_page_create(stu_connection_pool_t *pool) {
 	}
 
 	size = sizeof(stu_connection_page_t) + STU_CONNECTIONS_PER_PAGE * sizeof(stu_connection_t);
-	page = stu_alloc(size);
-	if (page == NULL) {
-		stu_log_error(stu_errno, "Failed to alloc connection page.");
-		goto failed;
-	}
 
-	shm = stu_slab_calloc(stu_cycle->slab_pool, sizeof(stu_shm_t));
-	shm->addr = (u_char *) page;
+	shm = stu_pcalloc(stu_cycle->pool, sizeof(stu_shm_t));
 	shm->size = size;
 	if (stu_shm_alloc(shm) == STU_ERROR) {
-		stu_log_error(0, "Failed to alloc shm for connection page.");
+		stu_log_error(0, "Failed to alloc alloc connection page.");
 		goto failed;
 	}
 
 	stu_list_push(&stu_cycle->shared_memory, shm, sizeof(stu_shm_t));
+
+	page = (stu_connection_page_t *) shm->addr;
 
 	stu_connection_page_init(page);
 	page->data.start = page->data.last = (u_char *) page + sizeof(stu_connection_page_t);

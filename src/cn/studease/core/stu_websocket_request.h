@@ -57,6 +57,7 @@ stu_websocket_request_t *stu_websocket_create_request(stu_connection_t *c);
 void stu_websocket_process_request(stu_websocket_request_t *r);
 
 void stu_websocket_finalize_request(stu_websocket_request_t *r, stu_int_t rc);
+u_char *stu_websocket_encode_frame(u_char *buf, uint64_t len, stu_int_t *extened);
 
 void stu_websocket_close_request(stu_websocket_request_t *r, stu_int_t rc);
 void stu_websocket_free_request(stu_websocket_request_t *r, stu_int_t rc);

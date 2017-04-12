@@ -10,7 +10,7 @@
 #include <unistd.h>
 
 stu_uint_t   stu_ncpu;
-stu_cycle_t *stu_cycle;
+volatile stu_cycle_t *stu_cycle;
 
 extern stu_hash_t *stu_upstreams;
 
@@ -27,7 +27,7 @@ stu_config_default(stu_config_t *cf) {
 	cf->origin_port = 80;
 	cf->master_process = TRUE;
 	cf->worker_processes = 1;
-	cf->worker_threads = 1;
+	cf->worker_threads = 4;
 	stu_str_set(&cf->pid, "chatd.pid");
 }
 
@@ -87,25 +87,25 @@ stu_cycle_create(stu_config_t *cf) {
 	shm = stu_pcalloc(pool, sizeof(stu_shm_t));
 	shm->addr = (u_char *) pool;
 	shm->size = pool->data.end - (u_char *) pool;
-	if (stu_shm_alloc(shm) == STU_ERROR) {
+	/*if (stu_shm_alloc(shm) == STU_ERROR) {
 		return NULL;
-	}
+	}*/
 	stu_list_push(&cycle->shared_memory, shm, sizeof(stu_shm_t));
 
 	shm = stu_pcalloc(pool, sizeof(stu_shm_t));
 	shm->addr = (u_char *) slab_pool;
 	shm->size = slab_pool->data.end - (u_char *) slab_pool;
-	if (stu_shm_alloc(shm) == STU_ERROR) {
+	/*if (stu_shm_alloc(shm) == STU_ERROR) {
 		return NULL;
-	}
+	}*/
 	stu_list_push(&cycle->shared_memory, shm, sizeof(stu_shm_t));
 
 	shm = stu_pcalloc(pool, sizeof(stu_shm_t));
 	shm->addr = (u_char *) ram_pool;
 	shm->size = ram_pool->data.end - (u_char *) ram_pool;
-	if (stu_shm_alloc(shm) == STU_ERROR) {
+	/*if (stu_shm_alloc(shm) == STU_ERROR) {
 		return NULL;
-	}
+	}*/
 	stu_list_push(&cycle->shared_memory, shm, sizeof(stu_shm_t));
 
 	if (stu_hash_init(&cycle->channels, NULL, STU_MAX_CHANNEL_N, slab_pool,

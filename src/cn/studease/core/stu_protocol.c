@@ -19,6 +19,8 @@ stu_str_t  STU_PROTOCOL_NAME = stu_string("name");
 stu_str_t  STU_PROTOCOL_ROLE = stu_string("role");
 stu_str_t  STU_PROTOCOL_STATE = stu_string("state");
 stu_str_t  STU_PROTOCOL_STATUS = stu_string("status");
+stu_str_t  STU_PROTOCOL_TOTAL = stu_string("total");
+stu_str_t  STU_PROTOCOL_USERS = stu_string("users");
 
 stu_str_t  STU_PROTOCOL_CMDS_TEXT = stu_string("text");
 stu_str_t  STU_PROTOCOL_CMDS_MUTE = stu_string("mute");
@@ -29,6 +31,7 @@ stu_str_t  STU_PROTOCOL_RAWS_IDENT = stu_string("ident");
 stu_str_t  STU_PROTOCOL_RAWS_TEXT = stu_string("text");
 stu_str_t  STU_PROTOCOL_RAWS_JOIN = stu_string("join");
 stu_str_t  STU_PROTOCOL_RAWS_LEFT = stu_string("left");
+stu_str_t  STU_PROTOCOL_RAWS_USERS = stu_string("users");
 stu_str_t  STU_PROTOCOL_RAWS_MUTE = stu_string("mute");
 stu_str_t  STU_PROTOCOL_RAWS_KICKOUT = stu_string("kickout");
 stu_str_t  STU_PROTOCOL_RAWS_ERROR = stu_string("error");

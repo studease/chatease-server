@@ -4,5 +4,5 @@
 
 USER_OBJS :=
 
-LIBS := -lssl -lcrypto -llua53
+LIBS := -lssl -lcrypto
 
