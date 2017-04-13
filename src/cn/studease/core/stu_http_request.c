@@ -67,8 +67,7 @@ stu_http_wait_request_handler(stu_event_t *rev) {
 	c = (stu_connection_t *) rev->data;
 
 	stu_spin_lock(&c->lock);
-	if (c->fd == (stu_socket_t) -1) {
-		stu_log_error(0, "http waited a invalid fd=%d.", c->fd);
+	if (c->fd == (stu_socket_t) STU_SOCKET_INVALID) {
 		goto done;
 	}
 
