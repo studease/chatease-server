@@ -19,3 +19,5 @@ add_executable(chatease-server ${DIR_SRC})
 #link
 target_link_libraries(chatease-server core)
 target_link_libraries(chatease-server pthread)
+target_link_libraries(chatease-server m)
+target_link_libraries(chatease-server crypto)
