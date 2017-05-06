@@ -1,2 +1,2 @@
 #!/bin/bash
-docker build -t chatease-server-clean .
+docker build -t chatease-server .
