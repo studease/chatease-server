@@ -29,6 +29,8 @@ static stu_int_t stu_http_process_unique_header_line(stu_http_request_t *r, stu_
 static const stu_str_t  STU_HTTP_HEADER_SEC_WEBSOCKET_ACCEPT = stu_string("Sec-WebSocket-Accept");
 static const stu_str_t  STU_HTTP_WEBSOCKET_SIGN_KEY = stu_string("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
 
+static const stu_str_t  STU_HTTP_FLASH_POLICY_FILE = stu_string("<?xml version=\"1.0\" encoding=\"UTF-8\"?><cross-domain-policy><allow-access-from domain=\"*\" /></cross-domain-policy>");
+
 
 stu_hash_t  stu_http_headers_in_hash;
 
@@ -103,6 +105,18 @@ again:
 	}
 
 	stu_log_debug(4, "recv: fd=%d, bytes=%d.", c->fd, n);//str=\n%s, c->buffer.start
+
+	if (stu_strncmp(c->buffer.start, "<policy-file-request/>\0", 23) == 0) {
+		n = send(c->fd, STU_HTTP_FLASH_POLICY_FILE.data, STU_HTTP_FLASH_POLICY_FILE.len, 0);
+		if (n == -1) {
+			stu_log_debug(4, "Failed to send policy file: fd=%d.", c->fd);
+			goto failed;
+		}
+
+		stu_log_debug(4, "sent policy file: fd=%d, bytes=%d.", c->fd, n);
+
+		goto done;
+	}
 
 	c->data = (void *) stu_http_create_request(c);
 	if (c->data == NULL) {

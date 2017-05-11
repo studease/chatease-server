@@ -30,8 +30,8 @@ stu_websocket_parse_frame(stu_websocket_request_t *r, stu_buf_t *b) {
 		case sw_fin:
 			r->frame->fin = (*p >> 7) & 0x1;
 			r->frame->rsv1 = (*p >> 6) & 0x1;
-			r->frame->rsv1 = (*p >> 5) & 0x1;
-			r->frame->rsv1 = (*p >> 4) & 0x1;
+			r->frame->rsv2 = (*p >> 5) & 0x1;
+			r->frame->rsv3 = (*p >> 4) & 0x1;
 			r->frame->opcode = *p & 0xF;
 			state = sw_mask;
 			break;
