@@ -71,6 +71,7 @@ stu_websocket_parse_frame(stu_websocket_request_t *r, stu_buf_t *b) {
 		case sw_payload_data:
 			switch (r->frame->opcode) {
 			case STU_WEBSOCKET_OPCODE_TEXT:
+			case STU_WEBSOCKET_OPCODE_BINARY:
 				if (r->frame->mask) {
 					for (i = 0; i < r->frame->extended; i++) {
 						p[i] ^= r->frame->masking_key[i % 4];

@@ -195,7 +195,7 @@ stu_spawn_process(stu_cycle_t *cycle, stu_spawn_proc_pt proc, void *data, char *
 static void
 stu_signal_online_users_handler(int signo) {
 	stu_hash_foreach(&stu_cycle->channels, stu_channel_broadcast);
-	alarm(STU_TIME_ONLINE_USERS_DELAY);
+	//alarm(STU_TIME_ONLINE_USERS_DELAY);
 }
 
 static void
@@ -288,7 +288,7 @@ stu_worker_process_cycle(stu_cycle_t *cycle, void *data) {
 	}
 
 	signal(SIGALRM, stu_signal_online_users_handler);
-	alarm(STU_TIME_ONLINE_USERS_DELAY);
+	//alarm(STU_TIME_ONLINE_USERS_DELAY);
 
 	// main thread of sub process, wait for signal
 	for ( ;; ) {

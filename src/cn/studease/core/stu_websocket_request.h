@@ -14,6 +14,7 @@
 #define STU_WEBSOCKET_REQUEST_DEFAULT_SIZE  1024
 
 #define STU_WEBSOCKET_OPCODE_TEXT           0x1
+#define STU_WEBSOCKET_OPCODE_BINARY         0x2
 #define STU_WEBSOCKET_OPCODE_CLOSE          0x8
 #define STU_WEBSOCKET_OPCODE_PING           0x9
 #define STU_WEBSOCKET_OPCODE_PONG           0xA
@@ -57,7 +58,7 @@ stu_websocket_request_t *stu_websocket_create_request(stu_connection_t *c);
 void stu_websocket_process_request(stu_websocket_request_t *r);
 
 void stu_websocket_finalize_request(stu_websocket_request_t *r, stu_int_t rc);
-u_char *stu_websocket_encode_frame(u_char *buf, uint64_t len, stu_int_t *extened);
+u_char *stu_websocket_encode_frame(u_char opcode, u_char *buf, uint64_t len, stu_int_t *extened);
 
 void stu_websocket_close_request(stu_websocket_request_t *r, stu_int_t rc);
 void stu_websocket_free_request(stu_websocket_request_t *r, stu_int_t rc);

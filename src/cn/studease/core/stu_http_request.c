@@ -18,6 +18,7 @@ static stu_int_t stu_http_process_host(stu_http_request_t *r, stu_table_elt_t *h
 static stu_int_t stu_http_process_connection(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 static stu_int_t stu_http_process_content_length(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 static stu_int_t stu_http_process_sec_websocket_key(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
+static stu_int_t stu_http_process_sec_websocket_protocol(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 
 static stu_int_t stu_http_process_sec_websocket_key_of_safari(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 static stu_int_t stu_http_process_sec_websocket_key_for_safari(stu_http_request_t *r);
@@ -27,6 +28,7 @@ static stu_int_t stu_http_process_unique_header_line(stu_http_request_t *r, stu_
 
 
 static const stu_str_t  STU_HTTP_HEADER_SEC_WEBSOCKET_ACCEPT = stu_string("Sec-WebSocket-Accept");
+static const stu_str_t  STU_HTTP_HEADER_SEC_WEBSOCKET_PROTOCOL = stu_string("Sec-WebSocket-Protocol");
 static const stu_str_t  STU_HTTP_WEBSOCKET_SIGN_KEY = stu_string("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
 
 static const stu_str_t  STU_HTTP_FLASH_POLICY_FILE = stu_string("<?xml version=\"1.0\" encoding=\"UTF-8\"?><cross-domain-policy><allow-access-from domain=\"*\" /></cross-domain-policy>");
@@ -51,6 +53,7 @@ stu_http_header_t  stu_http_headers_in[] = {
 	{ stu_string("Sec-Websocket-Key1"), offsetof(stu_http_headers_in_t, sec_websocket_key1), stu_http_process_sec_websocket_key_of_safari },
 	{ stu_string("Sec-Websocket-Key2"), offsetof(stu_http_headers_in_t, sec_websocket_key2), stu_http_process_sec_websocket_key_of_safari },
 	{ stu_string("(Key3)"), offsetof(stu_http_headers_in_t, sec_websocket_key3), stu_http_process_sec_websocket_key_of_safari },
+	{ stu_string("Sec-Websocket-Protocol"), offsetof(stu_http_headers_in_t, sec_websocket_protocol), stu_http_process_sec_websocket_protocol },
 	{ stu_string("Sec-Websocket-Version"), offsetof(stu_http_headers_in_t, sec_websocket_version), stu_http_process_unique_header_line },
 	{ stu_string("Sec-Websocket-Extensions"), offsetof(stu_http_headers_in_t, sec_websocket_extensions), stu_http_process_unique_header_line },
 	{ stu_string("Upgrade"), offsetof(stu_http_headers_in_t, upgrade), stu_http_process_header_line },
@@ -457,6 +460,28 @@ stu_http_process_sec_websocket_key_for_safari(stu_http_request_t *r) {
 }
 
 static stu_int_t
+stu_http_process_sec_websocket_protocol(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset) {
+	stu_table_elt_t *e;
+
+	e = stu_base_pcalloc(r->connection->pool, sizeof(stu_table_elt_t));
+	if (e == NULL) {
+		return STU_HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	e->key.data = STU_HTTP_HEADER_SEC_WEBSOCKET_PROTOCOL.data;
+	e->key.len = STU_HTTP_HEADER_SEC_WEBSOCKET_PROTOCOL.len;
+
+	e->value.data = stu_base_pcalloc(r->connection->pool, h->value.len + 1);
+	e->value.len = h->value.len;
+
+	memcpy(e->value.data, h->value.data, h->value.len);
+
+	r->headers_out.sec_websocket_protocol = e;
+
+	return STU_OK;
+}
+
+static stu_int_t
 stu_http_process_header_line(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset) {
 	stu_table_elt_t  **ph;
 
@@ -507,7 +532,9 @@ stu_http_request_handler(stu_event_t *wev) {
 	stu_connection_t   *c;
 	stu_channel_t      *ch;
 	stu_buf_t          *buf;
-	stu_int_t           n, size;
+	stu_table_elt_t    *accept;
+	stu_table_elt_t    *protocol;
+	stu_int_t           n;
 
 	c = (stu_connection_t *) wev->data;
 
@@ -523,40 +550,27 @@ stu_http_request_handler(stu_event_t *wev) {
 	stu_memzero(buf->start, buf->end - buf->start);
 
 	r = (stu_http_request_t *) c->data;
+	accept = r->headers_out.sec_websocket_accept;
+	protocol = r->headers_out.sec_websocket_protocol;
+
 	if (r->headers_out.status == STU_HTTP_SWITCHING_PROTOCOLS) {
 		buf->last = stu_memcpy(buf->last, "HTTP/1.1 101 Switching Protocols" CRLF, 34);
 		buf->last = stu_memcpy(buf->last, "Server: " __NAME "/" __VERSION CRLF, 32);
 		buf->last = stu_memcpy(buf->last, "Upgrade: websocket" CRLF, 20);
 		buf->last = stu_memcpy(buf->last, "Connection: upgrade" CRLF, 21);
-		buf->last = stu_memcpy(buf->last, r->headers_out.sec_websocket_accept->key.data, r->headers_out.sec_websocket_accept->key.len);
+		buf->last = stu_memcpy(buf->last, accept->key.data, accept->key.len);
 		buf->last = stu_memcpy(buf->last, ": ", 2);
-		buf->last = stu_memcpy(buf->last, r->headers_out.sec_websocket_accept->value.data, r->headers_out.sec_websocket_accept->value.len);
-		buf->last = stu_memcpy(buf->last, CRLF CRLF, 4);
+		buf->last = stu_memcpy(buf->last, accept->value.data, accept->value.len);
+		buf->last = stu_memcpy(buf->last, CRLF, 2);
+		if (protocol) {
+			buf->last = stu_memcpy(buf->last, protocol->key.data, protocol->key.len);
+			buf->last = stu_memcpy(buf->last, ": ", 2);
+			buf->last = stu_memcpy(buf->last, protocol->value.data, protocol->value.len);
+			buf->last = stu_memcpy(buf->last, CRLF, 2);
+		}
+		buf->last = stu_memcpy(buf->last, CRLF, 2);
 	} else {
 		buf->last = stu_memcpy(buf->last, "HTTP/1.1 400 Bad Request\r\nServer: " __NAME "/" __VERSION "\r\nContent-type: text/html\r\nContent-length: 23\r\n\r\n" __NAME "/" __VERSION "\n", 124);
-	}
-
-	if (r->response_body.start) {
-		size = r->response_body.last - r->response_body.start;
-		*buf->last++ = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
-		if (size < 126) {
-			*buf->last++ = size;
-		} else if (size < 65536) {
-			*buf->last++ = 0x7E;
-			*buf->last++ = size >> 8;
-			*buf->last++ = size;
-		} else {
-			*buf->last++ = 0x7F;
-			*buf->last++ = size >> 56;
-			*buf->last++ = size >> 48;
-			*buf->last++ = size >> 40;
-			*buf->last++ = size >> 32;
-			*buf->last++ = size >> 24;
-			*buf->last++ = size >> 16;
-			*buf->last++ = size >> 8;
-			*buf->last++ = size;
-		}
-		buf->last = stu_memcpy(buf->last, r->response_body.start, size);
 	}
 
 	n = send(c->fd, buf->start, buf->last - buf->start, 0);

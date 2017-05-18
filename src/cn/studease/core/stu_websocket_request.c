@@ -130,7 +130,7 @@ stu_websocket_process_request(stu_websocket_request_t *r) {
 
 	close = FALSE;
 	for (f = &r->frames_in; f; f = f->next) {
-		if (f->opcode != STU_WEBSOCKET_OPCODE_TEXT) {
+		if (f->opcode != STU_WEBSOCKET_OPCODE_TEXT && f->opcode != STU_WEBSOCKET_OPCODE_BINARY) {
 			if (f->opcode == STU_WEBSOCKET_OPCODE_CLOSE) {
 				close = TRUE;
 			}
@@ -255,7 +255,7 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 
 		// setup out frame.
 		out = &r->frames_out;
-		out->opcode = STU_WEBSOCKET_OPCODE_TEXT;
+		out->opcode = r->frames_in.opcode;
 		out->extended = data - temp;
 		out->payload_data.start = temp;
 		out->payload_data.end = out->payload_data.last = data;
@@ -308,7 +308,7 @@ stu_websocket_request_handler(stu_event_t *wev) {
 		stu_memzero(temp, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
 		memcpy((u_char *) temp + 10, f->payload_data.start, f->extended);
 
-		data = stu_websocket_encode_frame(temp, f->extended, &extened);
+		data = stu_websocket_encode_frame(f->opcode, temp, f->extended, &extened);
 		stu_log_debug(3, "frame header: %d %d %d %d %d %d %d %d %d %d",
 				temp[0], temp[1], temp[2], temp[3], temp[4],
 				temp[5], temp[6], temp[7], temp[8], temp[9]);
@@ -345,21 +345,21 @@ stu_websocket_request_handler(stu_event_t *wev) {
 }
 
 u_char *
-stu_websocket_encode_frame(u_char *data, uint64_t size, stu_int_t *extened) {
+stu_websocket_encode_frame(u_char opcode, u_char *data, uint64_t size, stu_int_t *extened) {
 	if (size < 126) {
 		data += 8;
-		data[0] = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
+		data[0] = 0x80 | opcode;
 		data[1] = size;
 		*extened = 0;
 	} else if (size < 65536) {
 		data += 6;
-		data[0] = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
+		data[0] = 0x80 | opcode;
 		data[1] = 0x7E;
 		data[2] = size >> 8;
 		data[3] = size;
 		*extened = 2;
 	} else {
-		data[0] = 0x80 | STU_WEBSOCKET_OPCODE_TEXT;
+		data[0] = 0x80 | opcode;
 		data[1] = 0x7F;
 		data[2] = size >> 56;
 		data[3] = size >> 48;

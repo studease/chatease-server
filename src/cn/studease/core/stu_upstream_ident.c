@@ -222,9 +222,11 @@ stu_upstream_ident_analyze_response(stu_connection_t *c) {
 	stu_upstream_t     *u;
 	stu_connection_t   *pc;
 	stu_http_request_t *r, *pr;
+	stu_table_elt_t    *protocol;
+	stu_int_t           n, size, extened;
 	stu_uint_t          kh;
 	stu_str_t          *cid, *uid, *uname, *channel_id;
-	u_char             *data, temp[STU_HTTP_REQUEST_DEFAULT_SIZE];
+	u_char             *data, temp[STU_HTTP_REQUEST_DEFAULT_SIZE], opcode;
 	stu_channel_t      *ch;
 	stu_json_t         *idt, *sta, *idchannel, *idcid, *idcstate, *iduser, *iduid, *iduname, *idurole;
 	stu_json_t         *res, *raw, *rschannel, *rsctotal, *rsuser;
@@ -233,6 +235,7 @@ stu_upstream_ident_analyze_response(stu_connection_t *c) {
 	pc = u->peer.connection;
 	pr = (stu_http_request_t *) pc->data;
 	r = (stu_http_request_t *) c->data;
+	protocol = r->headers_out.sec_websocket_protocol;
 
 	if (pr->headers_out.status != STU_HTTP_OK) {
 		stu_log_error(0, "Failed to load ident data: status=%ld.", pr->headers_out.status);
@@ -371,15 +374,29 @@ stu_upstream_ident_analyze_response(stu_connection_t *c) {
 	stu_json_add_item_to_object(res, rsuser);
 
 	stu_memzero(temp, STU_HTTP_REQUEST_DEFAULT_SIZE);
-	data = stu_json_stringify(res, (u_char *) temp);
+	data = stu_json_stringify(res, (u_char *) temp + 10);
 
 	stu_json_delete(idt);
 	stu_json_delete(res);
 
-	r->response_body.start = temp;
-	r->response_body.end = r->response_body.last = data;
+	if (protocol && stu_strncmp("binary", protocol->value.data, protocol->value.len) == 0) {
+		opcode = STU_WEBSOCKET_OPCODE_BINARY;
+	} else {
+		opcode = STU_WEBSOCKET_OPCODE_TEXT;
+	}
 
 	u->finalize_handler(c, STU_HTTP_SWITCHING_PROTOCOLS);
+
+	size = data - temp - 10;
+	data = stu_websocket_encode_frame(opcode, temp, size, &extened);
+
+	n = send(c->fd, data, size + 2 + extened, 0);
+	if (n == -1) {
+		stu_log_debug(4, "Failed to send \"ident\" frame: fd=%d.", c->fd);
+		goto failed;
+	}
+
+	stu_log_debug(4, "sent: fd=%d, bytes=%d.", c->fd, n);
 
 	return STU_OK;
 

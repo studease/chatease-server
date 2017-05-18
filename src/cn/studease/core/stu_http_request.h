@@ -74,6 +74,7 @@ typedef struct {
 	stu_table_elt_t *sec_websocket_key1;
 	stu_table_elt_t *sec_websocket_key2;
 	stu_table_elt_t *sec_websocket_key3;
+	stu_table_elt_t *sec_websocket_protocol;
 	stu_table_elt_t *sec_websocket_version;
 	stu_table_elt_t *sec_websocket_extensions;
 	stu_table_elt_t *upgrade;
@@ -97,6 +98,7 @@ typedef struct {
 	stu_table_elt_t *content_encoding;
 
 	stu_table_elt_t *sec_websocket_accept;
+	stu_table_elt_t *sec_websocket_protocol;
 	stu_table_elt_t *sec_websocket_extensions;
 	stu_table_elt_t *upgrade;
 

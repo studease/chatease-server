@@ -198,7 +198,7 @@ stu_channel_broadcast(stu_str_t *id, void *ch) {
 	stu_json_delete(res);
 
 	size = data - temp - 10;
-	data = stu_websocket_encode_frame(temp, size, &extened);
+	data = stu_websocket_encode_frame(STU_WEBSOCKET_OPCODE_BINARY, temp, size, &extened);
 
 	for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
 		e = stu_queue_data(q, stu_hash_elt_t, q);
