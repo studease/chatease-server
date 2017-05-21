@@ -14,10 +14,9 @@ typedef struct stu_chain_s    stu_chain_t;
 typedef struct stu_upstream_s stu_upstream_t;
 
 typedef enum {
-	STANDALONE = 0,
-	ORIGIN = 1,
-	EDGE = 2
-} stu_runmode_t;
+	PREVIEW =    0x00,
+	ENTERPRISE = 0x01
+} stu_edition_t;
 
 #define STU_OK          0
 #define STU_ERROR      -1

@@ -20,14 +20,20 @@ static void stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *po
 void
 stu_config_default(stu_config_t *cf) {
 	cf->daemon = TRUE;
-	cf->runmode = STANDALONE;
-	cf->port = 6688;
+
+	cf->edition = PREVIEW;
+	stu_str_set(&cf->keyname, "name");
+/*
+	cf->edition = ENTERPRISE;
+	stu_str_set(&cf->keyname, "token");
+*/
+	cf->port = 80;
 	stu_str_null(&cf->hostname);
-	stu_str_null(&cf->origin_addr);
-	cf->origin_port = 80;
+
 	cf->master_process = TRUE;
 	cf->worker_processes = 1;
 	cf->worker_threads = 4;
+
 	stu_str_set(&cf->pid, "chatd.pid");
 }
 
@@ -141,21 +147,17 @@ stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool) {
 	stu_upstream_server_t *server;
 
 	dst->daemon = src->daemon;
-	dst->runmode = src->runmode;
-	dst->port = src->port;
+	dst->edition = src->edition;
 
+	dst->keyname.data = stu_pcalloc(pool, src->keyname.len + 1);
+	dst->keyname.len = src->keyname.len;
+	stu_strncpy(dst->keyname.data, src->keyname.data, src->keyname.len);
+
+	dst->port = src->port;
 	if (src->hostname.len > 0) {
 		dst->hostname.data = stu_pcalloc(pool, src->hostname.len + 1);
 		dst->hostname.len = src->hostname.len;
 		memcpy(dst->hostname.data, src->hostname.data, src->hostname.len);
-	}
-
-	if (src->runmode == ORIGIN) {
-		dst->origin_addr.data = stu_pcalloc(pool, src->origin_addr.len + 1);
-		dst->origin_addr.len = src->origin_addr.len;
-		memcpy(dst->origin_addr.data, src->origin_addr.data, src->origin_addr.len);
-
-		dst->origin_port = src->origin_port;
 	}
 
 	dst->master_process = src->master_process;

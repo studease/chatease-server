@@ -5,8 +5,6 @@
  *      Author: Tony Lau
  */
 
-#include <sys/socket.h>
-#include <sys/time.h>
 #include "stu_config.h"
 #include "stu_core.h"
 
@@ -111,14 +109,14 @@ stu_websocket_process_request(stu_websocket_request_t *r) {
 	c = r->connection;
 	if (c->user.channel == NULL) {
 		stu_log_error(0, "Failed to process request: channel not found.");
-		stu_websocket_finalize_request(r, STU_HTTP_UNAUTHORIZED);
+		stu_websocket_finalize_request(r, STU_HTTP_UNAUTHORIZED, -1);
 		return;
 	}
 
 	rc = stu_websocket_process_request_frames(r);
 	if (rc != STU_DONE) {
 		stu_log_error(0, "Failed to process request frames.");
-		stu_websocket_finalize_request(r, STU_HTTP_BAD_REQUEST);
+		stu_websocket_finalize_request(r, STU_HTTP_BAD_REQUEST, -1);
 		return;
 	}
 
@@ -189,8 +187,8 @@ stu_websocket_process_request_frames(stu_websocket_request_t *r) {
 static void
 stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t size) {
 	stu_connection_t      *c;
-	stu_json_t            *req, *cmd, *rqdata, *rqtype, *rqchannel;
-	stu_json_t            *res, *raw, *rsdata, *rstype, *rschannel, *rsuser, *rsuid, *rsuname, *rsurole;
+	stu_json_t            *req, *cmd, *rqreq, *rqdata, *rqtype, *rqchannel;
+	stu_json_t            *res, *raw, *rsreq, *rsdata, *rstype, *rschannel, *rsuser, *rsuid, *rsuname, *rsurole;
 	stu_str_t             *str;
 	stu_websocket_frame_t *out;
 	u_char                *data, temp[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE];
@@ -200,15 +198,17 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 	req = stu_json_parse((u_char *) text, size);
 	if (req == NULL || req->type != STU_JSON_TYPE_OBJECT) {
 		stu_log_error(0, "Failed to parse request.");
-		stu_websocket_finalize_request(r, STU_HTTP_BAD_REQUEST);
+		stu_websocket_finalize_request(r, STU_HTTP_BAD_REQUEST, -1);
 		return;
 	}
+
+	rqreq = stu_json_get_object_item_by(req, &STU_PROTOCOL_REQ);
 
 	cmd = stu_json_get_object_item_by(req, &STU_PROTOCOL_CMD);
 	if (cmd == NULL || cmd->type != STU_JSON_TYPE_STRING) {
 		stu_log_error(0, "Failed to analyze request: \"cmd\" not found.");
 		stu_json_delete(req);
-		stu_websocket_finalize_request(r, STU_HTTP_BAD_REQUEST);
+		stu_websocket_finalize_request(r, STU_HTTP_BAD_REQUEST, rqreq ? *(stu_double_t *) rqreq->value : -1);
 		return;
 	}
 
@@ -222,7 +222,7 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 				|| rqchannel == NULL || rqchannel->type != STU_JSON_TYPE_OBJECT) {
 			stu_log_error(0, "Failed to analyze request: necessary item[s] not found.");
 			stu_json_delete(req);
-			stu_websocket_finalize_request(r, STU_HTTP_BAD_REQUEST);
+			stu_websocket_finalize_request(r, STU_HTTP_BAD_REQUEST, rqreq ? *(stu_double_t *) rqreq->value : -1);
 			return;
 		}
 
@@ -242,6 +242,10 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 		stu_json_add_item_to_object(rsuser, rsurole);
 
 		stu_json_add_item_to_object(res, raw);
+		if (rqreq) {
+			rsreq = stu_json_duplicate(rqreq, FALSE);
+			stu_json_add_item_to_object(res, rsreq);
+		}
 		stu_json_add_item_to_object(res, rsdata);
 		stu_json_add_item_to_object(res, rstype);
 		stu_json_add_item_to_object(res, rschannel);
@@ -260,19 +264,22 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 		out->payload_data.start = temp;
 		out->payload_data.end = out->payload_data.last = data;
 
-		stu_websocket_finalize_request(r, STU_HTTP_OK);
+		stu_websocket_finalize_request(r, STU_HTTP_OK, rqreq ? *(stu_double_t *) rqreq->value : -1);
 
 		return;
 	}
 
 	stu_json_delete(req);
 
-	stu_websocket_finalize_request(r, STU_HTTP_METHOD_NOT_ALLOWED);
+	stu_websocket_finalize_request(r, STU_HTTP_METHOD_NOT_ALLOWED, rqreq ? *(stu_double_t *) rqreq->value : -1);
 }
 
 void
-stu_websocket_finalize_request(stu_websocket_request_t *r, stu_int_t rc) {
-	stu_connection_t *c;
+stu_websocket_finalize_request(stu_websocket_request_t *r, stu_int_t rc, stu_double_t req) {
+	stu_connection_t      *c;
+	stu_websocket_frame_t *out;
+	stu_json_t            *res, *raw, *rsreq, *rserror, *rscode;
+	u_char                *data, temp[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE];
 
 	r->status = rc;
 	c = r->connection;
@@ -282,6 +289,34 @@ stu_websocket_finalize_request(stu_websocket_request_t *r, stu_int_t rc) {
 		stu_log_error(0, "Failed to add websocket client write event.");
 		return;
 	}*/
+
+	if (rc != STU_HTTP_OK) {
+		res = stu_json_create_object(NULL);
+		raw = stu_json_create_string(&STU_PROTOCOL_RAW, STU_PROTOCOL_RAWS_ERROR.data, STU_PROTOCOL_RAWS_ERROR.len);
+		rserror = stu_json_create_object(&STU_PROTOCOL_ERROR);
+
+		rscode = stu_json_create_number(&STU_PROTOCOL_CODE, (stu_double_t) rc);
+		stu_json_add_item_to_object(rserror, rscode);
+
+		stu_json_add_item_to_object(res, raw);
+		if (req >= 0) {
+			rsreq = stu_json_create_number(&STU_PROTOCOL_REQ, req);
+			stu_json_add_item_to_object(res, rsreq);
+		}
+		stu_json_add_item_to_object(res, rserror);
+
+		stu_memzero(temp, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
+		data = stu_json_stringify(res, (u_char *) temp);
+
+		stu_json_delete(res);
+
+		// setup out frame.
+		out = &r->frames_out;
+		out->opcode = r->frames_in.opcode;
+		out->extended = data - temp;
+		out->payload_data.start = temp;
+		out->payload_data.end = out->payload_data.last = data;
+	}
 
 	stu_websocket_request_handler(&c->write);
 }

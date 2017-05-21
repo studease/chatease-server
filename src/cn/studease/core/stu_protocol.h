@@ -13,6 +13,7 @@
 
 extern stu_str_t  STU_PROTOCOL_CMD;
 extern stu_str_t  STU_PROTOCOL_RAW;
+extern stu_str_t  STU_PROTOCOL_REQ;
 extern stu_str_t  STU_PROTOCOL_DATA;
 extern stu_str_t  STU_PROTOCOL_TYPE;
 extern stu_str_t  STU_PROTOCOL_CHANNEL;
@@ -23,7 +24,8 @@ extern stu_str_t  STU_PROTOCOL_ROLE;
 extern stu_str_t  STU_PROTOCOL_STATE;
 extern stu_str_t  STU_PROTOCOL_STATUS;
 extern stu_str_t  STU_PROTOCOL_TOTAL;
-extern stu_str_t  STU_PROTOCOL_USERS;
+extern stu_str_t  STU_PROTOCOL_ERROR;
+extern stu_str_t  STU_PROTOCOL_CODE;
 
 extern stu_str_t  STU_PROTOCOL_CMDS_TEXT;
 extern stu_str_t  STU_PROTOCOL_CMDS_MUTE;

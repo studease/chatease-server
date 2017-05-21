@@ -21,7 +21,7 @@ typedef struct {
 	stu_str_t         name;
 
 	stu_str_t         strid;
-	u_char            idstr[8];
+	u_char            idstr[9];
 
 	uint8_t           role;
 	stu_short_t       interval;

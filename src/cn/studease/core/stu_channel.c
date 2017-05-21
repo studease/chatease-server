@@ -145,7 +145,7 @@ stu_channel_broadcast(stu_str_t *id, void *ch) {
 	stu_hash_elt_t   *e;
 	stu_queue_t      *q;
 	stu_connection_t *c;
-	stu_json_t       *res, *raw, *rschannel, *rscid, *rscstate, *rsctotal, *rscusers, *rsuser, *rsuid, *rsuname, *rsurole;
+	stu_json_t       *res, *raw, *rschannel, *rscid, *rscstate, *rsctotal;
 	u_char           *data, temp[STU_CHANNEL_USERS_BUF_MAXIMUM];
 	uint64_t          size;
 	stu_int_t         extened, n;
@@ -164,33 +164,13 @@ stu_channel_broadcast(stu_str_t *id, void *ch) {
 	rscid = stu_json_create_string(&STU_PROTOCOL_ID, id->data, id->len);
 	rscstate = stu_json_create_number(&STU_PROTOCOL_STATE, (stu_double_t) channel->state);
 	rsctotal = stu_json_create_number(&STU_PROTOCOL_TOTAL, (stu_double_t) channel->userlist.length);
-	rscusers = stu_json_create_array(&STU_PROTOCOL_USERS);
 
 	stu_json_add_item_to_object(rschannel, rscid);
 	stu_json_add_item_to_object(rschannel, rscstate);
 	stu_json_add_item_to_object(rschannel, rsctotal);
-	stu_json_add_item_to_object(rschannel, rscusers);
 
 	stu_json_add_item_to_object(res, raw);
 	stu_json_add_item_to_object(res, rschannel);
-
-	elts = &channel->userlist.keys.elts;
-	for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
-		e = stu_queue_data(q, stu_hash_elt_t, q);
-		c = (stu_connection_t *) e->value;
-
-		rsuser = stu_json_create_object(NULL);
-
-		rsuid = stu_json_create_string(&STU_PROTOCOL_ID, c->user.strid.data, c->user.strid.len);
-		rsuname = stu_json_create_string(&STU_PROTOCOL_NAME, c->user.name.data, c->user.name.len);
-		rsurole = stu_json_create_number(&STU_PROTOCOL_ROLE, (stu_double_t) c->user.role);
-
-		stu_json_add_item_to_object(rsuser, rsuid);
-		stu_json_add_item_to_object(rsuser, rsuname);
-		stu_json_add_item_to_object(rsuser, rsurole);
-
-		stu_json_add_item_to_object(rscusers, rsuser);
-	}
 
 	stu_memzero(temp, STU_CHANNEL_USERS_BUF_MAXIMUM);
 	data = stu_json_stringify(res, (u_char *) temp + 10);
@@ -200,6 +180,7 @@ stu_channel_broadcast(stu_str_t *id, void *ch) {
 	size = data - temp - 10;
 	data = stu_websocket_encode_frame(STU_WEBSOCKET_OPCODE_BINARY, temp, size, &extened);
 
+	elts = &channel->userlist.keys.elts;
 	for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
 		e = stu_queue_data(q, stu_hash_elt_t, q);
 		c = (stu_connection_t *) e->value;

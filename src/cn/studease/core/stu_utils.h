@@ -11,6 +11,6 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
-stu_runmode_t stu_utils_get_runmode(stu_int_t mode);
+stu_edition_t stu_utils_get_edition(u_char *name, size_t len);
 
 #endif /* STU_UTILS_H_ */

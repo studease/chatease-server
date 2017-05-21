@@ -34,6 +34,10 @@ static const stu_str_t  STU_UPSTREAM_IDENT_REQUEST = stu_string(
 		 */
 	);
 
+const stu_str_t  STU_UPSTREAM_IDENT_RESPONSE = stu_string(
+		"{\"raw\":\"ident\",\"user\":{\"id\":\"%ld\",\"name\":\"%s\",\"role\":1},\"channel\":{\"id\":\"%s\",\"state\":0}}"
+	);
+
 static stu_int_t stu_upstream_ident_process_response_headers(stu_http_request_t *r);
 
 
@@ -225,7 +229,7 @@ stu_upstream_ident_analyze_response(stu_connection_t *c) {
 	stu_table_elt_t    *protocol;
 	stu_int_t           n, size, extened;
 	stu_uint_t          kh;
-	stu_str_t          *cid, *uid, *uname, *channel_id;
+	stu_str_t          *cid, *uid, *uname, channel_id;
 	u_char             *data, temp[STU_HTTP_REQUEST_DEFAULT_SIZE], opcode;
 	stu_channel_t      *ch;
 	stu_json_t         *idt, *sta, *idchannel, *idcid, *idcstate, *iduser, *iduid, *iduname, *idurole;
@@ -285,11 +289,17 @@ stu_upstream_ident_analyze_response(stu_connection_t *c) {
 	}
 
 	// get channel ID
-	channel_id = &r->target;
+	channel_id.data = stu_base_pcalloc(c->pool, r->target.len + 1);
+	if (channel_id.data == NULL) {
+		stu_log_error(0, "Failed to pcalloc memory for channel id, fd=%d.", c->fd);
+		goto failed;
+	}
+	stu_strncpy(channel_id.data, r->target.data, r->target.len);
+	channel_id.len = r->target.len;
 
 	cid = (stu_str_t *) idcid->value;
-	if (stu_strncmp(cid->data, channel_id->data, channel_id->len) != 0) {
-		stu_log_error(0, "Failed to analyze ident response: channel (%s != %s) not match.", cid->data, channel_id->data);
+	if (stu_strncmp(cid->data, channel_id.data, channel_id.len) != 0) {
+		stu_log_error(0, "Failed to analyze ident response: channel (%s != %s) not match.", cid->data, channel_id.data);
 		goto failed;
 	}
 
@@ -379,6 +389,7 @@ stu_upstream_ident_analyze_response(stu_connection_t *c) {
 	stu_json_delete(idt);
 	stu_json_delete(res);
 
+	// finalize request
 	if (protocol && stu_strncmp("binary", protocol->value.data, protocol->value.len) == 0) {
 		opcode = STU_WEBSOCKET_OPCODE_BINARY;
 	} else {

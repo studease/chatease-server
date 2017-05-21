@@ -48,4 +48,10 @@ u_char *stu_sprintf(u_char *s, const char *fmt, ...);
 stu_int_t stu_vprintf(const char *fmt, va_list args);
 u_char *stu_vsprintf(u_char *s, const char *fmt, va_list args);
 
+
+#define STU_UNESCAPE_URI       1
+#define STU_UNESCAPE_REDIRECT  2
+
+void stu_unescape_uri(u_char **dst, u_char **src, size_t size, stu_uint_t type);
+
 #endif /* STU_STRING_H_ */

@@ -27,9 +27,9 @@ int main(int argc, char **argv) {
 	stu_config_default(&cf);
 	while ((arg = getopt(argc, argv, ":m:p:w:t:c:")) != -1) {
 		switch (arg) {
-		case 'm':
-			cf.runmode = stu_utils_get_runmode(atoi(optarg));
-			stu_log_debug(0, "Runmode: %s", optarg);
+		case 'e':
+			cf.edition = stu_utils_get_edition((u_char *) optarg, strlen(optarg));
+			stu_log_debug(0, "Edition: %s", optarg);
 			break;
 		case 'p':
 			cf.port = atoi(optarg);

@@ -10,6 +10,7 @@
 
 stu_str_t  STU_PROTOCOL_CMD = stu_string("cmd");
 stu_str_t  STU_PROTOCOL_RAW = stu_string("raw");
+stu_str_t  STU_PROTOCOL_REQ = stu_string("req");
 stu_str_t  STU_PROTOCOL_DATA = stu_string("data");
 stu_str_t  STU_PROTOCOL_TYPE = stu_string("type");
 stu_str_t  STU_PROTOCOL_CHANNEL = stu_string("channel");
@@ -20,7 +21,8 @@ stu_str_t  STU_PROTOCOL_ROLE = stu_string("role");
 stu_str_t  STU_PROTOCOL_STATE = stu_string("state");
 stu_str_t  STU_PROTOCOL_STATUS = stu_string("status");
 stu_str_t  STU_PROTOCOL_TOTAL = stu_string("total");
-stu_str_t  STU_PROTOCOL_USERS = stu_string("users");
+stu_str_t  STU_PROTOCOL_ERROR = stu_string("error");
+stu_str_t  STU_PROTOCOL_CODE = stu_string("code");
 
 stu_str_t  STU_PROTOCOL_CMDS_TEXT = stu_string("text");
 stu_str_t  STU_PROTOCOL_CMDS_MUTE = stu_string("mute");

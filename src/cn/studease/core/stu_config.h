@@ -13,12 +13,14 @@
 #include <math.h>
 #include <arpa/inet.h>
 #include <stdint.h>
+#include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
 
 #define __NAME    "chatease-server"
-#define __VERSION "1.0.14"
+#define __VERSION "1.0.18"
 #define __LOGGER  4 // debug: 0 - 7, log: 8, error: 9
 
 #define STU_LINUX 1

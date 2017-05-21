@@ -15,13 +15,12 @@
 
 typedef struct {
 	stu_bool_t     daemon;
-	stu_runmode_t  runmode;
+
+	stu_edition_t  edition;
+	stu_str_t      keyname;
 
 	uint16_t       port;
 	stu_str_t      hostname;
-
-	stu_str_t      origin_addr;
-	uint16_t       origin_port;
 
 	stu_bool_t     master_process;
 	stu_int_t      worker_processes;

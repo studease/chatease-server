@@ -8,22 +8,16 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
-stu_runmode_t
-stu_utils_get_runmode(stu_int_t mode) {
-	stu_runmode_t  m;
+stu_edition_t
+stu_utils_get_edition(u_char *name, size_t len) {
+	stu_edition_t  edt;
 
-	switch (mode) {
-	case 0x1:
-		m = ORIGIN;
-		break;
-	case 0X2:
-		m = EDGE;
-		break;
-	default:
-		m = STANDALONE;
-		break;
+	if (stu_strncmp("preview", name, len) == 0) {
+		edt = PREVIEW;
+	} else if (stu_strncmp("enterprise", name, len) == 0) {
+		edt = ENTERPRISE;
 	}
 
-	return m;
+	return edt;
 }
 

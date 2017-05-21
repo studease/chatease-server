@@ -1,9 +1,9 @@
 {
 	"status": true,
 	"user": {
-		"id": "2",
-		"name": "Lau",
-		"role": 0
+		"id": "1",
+		"name": "Tony",
+		"role": 1
 	},
 	"channel": {
 		"id": "ch1",
