@@ -18,8 +18,9 @@ static const stu_str_t  STU_UPSTREAM_IDENT_REQUEST = stu_string(
 		"GET /websocket/data/userinfo.json?channel=%s&token=%s HTTP/1.1" CRLF
 		"Host: localhost" CRLF
 		"User-Agent: " __NAME "/" __VERSION CRLF
-		"Accept: text/html" CRLF
-		"Accept-Language: zh-CN,zh;q=0.8" CRLF
+		"Accept: application/json" CRLF
+		"Accept-Charset: utf-8"
+		"Accept-Language: zh-CN,zh;q=0.8,en-US;q=0.5,en;q=0.3" CRLF
 		"Connection: keep-alive" CRLF CRLF
 		/*
 		"POST /live/method=httpChatRoom HTTP/1.1" CRLF
@@ -247,6 +248,7 @@ stu_upstream_ident_analyze_response(stu_connection_t *c) {
 	}
 
 	// parse JSON string
+	stu_utf8_decode(&pc->buffer.last, pr->headers_out.content_length_n);
 	idt = stu_json_parse(pc->buffer.last, pr->headers_out.content_length_n);
 	if (idt == NULL) {
 		stu_log_error(0, "Failed to parse ident response.");

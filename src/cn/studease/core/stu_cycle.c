@@ -27,7 +27,7 @@ stu_config_default(stu_config_t *cf) {
 	cf->edition = ENTERPRISE;
 	stu_str_set(&cf->keyname, "token");
 */
-	cf->port = 80;
+	cf->port = 6688;
 	stu_str_null(&cf->hostname);
 
 	cf->master_process = TRUE;

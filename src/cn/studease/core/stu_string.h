@@ -52,6 +52,7 @@ u_char *stu_vsprintf(u_char *s, const char *fmt, va_list args);
 #define STU_UNESCAPE_URI       1
 #define STU_UNESCAPE_REDIRECT  2
 
+uint32_t stu_utf8_decode(u_char **p, size_t n);
 void stu_unescape_uri(u_char **dst, u_char **src, size_t size, stu_uint_t type);
 
 #endif /* STU_STRING_H_ */
