@@ -34,6 +34,9 @@ stu_config_default(stu_config_t *cf) {
 	cf->worker_processes = 1;
 	cf->worker_threads = 4;
 
+	cf->push_users = TRUE;
+	cf->push_users_interval = STU_CHANNEL_PUSH_USERS_DEFAULT_INTERVAL;
+
 	stu_str_set(&cf->pid, "chatd.pid");
 }
 
@@ -163,6 +166,9 @@ stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool) {
 	dst->master_process = src->master_process;
 	dst->worker_processes = src->worker_processes;
 	dst->worker_threads = src->worker_threads;
+
+	dst->push_users = src->push_users;
+	dst->push_users_interval = src->push_users_interval;
 
 	dst->pid.data = stu_pcalloc(pool, src->pid.len + 1);
 	dst->pid.len = src->pid.len;

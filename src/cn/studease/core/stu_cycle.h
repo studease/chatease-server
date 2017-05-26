@@ -26,6 +26,9 @@ typedef struct {
 	stu_int_t      worker_processes;
 	stu_int_t      worker_threads;
 
+	stu_bool_t     push_users;
+	stu_uint_t     push_users_interval; // seconds
+
 	stu_hash_t     upstreams;        // => stu_list_t => stu_http_upstream_server_t
 
 	stu_str_t      pid;

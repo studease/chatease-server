@@ -176,9 +176,9 @@ stu_http_process_request(stu_http_request_t *r) {
 	stu_int_t         rc;
 	stu_connection_t *c;
 	stu_table_elt_t  *protocol;
-	stu_int_t         n, size, extened;
+	stu_int_t         m, n, size, extened;
 	stu_uint_t        kh, seed;
-	stu_str_t         uname, cid;
+	stu_str_t         cid, name, role;
 	u_char           *d, *s, *data, temp[STU_HTTP_REQUEST_DEFAULT_SIZE], opcode;
 	stu_channel_t    *ch;
 
@@ -207,31 +207,36 @@ stu_http_process_request(stu_http_request_t *r) {
 		cid.len = r->target.len;
 
 		// reset user info
-		if (stu_http_arg(r, stu_cycle->config.keyname.data, stu_cycle->config.keyname.len, &uname) != STU_OK) {
+		if (stu_http_arg(r, stu_cycle->config.keyname.data, stu_cycle->config.keyname.len, &name) != STU_OK) {
 			stu_log_error(0, "User name not specified, fd=%d.", c->fd);
 			goto failed;
 		}
 
-		d = s = uname.data;
-		stu_unescape_uri(&d, &s, uname.len, 0);
-		uname.len = d - uname.data;
+		d = s = name.data;
+		stu_unescape_uri(&d, &s, name.len, 0);
+		name.len = d - name.data;
 
-		seed = stu_hash_key_lc(uname.data, uname.len);
+		seed = stu_hash_key_lc(name.data, name.len);
 		srand((unsigned int) seed);
 
 		c->user.id = rand() % 100000000;
 		stu_sprintf(c->user.strid.data, "%ld", c->user.id);
 		c->user.strid.len = strlen((const char *) c->user.strid.data);
 
-		c->user.name.data = stu_base_pcalloc(c->pool, uname.len + 1);
+		c->user.name.data = stu_base_pcalloc(c->pool, name.len + 1);
 		if (c->user.name.data == NULL) {
 			stu_log_error(0, "Failed to pcalloc memory for user name, fd=%d.", c->fd);
 			goto failed;
 		}
-		stu_strncpy(c->user.name.data, uname.data, uname.len);
-		c->user.name.len = uname.len;
+		stu_strncpy(c->user.name.data, name.data, name.len);
+		c->user.name.len = name.len;
 
 		c->user.role = 0x01;
+
+		if (stu_http_arg(r, (u_char *) "role", 4, &role) == STU_OK) {
+			m = atoi((const char *) role.data);
+			c->user.role = m & 0xFF;
+		}
 
 		// insert user into channel
 		kh = stu_hash_key_lc(cid.data, cid.len);

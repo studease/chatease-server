@@ -146,7 +146,7 @@ stu_channel_broadcast(stu_str_t *id, void *ch) {
 	stu_queue_t      *q;
 	stu_connection_t *c;
 	stu_json_t       *res, *raw, *rschannel, *rscid, *rscstate, *rsctotal;
-	u_char           *data, temp[STU_CHANNEL_USERS_BUF_MAXIMUM];
+	u_char           *data, temp[STU_CHANNEL_PUSH_USERS_DEFAULT_SIZE];
 	uint64_t          size;
 	stu_int_t         extened, n;
 
@@ -172,7 +172,7 @@ stu_channel_broadcast(stu_str_t *id, void *ch) {
 	stu_json_add_item_to_object(res, raw);
 	stu_json_add_item_to_object(res, rschannel);
 
-	stu_memzero(temp, STU_CHANNEL_USERS_BUF_MAXIMUM);
+	stu_memzero(temp, STU_CHANNEL_PUSH_USERS_DEFAULT_SIZE);
 	data = stu_json_stringify(res, (u_char *) temp + 10);
 
 	stu_json_delete(res);

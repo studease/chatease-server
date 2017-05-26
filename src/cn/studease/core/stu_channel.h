@@ -23,8 +23,8 @@
 
 #endif
 
-#define STU_CHANNEL_USERS_BUF_MAXIMUM 2048
-#define STU_TIME_ONLINE_USERS_DELAY   30
+#define STU_CHANNEL_PUSH_USERS_DEFAULT_SIZE     1024
+#define STU_CHANNEL_PUSH_USERS_DEFAULT_INTERVAL 30
 
 typedef struct {
 	stu_base_pool_t *pool; // not used currently.
