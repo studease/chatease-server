@@ -4,22 +4,21 @@
 
 > [[source] https://github.com/studease/chatease-server](https://github.com/studease/chatease-server)
 
-This is a websocket server for chatting.
+This is a websocket chat server.
 
 
 ## Prepare
 ----------
 
-Supply an interface to return a JSON object formatted as /data/userinfo.json.
+For Enterprise Edition, supply an interface to return a JSON object formatted as /data/userinfo.json.
 
 While the client is connecting to upgrade protocol, we send an identify upstream request to get the user info,
 which decides whether the operation will be satisfied.
 
+Preview Edition won't send the identify upstream request.
 
 ## Build
 --------
-
-Note: LUA is no longer used.
 
 ### CMake
 
