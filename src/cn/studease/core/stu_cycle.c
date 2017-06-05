@@ -20,13 +20,8 @@ static void stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *po
 void
 stu_config_default(stu_config_t *cf) {
 	cf->daemon = TRUE;
+	cf->edition = PREVIEW; // ENTERPRISE
 
-	cf->edition = PREVIEW;
-	stu_str_set(&cf->keyname, "name");
-/*
-	cf->edition = ENTERPRISE;
-	stu_str_set(&cf->keyname, "token");
-*/
 	cf->port = 80;
 	stu_str_null(&cf->hostname);
 
@@ -34,7 +29,7 @@ stu_config_default(stu_config_t *cf) {
 	cf->worker_processes = 1;
 	cf->worker_threads = 4;
 
-	cf->push_users = TRUE;
+	cf->push_users = FALSE;
 	cf->push_users_interval = STU_CHANNEL_PUSH_USERS_DEFAULT_INTERVAL;
 
 	stu_str_set(&cf->pid, "chatd.pid");
@@ -151,10 +146,6 @@ stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool) {
 
 	dst->daemon = src->daemon;
 	dst->edition = src->edition;
-
-	dst->keyname.data = stu_pcalloc(pool, src->keyname.len + 1);
-	dst->keyname.len = src->keyname.len;
-	stu_strncpy(dst->keyname.data, src->keyname.data, src->keyname.len);
 
 	dst->port = src->port;
 	if (src->hostname.len > 0) {

@@ -35,7 +35,9 @@ static const stu_str_t  STU_HTTP_FLASH_POLICY_FILE = stu_string("<?xml version=\
 
 
 extern stu_cycle_t *stu_cycle;
-extern const stu_str_t  STU_UPSTREAM_IDENT_RESPONSE;
+extern stu_int_t  stu_preview_auto_id;
+extern const stu_str_t  STU_PREVIEW_UPSTREAM_IDENT_RESPONSE;
+extern stu_str_t  STU_UPSTREAM_NAMES_IDENT;
 
 stu_hash_t  stu_http_headers_in_hash;
 
@@ -177,8 +179,8 @@ stu_http_process_request(stu_http_request_t *r) {
 	stu_connection_t *c;
 	stu_table_elt_t  *protocol;
 	stu_int_t         m, n, size, extened;
-	stu_uint_t        kh, seed;
-	stu_str_t         cid, name, role;
+	stu_uint_t        kh;
+	stu_str_t         cid, name, role, state;
 	u_char           *d, *s, *data, temp[STU_HTTP_REQUEST_DEFAULT_SIZE], opcode;
 	stu_channel_t    *ch;
 
@@ -207,7 +209,11 @@ stu_http_process_request(stu_http_request_t *r) {
 		cid.len = r->target.len;
 
 		// reset user info
-		if (stu_http_arg(r, stu_cycle->config.keyname.data, stu_cycle->config.keyname.len, &name) != STU_OK) {
+		c->user.id = stu_preview_auto_id++;
+		stu_sprintf(c->user.strid.data, "%ld", c->user.id);
+		c->user.strid.len = strlen((const char *) c->user.strid.data);
+
+		if (stu_http_arg(r, STU_PROTOCOL_NAME.data, STU_PROTOCOL_NAME.len, &name) != STU_OK) {
 			stu_log_error(0, "User name not specified, fd=%d.", c->fd);
 			goto failed;
 		}
@@ -215,13 +221,6 @@ stu_http_process_request(stu_http_request_t *r) {
 		d = s = name.data;
 		stu_unescape_uri(&d, &s, name.len, 0);
 		name.len = d - name.data;
-
-		seed = stu_hash_key_lc(name.data, name.len);
-		srand((unsigned int) seed);
-
-		c->user.id = rand() % 100000000;
-		stu_sprintf(c->user.strid.data, "%ld", c->user.id);
-		c->user.strid.len = strlen((const char *) c->user.strid.data);
 
 		c->user.name.data = stu_base_pcalloc(c->pool, name.len + 1);
 		if (c->user.name.data == NULL) {
@@ -232,8 +231,7 @@ stu_http_process_request(stu_http_request_t *r) {
 		c->user.name.len = name.len;
 
 		c->user.role = 0x01;
-
-		if (stu_http_arg(r, (u_char *) "role", 4, &role) == STU_OK) {
+		if (stu_http_arg(r, STU_PROTOCOL_ROLE.data, STU_PROTOCOL_ROLE.len, &role) == STU_OK) {
 			m = atoi((const char *) role.data);
 			c->user.role = m & 0xFF;
 		}
@@ -280,6 +278,13 @@ stu_http_process_request(stu_http_request_t *r) {
 
 		stu_spin_unlock(&stu_cycle->channels.lock);
 
+		if (stu_http_arg(r, STU_PROTOCOL_STATE.data, STU_PROTOCOL_STATE.len, &state) == STU_OK) {
+			if (c->user.role | 0xF0) {
+				m = atoi((const char *) state.data);
+				ch->state = m & 0xFF;
+			}
+		}
+
 		if (stu_channel_insert(ch, c) == STU_ERROR) {
 			stu_log_error(0, "Failed to insert connection.");
 			goto failed;
@@ -298,7 +303,11 @@ stu_http_process_request(stu_http_request_t *r) {
 		stu_http_finalize_request(r, STU_HTTP_SWITCHING_PROTOCOLS);
 
 		stu_memzero(temp, STU_HTTP_REQUEST_DEFAULT_SIZE);
-		data = stu_sprintf((u_char *) temp + 10, (const char *) STU_UPSTREAM_IDENT_RESPONSE.data, c->user.id, c->user.name.data, ch->id.data);
+		data = stu_sprintf(
+				(u_char *) temp + 10, (const char *) STU_PREVIEW_UPSTREAM_IDENT_RESPONSE.data,
+				c->user.id, c->user.name.data, c->user.role,
+				ch->id.data, ch->state, ch->userlist.length
+			);
 
 		size = data - temp - 10;
 		data = stu_websocket_encode_frame(opcode, temp, size, &extened);
@@ -314,7 +323,7 @@ stu_http_process_request(stu_http_request_t *r) {
 		return;
 	}
 
-	if (stu_upstream_create(c, (u_char *) "ident", 5) == STU_ERROR) {
+	if (stu_upstream_create(c, STU_UPSTREAM_NAMES_IDENT.data, STU_UPSTREAM_NAMES_IDENT.len) == STU_ERROR) {
 		stu_log_error(0, "Failed to create upstream.");
 		goto failed;
 	}
@@ -403,26 +412,22 @@ stu_http_process_request_headers(stu_http_request_t *r) {
 			}
 
 			//stu_log_debug(4, "http header => \"%s: %s\"", h->key.data, h->value.data);
-
 			continue;
 		}
 
 		if (rc == STU_DONE) {
-			stu_log_debug(4, "the whole header has been parsed successfully.");
+			stu_log_debug(4, "The whole header has been parsed successfully.");
 			return STU_OK;
 		}
 
 		if (rc == STU_AGAIN) {
-			stu_log_debug(4, "a header line parsing is still not complete.");
+			stu_log_debug(4, "A header line parsing is still not complete.");
 			continue;
 		}
 
-		stu_log_error(0, "client sent invalid header line: \"%s\"", r->header_name_start);
-
-		return STU_ERROR;
+		stu_log_error(0, "Unexpected error while processing request headers.");
+		break;
 	}
-
-	stu_log_error(0, "Unexpected error while processing request headers.");
 
 	return STU_ERROR;
 }

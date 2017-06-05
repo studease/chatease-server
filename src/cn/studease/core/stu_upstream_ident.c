@@ -8,11 +8,13 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
-stu_list_t *stu_ident_upstream;
+stu_str_t  STU_UPSTREAM_NAMES_IDENT = stu_string("ident");
+stu_list_t *stu_upstream_ident_servers;
 
 extern stu_cycle_t *stu_cycle;
 extern stu_hash_t   stu_http_upstream_headers_in_hash;
 
+static const stu_str_t  STU_UPSTREAM_IDENT_PARAMS_TOKEN = stu_string("token");
 static const stu_str_t  STU_UPSTREAM_IDENT_REQUEST = stu_string(
 
 		"GET /websocket/data/userinfo.json?channel=%s&token=%s HTTP/1.1" CRLF
@@ -35,8 +37,9 @@ static const stu_str_t  STU_UPSTREAM_IDENT_REQUEST = stu_string(
 		 */
 	);
 
-const stu_str_t  STU_UPSTREAM_IDENT_RESPONSE = stu_string(
-		"{\"raw\":\"ident\",\"user\":{\"id\":\"%ld\",\"name\":\"%s\",\"role\":1},\"channel\":{\"id\":\"%s\",\"state\":0}}"
+stu_int_t  stu_preview_auto_id = 1;
+const stu_str_t  STU_PREVIEW_UPSTREAM_IDENT_RESPONSE = stu_string(
+		"{\"raw\":\"ident\",\"user\":{\"id\":\"%ld\",\"name\":\"%s\",\"role\":%d},\"channel\":{\"id\":\"%s\",\"state\":%d,\"total\":%lu}}"
 	);
 
 static stu_int_t stu_upstream_ident_process_response_headers(stu_http_request_t *r);
@@ -471,8 +474,8 @@ stu_upstream_ident_write_handler(stu_event_t *ev) {
 	stu_strncpy(channel_id, r->target.data, r->target.len);
 
 	stu_str_null(&token);
-	if (stu_http_arg(r, (u_char *) "token", 5, &token) != STU_OK) {
-		stu_log_debug(4, "\"token\" not found while sending upstream %s: fd=%d.", u->server->name.data, pc->fd);
+	if (stu_http_arg(r, STU_UPSTREAM_IDENT_PARAMS_TOKEN.data, STU_UPSTREAM_IDENT_PARAMS_TOKEN.len, &token) != STU_OK) {
+		stu_log_debug(4, "\"%s\" not found while sending upstream %s: fd=%d.", STU_UPSTREAM_IDENT_PARAMS_TOKEN.data, u->server->name.data, pc->fd);
 		*tokenstr = '\0';
 	}
 	stu_strncpy(tokenstr, token.data, token.len);

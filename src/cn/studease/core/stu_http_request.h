@@ -33,6 +33,7 @@
 #define STU_HTTP_METHOD_NOT_ALLOWED        405
 #define STU_HTTP_REQUEST_TIMEOUT           408
 #define STU_HTTP_CONFLICT                  409
+#define STU_HTTP_EXPECTATION_FAILED        417
 
 #define STU_HTTP_INTERNAL_SERVER_ERROR     500
 #define STU_HTTP_NOT_IMPLEMENTED           501

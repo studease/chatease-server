@@ -15,9 +15,7 @@
 
 typedef struct {
 	stu_bool_t     daemon;
-
 	stu_edition_t  edition;
-	stu_str_t      keyname;
 
 	uint16_t       port;
 	stu_str_t      hostname;

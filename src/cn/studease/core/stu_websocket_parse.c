@@ -48,11 +48,19 @@ stu_websocket_parse_frame(stu_websocket_request_t *r, stu_buf_t *b) {
 			}
 			break;
 		case sw_extended_2:
+			if (b->end - p < 2) {
+				goto again;
+			}
+
 			r->frame->extended =  *p++ << 8;
 			r->frame->extended |= *p;
 			state = r->frame->mask ? sw_masking_key : sw_payload_data;
 			break;
 		case sw_extended_8:
+			if (b->end - p < 8) {
+				goto again;
+			}
+
 			r->frame->extended =  (i = *p++) << 56;
 			r->frame->extended |= (i = *p++) << 48;
 			r->frame->extended |= (i = *p++) << 40;
@@ -64,11 +72,19 @@ stu_websocket_parse_frame(stu_websocket_request_t *r, stu_buf_t *b) {
 			state = r->frame->mask ? sw_masking_key : sw_payload_data;
 			break;
 		case sw_masking_key:
+			if (b->end - p < 4) {
+				goto again;
+			}
+
 			memcpy(r->frames_in.masking_key, p, 4);
 			p += 3;
 			state = sw_payload_data;
 			break;
 		case sw_payload_data:
+			if (b->end - p < r->frame->extended) {
+				goto again;
+			}
+
 			switch (r->frame->opcode) {
 			case STU_WEBSOCKET_OPCODE_TEXT:
 			case STU_WEBSOCKET_OPCODE_BINARY:
@@ -93,16 +109,14 @@ stu_websocket_parse_frame(stu_websocket_request_t *r, stu_buf_t *b) {
 			}
 
 			buf->start = buf->last = p;
-			if (b->end - p >= r->frame->extended) {
-				buf->end = p + r->frame->extended;
-				p = buf->end;
-				if (r->frame->fin) {
-					goto frame_done;
-				}
-				goto done;
+			buf->end = p + r->frame->extended;
+
+			p = buf->end;
+			if (r->frame->fin) {
+				goto frame_done;
 			}
-			goto again;
-			break;
+
+			goto done;
 		}
 	}
 
@@ -127,5 +141,4 @@ frame_done:
 
 	return STU_DONE;
 }
-
 

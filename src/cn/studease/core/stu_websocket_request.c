@@ -8,7 +8,6 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
-static stu_int_t stu_websocket_process_request_frames(stu_websocket_request_t *r);
 static void stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t size);
 
 
@@ -27,14 +26,13 @@ stu_websocket_wait_request_handler(stu_event_t *rev) {
 
 	if (c->buffer.start == NULL) {
 		c->buffer.start = (u_char *) stu_base_palloc(c->pool, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
-		c->buffer.end = c->buffer.start + STU_WEBSOCKET_REQUEST_DEFAULT_SIZE;
+		c->buffer.last = c->buffer.end = c->buffer.start;
+		stu_memzero(c->buffer.start, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
 	}
-	c->buffer.last = c->buffer.start;
-	stu_memzero(c->buffer.start, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
 
 again:
 
-	n = recv(c->fd, c->buffer.start, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE, 0);
+	n = recv(c->fd, c->buffer.end, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE, 0);
 	if (n == -1) {
 		err = stu_errno;
 		if (err == EAGAIN) {
@@ -56,6 +54,7 @@ again:
 		goto failed;
 	}
 
+	c->buffer.end += n;
 	stu_log_debug(4, "recv: fd=%d, bytes=%d.", c->fd, n);
 
 	c->data = (void *) stu_websocket_create_request(c);
@@ -98,13 +97,12 @@ stu_websocket_create_request(stu_connection_t *c) {
 
 void
 stu_websocket_process_request(stu_websocket_request_t *r) {
-	stu_websocket_frame_t *f;
+	stu_websocket_frame_t *f, *new;
 	stu_connection_t      *c;
 	stu_int_t              rc;
 	stu_buf_t              buf;
 	u_char                 temp[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE];
 	uint64_t               len, size;
-	stu_bool_t             close;
 
 	c = r->connection;
 	if (c->user.channel == NULL) {
@@ -113,63 +111,59 @@ stu_websocket_process_request(stu_websocket_request_t *r) {
 		return;
 	}
 
-	rc = stu_websocket_process_request_frames(r);
-	if (rc != STU_DONE) {
-		stu_log_error(0, "Failed to process request frames.");
-		stu_websocket_finalize_request(r, STU_HTTP_BAD_REQUEST, -1);
-		return;
-	}
-
-	// concat keyframe string
-	stu_memzero(temp, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
-
-	buf.start = buf.last = temp;
-	buf.end = buf.start + STU_WEBSOCKET_REQUEST_DEFAULT_SIZE;
-
-	close = FALSE;
-	for (f = &r->frames_in; f; f = f->next) {
-		if (f->opcode != STU_WEBSOCKET_OPCODE_TEXT && f->opcode != STU_WEBSOCKET_OPCODE_BINARY) {
-			if (f->opcode == STU_WEBSOCKET_OPCODE_CLOSE) {
-				close = TRUE;
-			}
-			continue;
-		}
-
-		len = f->payload_data.end - f->payload_data.start;
-		if (len == 0) {
-			continue;
-		}
-
-		buf.last = stu_memcpy(buf.last, f->payload_data.start, len);
-
-		f->payload_data.end = f->payload_data.start;
-	}
-
-	size = buf.last - buf.start;
-	if (size > 0) {
-		stu_websocket_analyze_request(r, (u_char *) temp, size);
-	} else {
-		stu_log_debug(4, "Failed to concat keyframe string: size=%lu.", size);
-	}
-
-	if (close == TRUE) {
-		stu_websocket_close_connection(c);
-	}
-}
-
-static stu_int_t
-stu_websocket_process_request_frames(stu_websocket_request_t *r) {
-	stu_int_t              rc;
-	stu_websocket_frame_t *new;
-
-	do {
+	for ( ;; ) {
 		rc = stu_websocket_parse_frame(r, r->frame_in);
+
+		if (rc == STU_DONE) {
+			// Concat keyframe data
+			stu_memzero(temp, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
+
+			buf.start = buf.last = temp;
+			buf.end = buf.start + STU_WEBSOCKET_REQUEST_DEFAULT_SIZE;
+
+			for (f = &r->frames_in; f; f = f->next) {
+				if (f->opcode != STU_WEBSOCKET_OPCODE_TEXT && f->opcode != STU_WEBSOCKET_OPCODE_BINARY) {
+					if (f->opcode == STU_WEBSOCKET_OPCODE_CLOSE) {
+						stu_websocket_close_connection(c);
+						return;
+					}
+
+					continue;
+				}
+
+				len = f->payload_data.end - f->payload_data.start;
+				if (len == 0) {
+					continue;
+				}
+
+				buf.last = stu_memcpy(buf.last, f->payload_data.start, len);
+
+				f->payload_data.end = f->payload_data.start;
+			}
+
+			size = buf.last - buf.start;
+			if (size > 0) {
+				stu_websocket_analyze_request(r, (u_char *) temp, size);
+			} else {
+				stu_log_debug(4, "Failed to concat keyframe string: size=%lu.", size);
+			}
+
+			if (r->frame_in->last == r->frame_in->end) {
+				r->frame_in->last = r->frame_in->end = r->frame_in->start;
+				stu_memzero(r->frame_in->start, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
+				break;
+			}
+
+			continue;
+		}
+
 		if (rc == STU_OK) {
 			if (r->frame->next == NULL) {
 				new = stu_base_pcalloc(r->connection->pool, sizeof(stu_websocket_frame_t));
 				if (new == NULL) {
 					stu_log_error(0, "Failed to alloc new websocket frame.");
-					return STU_ERROR;
+					stu_websocket_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR, -1);
+					return;
 				}
 
 				r->frame->next = new;
@@ -178,15 +172,24 @@ stu_websocket_process_request_frames(stu_websocket_request_t *r) {
 			}
 
 			r->frame = new;
-		}
-	} while (rc == STU_OK);
 
-	return rc;
+			continue;
+		}
+
+		if (rc == STU_AGAIN) {
+			stu_log_debug(4, "A request frame parsing is still not complete.");
+			break;
+		}
+
+		stu_log_error(0, "Unexpected error while processing request frames.");
+		break;
+	}
 }
 
 static void
 stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t size) {
 	stu_connection_t      *c;
+	stu_channel_t         *ch;
 	stu_json_t            *req, *cmd, *rqreq, *rqdata, *rqtype, *rqchannel;
 	stu_json_t            *res, *raw, *rsreq, *rsdata, *rstype, *rschannel, *rsuser, *rsuid, *rsuname, *rsurole;
 	stu_str_t             *str;
@@ -194,6 +197,7 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 	u_char                *data, temp[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE];
 
 	c = r->connection;
+	ch = c->user.channel;
 
 	req = stu_json_parse((u_char *) text, size);
 	if (req == NULL || req->type != STU_JSON_TYPE_OBJECT) {
@@ -214,6 +218,13 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 
 	str = (stu_str_t *) cmd->value;
 	if (stu_strncmp(str->data, STU_PROTOCOL_CMDS_TEXT.data, STU_PROTOCOL_CMDS_TEXT.len) == 0) {
+		if (c->user.role < ch->state) {
+			stu_log_error(0, "Text request refused!");
+			stu_json_delete(req);
+			stu_websocket_finalize_request(r, STU_HTTP_EXPECTATION_FAILED, rqreq ? *(stu_double_t *) rqreq->value : -1);
+			return;
+		}
+
 		rqdata = stu_json_get_object_item_by(req, &STU_PROTOCOL_DATA);
 		rqtype = stu_json_get_object_item_by(req, &STU_PROTOCOL_TYPE);
 		rqchannel = stu_json_get_object_item_by(req, &STU_PROTOCOL_CHANNEL);
