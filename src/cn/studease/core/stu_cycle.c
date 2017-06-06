@@ -29,7 +29,7 @@ stu_config_default(stu_config_t *cf) {
 	cf->worker_processes = 1;
 	cf->worker_threads = 4;
 
-	cf->push_users = FALSE;
+	cf->push_users = TRUE;
 	cf->push_users_interval = STU_CHANNEL_PUSH_USERS_DEFAULT_INTERVAL;
 
 	stu_str_set(&cf->pid, "chatd.pid");
