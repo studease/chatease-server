@@ -20,7 +20,7 @@
 #include <unistd.h>
 
 #define __NAME    "chatease-server"
-#define __VERSION "1.0.18"
+#define __VERSION "1.0.24"
 #define __LOGGER  4 // debug: 0 - 7, log: 8, error: 9
 
 #define STU_LINUX 1
