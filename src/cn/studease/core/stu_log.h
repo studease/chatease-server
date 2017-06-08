@@ -14,11 +14,14 @@
 
 #define STU_LOG_RECORD_MAX_LEN  1024
 
-static const stu_str_t STU_LOG_PREFIX = stu_string("[LOG] ");
+static const stu_str_t STU_LOG_PREFIX = stu_string("[L O G] ");
 static const stu_str_t STU_DEBUG_PREFIX = stu_string("[DEBUG] ");
 static const stu_str_t STU_ERROR_PREFIX = stu_string("[ERROR] ");
 
-void stu_log(const char *fmt, ...);
+
+stu_int_t  stu_log_init(stu_file_t *file);
+
+void stu_log_info(const char *fmt, ...);
 void stu_log_debug(stu_int_t level, const char *fmt, ...);
 void stu_log_error(stu_int_t err, const char *fmt, ...);
 

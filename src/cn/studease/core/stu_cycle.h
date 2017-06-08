@@ -29,7 +29,8 @@ typedef struct {
 
 	stu_hash_t     upstreams;        // => stu_list_t => stu_http_upstream_server_t
 
-	stu_str_t      pid;
+	stu_file_t     pid;
+	stu_file_t     log;
 } stu_config_t;
 
 struct stu_cycle_s {
@@ -49,8 +50,8 @@ void stu_config_default(stu_config_t *cf);
 
 stu_cycle_t *stu_cycle_create(stu_config_t *cf);
 
-stu_int_t stu_pidfile_create(stu_str_t *name);
-void stu_pidfile_delete(stu_str_t *name);
+stu_int_t stu_pidfile_create(stu_file_t *pid);
+void stu_pidfile_delete(stu_file_t *pid);
 
 stu_thread_key_t  stu_thread_key;
 

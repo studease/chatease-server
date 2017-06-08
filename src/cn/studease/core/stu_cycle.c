@@ -19,6 +19,11 @@ static void stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *po
 
 void
 stu_config_default(stu_config_t *cf) {
+	struct timeval  tv;
+	stu_tm_t        tm;
+
+	stu_ncpu = sysconf(_SC_NPROCESSORS_ONLN);
+
 	cf->daemon = TRUE;
 	cf->edition = PREVIEW; // ENTERPRISE
 
@@ -32,7 +37,25 @@ stu_config_default(stu_config_t *cf) {
 	cf->push_users = TRUE;
 	cf->push_users_interval = STU_CHANNEL_PUSH_USERS_DEFAULT_INTERVAL;
 
-	stu_str_set(&cf->pid, "chatd.pid");
+	stu_memzero(&cf->pid, sizeof(stu_file_t));
+	stu_str_set(&cf->pid.name, "chatd.pid");
+
+	// log file name
+	stu_memzero(&cf->log, sizeof(stu_file_t));
+
+	stu_gettimeofday(&tv);
+	stu_localtime(tv.tv_sec, &tm);
+
+	cf->log.name.data = stu_calloc(STU_FILE_PATH_MAX_LEN);
+	if (cf->log.name.data == NULL) {
+		return;
+	}
+
+	stu_sprintf(cf->log.name.data, "logs/%4d-%02d-%02d %02d:%02d:%02d.log",
+			tm.stu_tm_year, tm.stu_tm_mon, tm.stu_tm_mday,
+			tm.stu_tm_hour, tm.stu_tm_min, tm.stu_tm_sec
+		);
+	cf->log.name.len = stu_strlen(cf->log.name.data);
 }
 
 stu_cycle_t *
@@ -43,10 +66,6 @@ stu_cycle_create(stu_config_t *cf) {
 	stu_ram_pool_t        *ram_pool;
 	stu_cycle_t           *cycle;
 	stu_shm_t             *shm;
-
-	stu_strerror_init();
-
-	stu_ncpu = sysconf(_SC_NPROCESSORS_ONLN);
 
 	pool = stu_pool_create(STU_CYCLE_POOL_SIZE);
 	if (pool == NULL) {
@@ -128,17 +147,6 @@ stu_cycle_create(stu_config_t *cf) {
 	return cycle;
 }
 
-stu_int_t
-stu_pidfile_create(stu_str_t *name) {
-	return STU_OK;
-}
-
-void
-stu_pidfile_delete(stu_str_t *name) {
-
-}
-
-
 static void
 stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool) {
 	stu_list_t            *upstream;
@@ -161,9 +169,9 @@ stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool) {
 	dst->push_users = src->push_users;
 	dst->push_users_interval = src->push_users_interval;
 
-	dst->pid.data = stu_pcalloc(pool, src->pid.len + 1);
-	dst->pid.len = src->pid.len;
-	memcpy(dst->pid.data, src->pid.data, src->pid.len);
+	dst->pid.name.data = stu_pcalloc(pool, src->pid.name.len + 1);
+	dst->pid.name.len = src->pid.name.len;
+	memcpy(dst->pid.name.data, src->pid.name.data, src->pid.name.len);
 
 	// init upstream
 	upstream = stu_pcalloc(pool, sizeof(stu_list_t));
@@ -212,5 +220,34 @@ stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool) {
 	}
 
 	stu_upstreams = &dst->upstreams;
+}
+
+
+stu_int_t
+stu_pidfile_create(stu_file_t *pid) {
+	u_char  temp[STU_FILE_PATH_MAX_LEN];
+
+	pid->fd = stu_open_file(pid->name.data, STU_FILE_RDWR, STU_FILE_TRUNCATE, STU_FILE_DEFAULT_ACCESS);
+	if (pid->fd == STU_FILE_INVALID) {
+		stu_log_error(stu_errno, "Failed to " stu_open_file_n " pid file.");
+		return STU_ERROR;
+	}
+
+	stu_memzero(temp, STU_FILE_PATH_MAX_LEN);
+	stu_sprintf(temp, "%d", stu_getpid());
+
+	if (stu_write_file(pid, temp, stu_strlen(temp), pid->offset) == STU_ERROR) {
+		stu_log_error(stu_errno, "Failed to " stu_write_fd_n " pid file.");
+		return STU_ERROR;
+	}
+
+	return STU_OK;
+}
+
+void
+stu_pidfile_delete(stu_file_t *pid) {
+	if (stu_delete_file(pid->name.data) == -1) {
+		stu_log_error(stu_errno, "Failed to " stu_delete_file_n " pid file.");
+	}
 }
 

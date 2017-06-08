@@ -70,13 +70,13 @@ stu_http_add_listen(stu_config_t *cf) {
 	sa.sin_addr.s_addr = htons(INADDR_ANY);
 	sa.sin_port = htons(cf->port);
 
-	stu_log("Binding sockaddr...");
+	stu_log_info("Binding sockaddr...");
 	if (bind(stu_httpfd, (struct sockaddr*)&sa, sizeof(sa))) {
 		stu_log_error(stu_errno, "Failed to bind http server fd.");
 		return STU_ERROR;
 	}
 
-	stu_log("Listening on port %d.", cf->port);
+	stu_log_info("Listening on port %d.", cf->port);
 	if (listen(stu_httpfd, cf->port)) {
 		stu_log_error(stu_errno, "Failed to listen http server port %d.\n", cf->port);
 		return STU_ERROR;

@@ -14,6 +14,7 @@
 #include <stdlib.h>
 
 extern stu_cycle_t *stu_cycle;
+extern stu_str_t    STU_CONF_FILE_DEFAULT_PATH;
 
 
 int main(int argc, char **argv) {
@@ -21,10 +22,8 @@ int main(int argc, char **argv) {
 	char          val;
 	stu_config_t  cf;
 
-	stu_log("GCC %s", __VERSION__);
-	stu_log(__NAME "/" __VERSION);
-
 	stu_config_default(&cf);
+
 	while ((arg = getopt(argc, argv, ":m:p:w:t:c:")) != -1) {
 		switch (arg) {
 		case 'e':
@@ -53,14 +52,32 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	stu_cycle = stu_cycle_create(&cf);
-	if (stu_cycle == NULL) {
-		stu_log_error(0, "Failed to init cycle.");
+	if (stu_strerror_init() == STU_ERROR) {
+		stu_log_error(0, "Failed to init error strings.");
 		return EXIT_FAILURE;
 	}
 
-	if (stu_pidfile_create(&stu_cycle->config.pid) == STU_ERROR) {
-		stu_log_error(0, "Failed to create pid file.");
+	if (stu_conf_file_parse(STU_CONF_FILE_DEFAULT_PATH.data) == STU_ERROR) {
+		stu_log_error(0, "Failed to parse configure file.");
+		return EXIT_FAILURE;
+	}
+
+	if (stu_log_init(&cf.log) == STU_ERROR) {
+		stu_log_error(0, "Failed to init log file.");
+		return EXIT_FAILURE;
+	}
+
+	stu_log_info("GCC %s", __VERSION__);
+	stu_log_info(__NAME "/" __VERSION);
+
+	if (stu_pidfile_create(&cf.pid) == STU_ERROR) {
+		stu_log_error(0, "Failed to create pid file: %s.", cf.pid.name.data);
+		return EXIT_FAILURE;
+	}
+
+	stu_cycle = stu_cycle_create(&cf);
+	if (stu_cycle == NULL) {
+		stu_log_error(0, "Failed to init cycle.");
 		return EXIT_FAILURE;
 	}
 

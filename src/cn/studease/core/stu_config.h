@@ -21,11 +21,12 @@
 
 #define __NAME    "chatease-server"
 #define __VERSION "1.0.24"
-#define __LOGGER  4 // debug: 0 - 7, log: 8, error: 9
+#define __LOGGER  4
 
 #define STU_LINUX 1
 #define STU_WIN32 !STU_LINUX
 
+#define STU_HAVE_PREAD           1
 #define STU_HAVE_LOCALTIME_R     1
 #define STU_HAVE_OPENSSL_EVP_H   1
 #define STU_HAVE_OPENSSL_SHA1_H  1

@@ -39,9 +39,13 @@ typedef struct tm             stu_tm_t;
 #define stu_timezone(isdst) (- (isdst ? timezone + 3600 : timezone) / 60)
 
 void stu_timezone_update(void);
+
 void stu_localtime(time_t s, stu_tm_t *tm);
 void stu_libc_localtime(time_t s, struct tm *tm);
+
+void stu_gmtime(time_t t, stu_tm_t *tp);
 void stu_libc_gmtime(time_t s, struct tm *tm);
+
 
 #define stu_gettimeofday(tp)  (void) gettimeofday(tp, NULL);
 #define stu_msleep(ms)        (void) usleep(ms * 1000)

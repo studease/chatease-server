@@ -7,6 +7,7 @@ C_SRCS += \
 ../src/cn/studease/core/stu_alloc.c \
 ../src/cn/studease/core/stu_base64.c \
 ../src/cn/studease/core/stu_channel.c \
+../src/cn/studease/core/stu_conf_file.c \
 ../src/cn/studease/core/stu_connection.c \
 ../src/cn/studease/core/stu_cycle.c \
 ../src/cn/studease/core/stu_errno.c \
@@ -43,6 +44,7 @@ OBJS += \
 ./src/cn/studease/core/stu_alloc.o \
 ./src/cn/studease/core/stu_base64.o \
 ./src/cn/studease/core/stu_channel.o \
+./src/cn/studease/core/stu_conf_file.o \
 ./src/cn/studease/core/stu_connection.o \
 ./src/cn/studease/core/stu_cycle.o \
 ./src/cn/studease/core/stu_errno.o \
@@ -79,6 +81,7 @@ C_DEPS += \
 ./src/cn/studease/core/stu_alloc.d \
 ./src/cn/studease/core/stu_base64.d \
 ./src/cn/studease/core/stu_channel.d \
+./src/cn/studease/core/stu_conf_file.d \
 ./src/cn/studease/core/stu_connection.d \
 ./src/cn/studease/core/stu_cycle.d \
 ./src/cn/studease/core/stu_errno.d \
