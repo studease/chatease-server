@@ -9,7 +9,7 @@
 #include "stu_core.h"
 
 ssize_t
-stu_read_file(stu_file_t *file, u_char *buf, size_t size, off_t offset) {
+stu_file_read(stu_file_t *file, u_char *buf, size_t size, off_t offset) {
 	ssize_t  n;
 
 	n = pread(file->fd, buf, size, offset);
@@ -18,13 +18,13 @@ stu_read_file(stu_file_t *file, u_char *buf, size_t size, off_t offset) {
 		return STU_ERROR;
 	}
 
-	file->offset += n;
+	stu_atomic_fetch_add(&file->offset, n); // file->offset += n;
 
 	return n;
 }
 
 ssize_t
-stu_write_file(stu_file_t *file, u_char *buf, size_t size, off_t offset) {
+stu_file_write(stu_file_t *file, u_char *buf, size_t size, off_t offset) {
 	ssize_t  n, written;
 
 	written = 0;
@@ -36,7 +36,7 @@ stu_write_file(stu_file_t *file, u_char *buf, size_t size, off_t offset) {
 			return STU_ERROR;
 		}
 
-		file->offset += n;
+		stu_atomic_fetch_add(&file->offset, n); // file->offset += n;
 		written += n;
 
 		if ((size_t) n == size) {
@@ -52,7 +52,7 @@ stu_write_file(stu_file_t *file, u_char *buf, size_t size, off_t offset) {
 
 
 stu_int_t
-stu_set_file_time(u_char *name, stu_fd_t fd, time_t s) {
+stu_file_set_time(u_char *name, stu_fd_t fd, time_t s) {
 	struct timeval  tv[2];
 
 	tv[0].tv_sec = s;
@@ -69,7 +69,7 @@ stu_set_file_time(u_char *name, stu_fd_t fd, time_t s) {
 
 
 stu_int_t
-stu_open_dir(u_char *name, stu_dir_t *dir) {
+stu_dir_open(u_char *name, stu_dir_t *dir) {
 	dir->dir = opendir((const char *) name);
 
 	if (dir->dir == NULL) {
@@ -82,7 +82,7 @@ stu_open_dir(u_char *name, stu_dir_t *dir) {
 }
 
 stu_int_t
-stu_read_dir(stu_dir_t *dir) {
+stu_dir_read(stu_dir_t *dir) {
 	dir->de = readdir(dir->dir);
 
 	if (dir->de) {

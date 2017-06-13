@@ -26,22 +26,26 @@
 
 typedef void (*stu_upstream_handler_pt)(stu_event_t *c);
 
+typedef struct stu_upstream_server_s stu_upstream_server_t;
+
+struct stu_upstream_server_s {
+	stu_str_t                name;
+	stu_addr_t               addr;
+	in_port_t                port;
+
+	stu_uint_t               weight;
+	stu_uint_t               max_fails;
+	time_t                   timeout;
+
+	stu_uint_t               fails;
+	uint8_t                  state;
+
+	stu_upstream_server_t   *next;
+};
+
 typedef struct {
-	stu_str_t   name;
-	stu_addr_t  addr;
-	in_port_t   port;
-
-	stu_uint_t  weight;
-	stu_uint_t  max_fails;
-	time_t      fail_timeout;
-
-	stu_uint_t  fails;
-	uint8_t     state;
-} stu_upstream_server_t;
-
-typedef struct {
-	stu_connection_t *connection;
-	uint8_t           state;
+	stu_connection_t        *connection;
+	uint8_t                  state;
 } stu_peer_connection_t;
 
 struct stu_upstream_s {

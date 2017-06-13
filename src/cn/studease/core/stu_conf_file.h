@@ -18,6 +18,6 @@ typedef struct {
 	stu_buf_t  *buffer;
 } stu_conf_file_t;
 
-stu_int_t stu_conf_file_parse(u_char *name);
+stu_int_t stu_conf_file_parse(stu_config_t *cf, u_char *name, stu_pool_t *pool);
 
 #endif /* STU_CONF_FILE_H_ */

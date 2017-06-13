@@ -72,8 +72,8 @@ stu_upstream_create(stu_connection_t *c, u_char *name, size_t len) {
 		q = stu_queue_head(&upstream->elts.queue);
 		e = stu_queue_data(q, stu_list_elt_t, queue);
 
-		upstream->elts.obj = e;
-		upstream->elts.size = 0;
+		upstream->elts.obj = e;  // current server
+		upstream->elts.size = 0; // current count
 	}
 
 	s = (stu_upstream_server_t *) e->obj;

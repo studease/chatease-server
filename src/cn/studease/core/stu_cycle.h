@@ -14,23 +14,21 @@
 #define STU_CYCLE_POOL_SIZE  STU_POOL_DEFAULT_SIZE
 
 typedef struct {
-	stu_bool_t     daemon;
+	stu_file_t     log;
+	stu_file_t     pid;
+
 	stu_edition_t  edition;
-
-	uint16_t       port;
-	stu_str_t      hostname;
-
 	stu_bool_t     master_process;
 	stu_int_t      worker_processes;
 	stu_int_t      worker_threads;
 
+	uint16_t       port;
+	stu_str_t      hostname;
+
 	stu_bool_t     push_users;
 	stu_uint_t     push_users_interval; // seconds
 
-	stu_hash_t     upstreams;        // => stu_list_t => stu_http_upstream_server_t
-
-	stu_file_t     pid;
-	stu_file_t     log;
+	stu_hash_t     upstreams;           // => stu_list_t => stu_http_upstream_server_t
 } stu_config_t;
 
 struct stu_cycle_s {

@@ -35,16 +35,12 @@ stu_channel_insert(stu_channel_t *ch, stu_connection_t *c) {
 
 stu_int_t
 stu_channel_insert_locked(stu_channel_t *ch, stu_connection_t *c) {
-	stu_str_t *key;
-
-	key = &c->user.strid;
-
-	if (stu_hash_insert_locked(&ch->userlist, key, c, STU_HASH_LOWCASE) == STU_ERROR) {
-		stu_log_error(0, "Failed to insert user \"%s\" into channel \"%s\", total=%lu.", key->data, ch->id.data, ch->userlist.length);
+	if (stu_hash_insert_locked(&ch->userlist, &c->user.id, c, STU_HASH_LOWCASE) == STU_ERROR) {
+		stu_log_error(0, "Failed to insert user \"%s\" into channel \"%s\", total=%lu.", c->user.id.data, ch->id.data, ch->userlist.length);
 		return STU_ERROR;
 	}
 
-	stu_log_debug(4, "Inserted user \"%s\" into channel \"%s\", total=%lu.", key->data, ch->id.data, ch->userlist.length);
+	stu_log_debug(4, "Inserted user \"%s\" into channel \"%s\", total=%lu.", c->user.id.data, ch->id.data, ch->userlist.length);
 
 	return STU_OK;
 }
@@ -83,7 +79,6 @@ stu_channel_remove_locked(stu_channel_t *ch, stu_connection_t *c) {
 
 static void
 stu_channel_remove_user_locked(stu_channel_t *ch, stu_connection_t *c) {
-	stu_str_t        *key;
 	stu_uint_t        kh, i;
 	stu_hash_t       *hash;
 	stu_hash_elt_t   *elts, *e;
@@ -91,23 +86,22 @@ stu_channel_remove_user_locked(stu_channel_t *ch, stu_connection_t *c) {
 	stu_connection_t *vc;
 
 	hash = &ch->userlist;
-	key = &c->user.strid;
-	kh = stu_hash_key_lc(key->data, key->len);
+	kh = stu_hash_key_lc(c->user.id.data, c->user.id.len);
 	i = kh % hash->size;
 
 	elts = hash->buckets[i];
 	if (elts == NULL) {
-		stu_log_error(0, "Failed to remove from hash: key=%lu, i=%lu, name=%s.", kh, i, key->data);
+		stu_log_error(0, "Failed to remove from hash: key=%lu, i=%lu, name=%s.", kh, i, c->user.id.data);
 		return;
 	}
 
 	for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
 		e = stu_queue_data(q, stu_hash_elt_t, queue);
 		vc = (stu_connection_t *) e->value;
-		if (e->key_hash != kh || e->key.len != key->len || vc->fd != c->fd) {
+		if (e->key_hash != kh || e->key.len != c->user.id.len || vc->fd != c->fd) {
 			continue;
 		}
-		if (stu_strncmp(e->key.data, key->data, key->len) == 0) {
+		if (stu_strncmp(e->key.data, c->user.id.data, c->user.id.len) == 0) {
 			stu_queue_remove(&e->queue);
 			stu_queue_remove(&e->q);
 
@@ -118,7 +112,7 @@ stu_channel_remove_user_locked(stu_channel_t *ch, stu_connection_t *c) {
 
 			hash->length--;
 
-			stu_log_debug(1, "Removed %p from hash: key=%lu, i=%lu, name=%s.", e->value, kh, i, key->data);
+			stu_log_debug(1, "Removed %p from hash: key=%lu, i=%lu, name=%s.", e->value, kh, i, c->user.id.data);
 
 			break;
 		}
@@ -134,7 +128,7 @@ stu_channel_remove_user_locked(stu_channel_t *ch, stu_connection_t *c) {
 		//stu_log_debug(1, "Removed sentinel from hash: key=%lu, i=%lu, name=%s.", key, i, name);
 	}
 
-	stu_log_debug(4, "removed user \"%s\" from channel \"%s\", total=%lu.", key->data, ch->id.data, ch->userlist.length);
+	stu_log_debug(4, "removed user \"%s\" from channel \"%s\", total=%lu.", c->user.id.data, ch->id.data, ch->userlist.length);
 }
 
 

@@ -17,40 +17,27 @@ static u_char *stu_log_errno(u_char *buf, u_char *last, stu_int_t err);
 
 stu_int_t
 stu_log_init(stu_file_t *file) {
-	u_char    *path, *p, *last, temp[STU_FILE_PATH_MAX_LEN];
-	stu_dir_t  dir;
-
-	path = NULL;
+	u_char    *p, *last, temp[STU_FILE_PATH_MAX_LEN];
 
 	last = file->name.data + file->name.len;
-	p = stu_strrchr(file->name.data, last, '/');
-	if (p) {
+
+	p = stu_strlchr(file->name.data, last, '/');
+	while (p) {
 		stu_strncpy(temp, file->name.data, p - file->name.data);
-		path = temp;
-	}
-
-	if (path) {
-		if (stu_open_dir(path, &dir) == STU_ERROR) {
-			stu_log_debug(3, "Failed to " stu_open_file_n " log file dir.");
-
-			if (stu_create_dir(path, STU_FILE_DEFAULT_ACCESS) == STU_ERROR) {
-				stu_log_error(stu_errno, "Failed to " stu_create_dir_n " for log file.");
+		if (stu_file_exist(temp) == -1) {
+			if (stu_dir_create(temp, STU_FILE_DEFAULT_ACCESS) == STU_ERROR) {
+				stu_log_error(stu_errno, "Failed to " stu_dir_create_n " for log file.");
 				return STU_ERROR;
 			}
 		}
+
+		p = stu_strlchr(p + 1, last, '/');
 	}
 
-	file->fd = stu_open_file(file->name.data, STU_FILE_APPEND, STU_FILE_CREATE_OR_OPEN, STU_FILE_DEFAULT_ACCESS);
+	file->fd = stu_file_open(file->name.data, STU_FILE_APPEND, STU_FILE_CREATE_OR_OPEN, STU_FILE_DEFAULT_ACCESS);
 	if (file->fd == STU_FILE_INVALID) {
-		stu_log_error(stu_errno, "Failed to " stu_open_file_n " log file \"%s\".", file->name.data);
+		stu_log_error(stu_errno, "Failed to " stu_file_open_n " log file \"%s\".", file->name.data);
 		return STU_ERROR;
-	}
-
-	if (path) {
-		if (stu_close_dir(&dir) == -1) {
-			stu_log_error(stu_errno, "Failed to " stu_close_file_n " log file dir.");
-			return STU_ERROR;
-		}
 	}
 
 	stu_log = file;
@@ -70,11 +57,17 @@ stu_log_info(const char *fmt, ...) {
 	p = stu_vsprintf(p, fmt, args);
 	va_end(args);
 
-	if (p >= last) {
-		p = last - 1;
+	if (p >= last - 1) {
+		p = last - 2;
+	}
+	*p++ = LF;
+	*p = '\0';
+
+	if (stu_log) {
+		stu_file_write(stu_log, temp, p - temp, stu_atomic_read(&stu_log->offset));
 	}
 
-	stu_printf("%s\n", temp);
+	stu_printf((const char *) temp);
 }
 
 void
@@ -94,11 +87,17 @@ stu_log_debug(stu_int_t level, const char *fmt, ...) {
 	p = stu_vsprintf(p, fmt, args);
 	va_end(args);
 
-	if (p >= last) {
-		p = last - 1;
+	if (p >= last - 1) {
+		p = last - 2;
+	}
+	*p++ = LF;
+	*p = '\0';
+
+	if (stu_log) {
+		stu_file_write(stu_log, temp, p - temp, stu_atomic_read(&stu_log->offset));
 	}
 
-	stu_printf("%s\n", temp);
+	stu_printf((const char *) temp);
 }
 
 void
@@ -117,11 +116,17 @@ stu_log_error(stu_int_t err, const char *fmt, ...) {
 		p = stu_log_errno(p, last, err);
 	}
 
-	if (p >= last) {
-		p = last - 1;
+	if (p >= last - 1) {
+		p = last - 2;
+	}
+	*p++ = LF;
+	*p = '\0';
+
+	if (stu_log) {
+		stu_file_write(stu_log, temp, p - temp, stu_atomic_read(&stu_log->offset));
 	}
 
-	stu_printf("%s\n", temp);
+	stu_printf((const char *) temp);
 }
 
 

@@ -93,14 +93,14 @@ done:
 
 	stu_atomic_fetch_add(&stu_cycle->connection_n, 1);
 
-	stu_connection_init(c, s);
-
 	c->pool = stu_ram_alloc(&stu_cycle->ram_pool);
 
 	stu_spinlock_init(&c->pool->lock);
 	c->pool->data.start = c->pool->data.last = (u_char *) c->pool + sizeof(stu_base_pool_t);
 	c->pool->data.end = (u_char *) c->pool + STU_RAM_BLOCK_SIZE;
 	c->pool->prev = c->pool->next = NULL;
+
+	stu_connection_init(c, s);
 
 	c->read.data = c->write.data = (void *) c;
 	c->read.active = FALSE;
@@ -151,10 +151,8 @@ static void
 stu_connection_init(stu_connection_t *c, stu_socket_t s) {
 	stu_spinlock_init(&c->lock);
 
-	c->pool = NULL;
-
 	c->fd = s;
-	stu_user_init(&c->user, c->fd, NULL, c->pool);
+	stu_user_init(&c->user, NULL, NULL, c->pool);
 
 	c->buffer.start = c->buffer.last = c->buffer.end = NULL;
 	c->data = NULL;

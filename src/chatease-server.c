@@ -57,11 +57,6 @@ int main(int argc, char **argv) {
 		return EXIT_FAILURE;
 	}
 
-	if (stu_conf_file_parse(STU_CONF_FILE_DEFAULT_PATH.data) == STU_ERROR) {
-		stu_log_error(0, "Failed to parse configure file.");
-		return EXIT_FAILURE;
-	}
-
 	if (stu_log_init(&cf.log) == STU_ERROR) {
 		stu_log_error(0, "Failed to init log file.");
 		return EXIT_FAILURE;
@@ -70,14 +65,19 @@ int main(int argc, char **argv) {
 	stu_log_info("GCC %s", __VERSION__);
 	stu_log_info(__NAME "/" __VERSION);
 
-	if (stu_pidfile_create(&cf.pid) == STU_ERROR) {
-		stu_log_error(0, "Failed to create pid file: %s.", cf.pid.name.data);
-		return EXIT_FAILURE;
-	}
-
 	stu_cycle = stu_cycle_create(&cf);
 	if (stu_cycle == NULL) {
 		stu_log_error(0, "Failed to init cycle.");
+		return EXIT_FAILURE;
+	}
+
+	if (stu_conf_file_parse(&stu_cycle->config, STU_CONF_FILE_DEFAULT_PATH.data, stu_cycle->pool) == STU_ERROR) {
+		stu_log_error(0, "Failed to parse configure file.");
+		return EXIT_FAILURE;
+	}
+
+	if (stu_pidfile_create(&stu_cycle->config.pid) == STU_ERROR) {
+		stu_log_error(0, "Failed to create pid file: %s.", stu_cycle->config.pid.name.data);
 		return EXIT_FAILURE;
 	}
 

@@ -22,25 +22,7 @@ stu_config_default(stu_config_t *cf) {
 	struct timeval  tv;
 	stu_tm_t        tm;
 
-	stu_ncpu = sysconf(_SC_NPROCESSORS_ONLN);
-
-	cf->daemon = TRUE;
-	cf->edition = PREVIEW; // ENTERPRISE
-
-	cf->port = 80;
-	stu_str_null(&cf->hostname);
-
-	cf->master_process = TRUE;
-	cf->worker_processes = 1;
-	cf->worker_threads = 4;
-
-	cf->push_users = TRUE;
-	cf->push_users_interval = STU_CHANNEL_PUSH_USERS_DEFAULT_INTERVAL;
-
-	stu_memzero(&cf->pid, sizeof(stu_file_t));
-	stu_str_set(&cf->pid.name, "chatd.pid");
-
-	// log file name
+	// log
 	stu_memzero(&cf->log, sizeof(stu_file_t));
 
 	stu_gettimeofday(&tv);
@@ -56,6 +38,21 @@ stu_config_default(stu_config_t *cf) {
 			tm.stu_tm_hour, tm.stu_tm_min, tm.stu_tm_sec
 		);
 	cf->log.name.len = stu_strlen(cf->log.name.data);
+
+	// pid
+	stu_memzero(&cf->pid, sizeof(stu_file_t));
+	stu_str_set(&cf->pid.name, "chatd.pid");
+
+	cf->edition = PREVIEW; // ENTERPRISE
+	cf->master_process = TRUE;
+	cf->worker_processes = 1;
+	cf->worker_threads = 4;
+
+	cf->port = 80;
+	stu_str_null(&cf->hostname);
+
+	cf->push_users = TRUE;
+	cf->push_users_interval = STU_CHANNEL_PUSH_USERS_DEFAULT_INTERVAL;
 }
 
 stu_cycle_t *
@@ -66,6 +63,8 @@ stu_cycle_create(stu_config_t *cf) {
 	stu_ram_pool_t        *ram_pool;
 	stu_cycle_t           *cycle;
 	stu_shm_t             *shm;
+
+	stu_ncpu = sysconf(_SC_NPROCESSORS_ONLN);
 
 	pool = stu_pool_create(STU_CYCLE_POOL_SIZE);
 	if (pool == NULL) {
@@ -105,6 +104,8 @@ stu_cycle_create(stu_config_t *cf) {
 	//stu_ram_test(&cycle->ram_pool);
 
 	stu_config_copy(&cycle->config, cf, pool);
+
+	// shared memory
 	stu_list_init(&cycle->shared_memory, slab_pool, (stu_list_palloc_pt) stu_slab_alloc, (stu_list_free_pt) stu_slab_free);
 
 	shm = stu_pcalloc(pool, sizeof(stu_shm_t));
@@ -149,11 +150,18 @@ stu_cycle_create(stu_config_t *cf) {
 
 static void
 stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool) {
-	stu_list_t            *upstream;
-	stu_upstream_server_t *server;
+	dst->log.name.data = stu_pcalloc(pool, src->log.name.len + 1);
+	dst->log.name.len = src->log.name.len;
+	memcpy(dst->log.name.data, src->log.name.data, src->log.name.len);
 
-	dst->daemon = src->daemon;
+	dst->pid.name.data = stu_pcalloc(pool, src->pid.name.len + 1);
+	dst->pid.name.len = src->pid.name.len;
+	memcpy(dst->pid.name.data, src->pid.name.data, src->pid.name.len);
+
 	dst->edition = src->edition;
+	dst->master_process = src->master_process;
+	dst->worker_processes = src->worker_processes;
+	dst->worker_threads = src->worker_threads;
 
 	dst->port = src->port;
 	if (src->hostname.len > 0) {
@@ -162,60 +170,11 @@ stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool) {
 		memcpy(dst->hostname.data, src->hostname.data, src->hostname.len);
 	}
 
-	dst->master_process = src->master_process;
-	dst->worker_processes = src->worker_processes;
-	dst->worker_threads = src->worker_threads;
-
 	dst->push_users = src->push_users;
 	dst->push_users_interval = src->push_users_interval;
 
-	dst->pid.name.data = stu_pcalloc(pool, src->pid.name.len + 1);
-	dst->pid.name.len = src->pid.name.len;
-	memcpy(dst->pid.name.data, src->pid.name.data, src->pid.name.len);
-
-	// init upstream
-	upstream = stu_pcalloc(pool, sizeof(stu_list_t));
-	if (upstream == NULL) {
-		stu_log_error(0, "Failed to pcalloc upstream list.");
-		return;
-	}
-
-	stu_list_init(upstream, pool, (stu_list_palloc_pt) stu_pcalloc, NULL);
-
-	// add server
-	server = stu_pcalloc(pool, sizeof(stu_upstream_server_t));
-	if (server == NULL) {
-		stu_log_error(0, "Failed to pcalloc upstream server.");
-		return;
-	}
-
-	server->name.data = stu_pcalloc(pool, 6);
-	server->name.len = 5;
-	memcpy(server->name.data, "ident", 5);
-
-	server->port = 80;
-	server->weight = 32;
-
-	server->addr.name.data = stu_pcalloc(pool, 14);
-	server->addr.name.len = 13;
-	memcpy(server->addr.name.data, "192.168.4.247", 13);
-
-	server->addr.sockaddr.sin_family = AF_INET;
-	server->addr.sockaddr.sin_addr.s_addr = inet_addr((const char *) server->addr.name.data);
-	server->addr.sockaddr.sin_port = htons(server->port);
-	bzero(&(server->addr.sockaddr.sin_zero), 8);
-	server->addr.socklen = sizeof(struct sockaddr);
-
-	stu_list_push(upstream, server, sizeof(stu_upstream_server_t));
-
-	// init upstreams
 	if (stu_hash_init(&dst->upstreams, NULL, STU_UPSTREAM_MAXIMUM, pool, (stu_hash_palloc_pt) stu_pcalloc, NULL) == STU_ERROR) {
 		stu_log_error(0, "Failed to init upstream hash.");
-		return;
-	}
-
-	if (stu_hash_insert(&dst->upstreams, &server->name, upstream, STU_HASH_LOWCASE|STU_HASH_REPLACE) == STU_ERROR) {
-		stu_log_error(0, "Failed to insert upstream %s into hash.", server->name.data);
 		return;
 	}
 
@@ -227,16 +186,16 @@ stu_int_t
 stu_pidfile_create(stu_file_t *pid) {
 	u_char  temp[STU_FILE_PATH_MAX_LEN];
 
-	pid->fd = stu_open_file(pid->name.data, STU_FILE_RDWR, STU_FILE_TRUNCATE, STU_FILE_DEFAULT_ACCESS);
+	pid->fd = stu_file_open(pid->name.data, STU_FILE_RDWR, STU_FILE_TRUNCATE, STU_FILE_DEFAULT_ACCESS);
 	if (pid->fd == STU_FILE_INVALID) {
-		stu_log_error(stu_errno, "Failed to " stu_open_file_n " pid file.");
+		stu_log_error(stu_errno, "Failed to " stu_file_open_n " pid file.");
 		return STU_ERROR;
 	}
 
 	stu_memzero(temp, STU_FILE_PATH_MAX_LEN);
 	stu_sprintf(temp, "%d", stu_getpid());
 
-	if (stu_write_file(pid, temp, stu_strlen(temp), pid->offset) == STU_ERROR) {
+	if (stu_file_write(pid, temp, stu_strlen(temp), pid->offset) == STU_ERROR) {
 		stu_log_error(stu_errno, "Failed to " stu_write_fd_n " pid file.");
 		return STU_ERROR;
 	}
@@ -246,8 +205,8 @@ stu_pidfile_create(stu_file_t *pid) {
 
 void
 stu_pidfile_delete(stu_file_t *pid) {
-	if (stu_delete_file(pid->name.data) == -1) {
-		stu_log_error(stu_errno, "Failed to " stu_delete_file_n " pid file.");
+	if (stu_file_delete(pid->name.data) == -1) {
+		stu_log_error(stu_errno, "Failed to " stu_file_delete_n " pid file.");
 	}
 }
 

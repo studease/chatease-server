@@ -52,35 +52,38 @@ typedef struct {
 #define STU_FILE_DEFAULT_ACCESS  0644
 #define STU_FILE_OWNER_ACCESS    0600
 
+#define stu_file_exist(name)     access((const char *) name, F_OK)
+#define stu_file_exist_n         "access()"
+
 #ifdef __CYGWIN__
 
-#define stu_open_file(name, mode, create, access)                            \
+#define stu_file_open(name, mode, create, access)                            \
 	open((const char *) name, mode|create|O_BINARY, access)
 
 #else
 
-#define stu_open_file(name, mode, create, access)                            \
+#define stu_file_open(name, mode, create, access)                            \
 	open((const char *) name, mode|create, access)
 
 #endif
 
-#define stu_open_file_n          "open()"
+#define stu_file_open_n          "open()"
 
-#define stu_close_file           close
-#define stu_close_file_n         "close()"
+#define stu_file_close           close
+#define stu_file_close_n         "close()"
 
-#define stu_delete_file(name)    unlink((const char *) name)
-#define stu_delete_file_n        "unlink()"
+#define stu_file_delete(name)    unlink((const char *) name)
+#define stu_file_delete_n        "unlink()"
 
 
-ssize_t stu_read_file(stu_file_t *file, u_char *buf, size_t size, off_t offset);
+ssize_t stu_file_read(stu_file_t *file, u_char *buf, size_t size, off_t offset);
 #if (STU_HAVE_PREAD)
-#define stu_read_file_n          "pread()"
+#define stu_file_read_n          "pread()"
 #else
-#define stu_read_file_n          "read()"
+#define stu_file_read_n          "read()"
 #endif
 
-ssize_t stu_write_file(stu_file_t *file, u_char *buf, size_t size, off_t offset);
+ssize_t stu_file_write(stu_file_t *file, u_char *buf, size_t size, off_t offset);
 
 #define stu_read_fd              read
 #define stu_read_fd_n            "read()"
@@ -98,14 +101,14 @@ stu_write_fd(stu_fd_t fd, void *buf, size_t n) {
 #define stu_write_fd_n           "write()"
 
 
-#define stu_rename_file(o, n)    rename((const char *) o, (const char *) n)
-#define stu_rename_file_n        "rename()"
+#define stu_file_rename(o, n)    rename((const char *) o, (const char *) n)
+#define stu_file_rename_n        "rename()"
 
-#define stu_change_file_access(n, a) chmod((const char *) n, a)
-#define stu_change_file_access_n "chmod()"
+#define stu_file_change_access(n, a) chmod((const char *) n, a)
+#define stu_file_change_access_n "chmod()"
 
-stu_int_t stu_set_file_time(u_char *name, stu_fd_t fd, time_t s);
-#define stu_set_file_time_n      "utimes()"
+stu_int_t stu_file_set_time(u_char *name, stu_fd_t fd, time_t s);
+#define stu_file_set_time_n      "utimes()"
 
 #define stu_file_info(file, sb)  stat((const char *) file, sb)
 #define stu_file_info_n          "stat()"
@@ -134,20 +137,20 @@ stu_int_t stu_set_file_time(u_char *name, stu_fd_t fd, time_t s);
 #define stu_path_separator(c)    ((c) == '/')
 
 
-stu_int_t stu_open_dir(u_char *name, stu_dir_t *dir);
-#define stu_open_dir_n           "opendir()"
+stu_int_t stu_dir_open(u_char *name, stu_dir_t *dir);
+#define stu_dir_open_n           "opendir()"
 
-#define stu_close_dir(d)         closedir((d)->dir)
-#define stu_close_dir_n          "closedir()"
+#define stu_dir_close(d)         closedir((d)->dir)
+#define stu_dir_close_n          "closedir()"
 
-stu_int_t stu_read_dir(stu_dir_t *dir);
-#define stu_read_dir_n           "readdir()"
+stu_int_t stu_dir_read(stu_dir_t *dir);
+#define stu_dir_read_n           "readdir()"
 
-#define stu_create_dir(name, access) mkdir((const char *) name, access)
-#define stu_create_dir_n         "mkdir()"
+#define stu_dir_create(name, access) mkdir((const char *) name, access)
+#define stu_dir_create_n         "mkdir()"
 
-#define stu_delete_dir(name)     rmdir((const char *) name)
-#define stu_delete_dir_n         "rmdir()"
+#define stu_dir_delete(name)     rmdir((const char *) name)
+#define stu_dir_delete_n         "rmdir()"
 
 #define stu_dir_access(a)        (a | (a & 0444) >> 2)
 

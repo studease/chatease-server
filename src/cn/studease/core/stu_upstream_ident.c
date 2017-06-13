@@ -37,7 +37,7 @@ static const stu_str_t  STU_UPSTREAM_IDENT_REQUEST = stu_string(
 		 */
 	);
 
-stu_int_t  stu_preview_auto_id = 1;
+stu_int_t  stu_preview_auto_id = 1001;
 const stu_str_t  STU_PREVIEW_UPSTREAM_IDENT_RESPONSE = stu_string(
 		"{\"raw\":\"ident\",\"user\":{\"id\":\"%ld\",\"name\":\"%s\",\"role\":%d},\"channel\":{\"id\":\"%s\",\"state\":%d,\"total\":%lu}}"
 	);
@@ -310,9 +310,15 @@ stu_upstream_ident_analyze_response(stu_connection_t *c) {
 
 	// reset user info
 	uid = (stu_str_t *) iduid->value;
-	c->user.id = atol((const char *) uid->data);
-	stu_strncpy(c->user.strid.data, uid->data, uid->len);
-	c->user.strid.len = uid->len;
+
+	c->user.id.data = stu_base_pcalloc(c->pool, uid->len + 1);
+	if (c->user.id.data == NULL) {
+		stu_log_error(0, "Failed to pcalloc memory for user id, fd=%d.", c->fd);
+		goto failed;
+	}
+
+	c->user.id.len = uid->len;
+	stu_strncpy(c->user.id.data, uid->data, uid->len);
 
 	uname = (stu_str_t *) iduname->value;
 	c->user.name.data = stu_base_pcalloc(c->pool, uname->len + 1);

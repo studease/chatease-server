@@ -199,9 +199,9 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 	c = r->connection;
 	ch = c->user.channel;
 
-	req = stu_json_parse((u_char *) text, size);
+	req = stu_json_parse(text, size);
 	if (req == NULL || req->type != STU_JSON_TYPE_OBJECT) {
-		stu_log_error(0, "Failed to parse request.");
+		stu_log_error(0, "Failed to parse websocket request.");
 		stu_websocket_finalize_request(r, STU_HTTP_BAD_REQUEST, -1);
 		return;
 	}
@@ -210,7 +210,7 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 
 	cmd = stu_json_get_object_item_by(req, &STU_PROTOCOL_CMD);
 	if (cmd == NULL || cmd->type != STU_JSON_TYPE_STRING) {
-		stu_log_error(0, "Failed to analyze request: \"cmd\" not found.");
+		stu_log_error(0, "Failed to analyze websocket request: \"cmd\" not found.");
 		stu_json_delete(req);
 		stu_websocket_finalize_request(r, STU_HTTP_BAD_REQUEST, rqreq ? *(stu_double_t *) rqreq->value : -1);
 		return;
@@ -219,7 +219,7 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 	str = (stu_str_t *) cmd->value;
 	if (stu_strncmp(str->data, STU_PROTOCOL_CMDS_TEXT.data, STU_PROTOCOL_CMDS_TEXT.len) == 0) {
 		if (c->user.role < ch->state) {
-			stu_log_error(0, "Text request refused!");
+			stu_log_error(0, "Websocket text request refused!");
 			stu_json_delete(req);
 			stu_websocket_finalize_request(r, STU_HTTP_EXPECTATION_FAILED, rqreq ? *(stu_double_t *) rqreq->value : -1);
 			return;
@@ -231,7 +231,7 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 		if (rqdata == NULL || rqdata->type != STU_JSON_TYPE_STRING
 				|| rqtype == NULL || rqtype->type != STU_JSON_TYPE_STRING
 				|| rqchannel == NULL || rqchannel->type != STU_JSON_TYPE_OBJECT) {
-			stu_log_error(0, "Failed to analyze request: necessary item[s] not found.");
+			stu_log_error(0, "Failed to analyze websocket request: necessary item[s] not found.");
 			stu_json_delete(req);
 			stu_websocket_finalize_request(r, STU_HTTP_BAD_REQUEST, rqreq ? *(stu_double_t *) rqreq->value : -1);
 			return;
@@ -244,7 +244,7 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 		rschannel = stu_json_duplicate(rqchannel, TRUE);
 		rsuser = stu_json_create_object(&STU_PROTOCOL_USER);
 
-		rsuid = stu_json_create_string(&STU_PROTOCOL_ID, c->user.strid.data, c->user.strid.len);
+		rsuid = stu_json_create_string(&STU_PROTOCOL_ID, c->user.id.data, c->user.id.len);
 		rsuname = stu_json_create_string(&STU_PROTOCOL_NAME, c->user.name.data, c->user.name.len);
 		rsurole = stu_json_create_number(&STU_PROTOCOL_ROLE, (stu_double_t) c->user.role);
 

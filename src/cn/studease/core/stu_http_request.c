@@ -181,7 +181,7 @@ stu_http_process_request(stu_http_request_t *r) {
 	stu_int_t         m, n, size, extened;
 	stu_uint_t        kh;
 	stu_str_t         cid, name, role, state;
-	u_char           *d, *s, *data, temp[STU_HTTP_REQUEST_DEFAULT_SIZE], opcode;
+	u_char           *d, *s, *data, buf[STU_USER_ID_MAX_LEN], temp[STU_HTTP_REQUEST_DEFAULT_SIZE], opcode;
 	stu_channel_t    *ch;
 
 	rc = stu_http_process_request_headers(r);
@@ -199,130 +199,10 @@ stu_http_process_request(stu_http_request_t *r) {
 	}
 
 	if (stu_cycle->config.edition == PREVIEW) {
-		// get channel ID
-		cid.data = stu_base_pcalloc(c->pool, r->target.len + 1);
-		if (cid.data == NULL) {
-			stu_log_error(0, "Failed to pcalloc memory for channel id, fd=%d.", c->fd);
-			goto failed;
-		}
-		stu_strncpy(cid.data, r->target.data, r->target.len);
-		cid.len = r->target.len;
-
-		// reset user info
-		c->user.id = stu_preview_auto_id++;
-		stu_sprintf(c->user.strid.data, "%ld", c->user.id);
-		c->user.strid.len = strlen((const char *) c->user.strid.data);
-
-		if (stu_http_arg(r, STU_PROTOCOL_NAME.data, STU_PROTOCOL_NAME.len, &name) != STU_OK) {
-			stu_log_error(0, "User name not specified, fd=%d.", c->fd);
-			goto failed;
-		}
-
-		d = s = name.data;
-		stu_unescape_uri(&d, &s, name.len, 0);
-		name.len = d - name.data;
-
-		c->user.name.data = stu_base_pcalloc(c->pool, name.len + 1);
-		if (c->user.name.data == NULL) {
-			stu_log_error(0, "Failed to pcalloc memory for user name, fd=%d.", c->fd);
-			goto failed;
-		}
-		stu_strncpy(c->user.name.data, name.data, name.len);
-		c->user.name.len = name.len;
-
-		c->user.role = 0x01;
-		if (stu_http_arg(r, STU_PROTOCOL_ROLE.data, STU_PROTOCOL_ROLE.len, &role) == STU_OK) {
-			m = atoi((const char *) role.data);
-			c->user.role = m & 0xFF;
-		}
-
-		// insert user into channel
-		kh = stu_hash_key_lc(cid.data, cid.len);
-
-		stu_spin_lock(&stu_cycle->channels.lock);
-
-		ch = stu_hash_find_locked(&stu_cycle->channels, kh, cid.data, cid.len);
-		if (ch == NULL) {
-			stu_log_debug(4, "channel \"%s\" not found: kh=%lu, i=%lu, len=%lu.",
-					cid.data, kh, kh % stu_cycle->channels.size, stu_cycle->channels.length);
-
-			ch = stu_slab_calloc(stu_cycle->slab_pool, sizeof(stu_channel_t));
-			if (ch == NULL) {
-				stu_log_error(0, "Failed to alloc new channel.");
-				stu_spin_unlock(&stu_cycle->channels.lock);
-				goto failed;
-			}
-
-			if (stu_channel_init(ch, &cid) == STU_ERROR) {
-				stu_log_error(0, "Failed to init channel.");
-				stu_spin_unlock(&stu_cycle->channels.lock);
-				goto failed;
-			}
-
-			if (stu_hash_init(&ch->userlist, NULL, STU_MAX_USER_N, stu_cycle->slab_pool,
-					(stu_hash_palloc_pt) stu_slab_calloc, (stu_hash_free_pt) stu_slab_free) == STU_ERROR) {
-				stu_log_error(0, "Failed to init userlist.");
-				stu_spin_unlock(&stu_cycle->channels.lock);
-				goto failed;
-			}
-
-			if (stu_hash_insert_locked(&stu_cycle->channels, &cid, ch, STU_HASH_LOWCASE|STU_HASH_REPLACE) == STU_ERROR) {
-				stu_log_error(0, "Failed to insert channel.");
-				stu_spin_unlock(&stu_cycle->channels.lock);
-				goto failed;
-			}
-
-			stu_log_debug(4, "new channel \"%s\": kh=%lu, total=%lu.",
-					ch->id.data, kh, stu_atomic_read(&stu_cycle->channels.length));
-		}
-
-		stu_spin_unlock(&stu_cycle->channels.lock);
-
-		if (stu_http_arg(r, STU_PROTOCOL_STATE.data, STU_PROTOCOL_STATE.len, &state) == STU_OK) {
-			if (c->user.role | 0xF0) {
-				m = atoi((const char *) state.data);
-				ch->state = m & 0xFF;
-			}
-		}
-
-		if (stu_channel_insert(ch, c) == STU_ERROR) {
-			stu_log_error(0, "Failed to insert connection.");
-			goto failed;
-		}
-
-		c->user.channel = ch;
-
-		// finalize request
-		protocol = r->headers_out.sec_websocket_protocol;
-		if (protocol && stu_strncmp("binary", protocol->value.data, protocol->value.len) == 0) {
-			opcode = STU_WEBSOCKET_OPCODE_BINARY;
-		} else {
-			opcode = STU_WEBSOCKET_OPCODE_TEXT;
-		}
-
-		stu_http_finalize_request(r, STU_HTTP_SWITCHING_PROTOCOLS);
-
-		stu_memzero(temp, STU_HTTP_REQUEST_DEFAULT_SIZE);
-		data = stu_sprintf(
-				(u_char *) temp + 10, (const char *) STU_PREVIEW_UPSTREAM_IDENT_RESPONSE.data,
-				c->user.id, c->user.name.data, c->user.role,
-				ch->id.data, ch->state, ch->userlist.length
-			);
-
-		size = data - temp - 10;
-		data = stu_websocket_encode_frame(opcode, temp, size, &extened);
-
-		n = send(c->fd, data, size + 2 + extened, 0);
-		if (n == -1) {
-			stu_log_debug(4, "Failed to send \"ident\" frame: fd=%d.", c->fd);
-			goto failed;
-		}
-
-		stu_log_debug(4, "sent: fd=%d, bytes=%d.", c->fd, n);
-
-		return;
+		goto preview;
 	}
 
+	// enterprise
 	if (stu_upstream_create(c, STU_UPSTREAM_NAMES_IDENT.data, STU_UPSTREAM_NAMES_IDENT.len) == STU_ERROR) {
 		stu_log_error(0, "Failed to create upstream.");
 		goto failed;
@@ -341,6 +221,138 @@ stu_http_process_request(stu_http_request_t *r) {
 		stu_log_error(0, "Failed to init upstream.");
 		goto failed;
 	}
+
+	return;
+
+preview:
+
+	// get channel ID
+	cid.data = stu_base_pcalloc(c->pool, r->target.len + 1);
+	if (cid.data == NULL) {
+		stu_log_error(0, "Failed to pcalloc memory for channel id, fd=%d.", c->fd);
+		goto failed;
+	}
+	stu_strncpy(cid.data, r->target.data, r->target.len);
+	cid.len = r->target.len;
+
+	// reset user info
+	s = stu_sprintf(buf, "%ld", stu_preview_auto_id++);
+	*s = '\0';
+
+	c->user.id.len = s - buf;
+	c->user.id.data = stu_base_pcalloc(c->pool, c->user.id.len + 1);
+	if (c->user.id.data == NULL) {
+		stu_log_error(0, "Failed to pcalloc memory for user id, fd=%d.", c->fd);
+		goto failed;
+	}
+	stu_strncpy(c->user.id.data, buf, c->user.id.len);
+
+	if (stu_http_arg(r, STU_PROTOCOL_NAME.data, STU_PROTOCOL_NAME.len, &name) != STU_OK) {
+		stu_log_error(0, "User name not specified, fd=%d.", c->fd);
+		goto failed;
+	}
+
+	d = s = name.data;
+	stu_unescape_uri(&d, &s, name.len, 0);
+	name.len = d - name.data;
+
+	c->user.name.data = stu_base_pcalloc(c->pool, name.len + 1);
+	if (c->user.name.data == NULL) {
+		stu_log_error(0, "Failed to pcalloc memory for user name, fd=%d.", c->fd);
+		goto failed;
+	}
+	stu_strncpy(c->user.name.data, name.data, name.len);
+	c->user.name.len = name.len;
+
+	c->user.role = STU_USER_ROLE_NORMAL;
+	if (stu_http_arg(r, STU_PROTOCOL_ROLE.data, STU_PROTOCOL_ROLE.len, &role) == STU_OK) {
+		m = atoi((const char *) role.data);
+		c->user.role = m & 0xFF;
+	}
+
+	// insert user into channel
+	kh = stu_hash_key_lc(cid.data, cid.len);
+
+	stu_spin_lock(&stu_cycle->channels.lock);
+
+	ch = stu_hash_find_locked(&stu_cycle->channels, kh, cid.data, cid.len);
+	if (ch == NULL) {
+		stu_log_debug(4, "channel \"%s\" not found: kh=%lu, i=%lu, len=%lu.",
+				cid.data, kh, kh % stu_cycle->channels.size, stu_cycle->channels.length);
+
+		ch = stu_slab_calloc(stu_cycle->slab_pool, sizeof(stu_channel_t));
+		if (ch == NULL) {
+			stu_log_error(0, "Failed to alloc new channel.");
+			stu_spin_unlock(&stu_cycle->channels.lock);
+			goto failed;
+		}
+
+		if (stu_channel_init(ch, &cid) == STU_ERROR) {
+			stu_log_error(0, "Failed to init channel.");
+			stu_spin_unlock(&stu_cycle->channels.lock);
+			goto failed;
+		}
+
+		if (stu_hash_init(&ch->userlist, NULL, STU_MAX_USER_N, stu_cycle->slab_pool,
+				(stu_hash_palloc_pt) stu_slab_calloc, (stu_hash_free_pt) stu_slab_free) == STU_ERROR) {
+			stu_log_error(0, "Failed to init userlist.");
+			stu_spin_unlock(&stu_cycle->channels.lock);
+			goto failed;
+		}
+
+		if (stu_hash_insert_locked(&stu_cycle->channels, &cid, ch, STU_HASH_LOWCASE|STU_HASH_REPLACE) == STU_ERROR) {
+			stu_log_error(0, "Failed to insert channel.");
+			stu_spin_unlock(&stu_cycle->channels.lock);
+			goto failed;
+		}
+
+		stu_log_debug(4, "new channel \"%s\": kh=%lu, total=%lu.",
+				ch->id.data, kh, stu_atomic_read(&stu_cycle->channels.length));
+	}
+
+	stu_spin_unlock(&stu_cycle->channels.lock);
+
+	if (stu_http_arg(r, STU_PROTOCOL_STATE.data, STU_PROTOCOL_STATE.len, &state) == STU_OK) {
+		if (c->user.role | 0xF0) {
+			m = atoi((const char *) state.data);
+			ch->state = m & 0xFF;
+		}
+	}
+
+	if (stu_channel_insert(ch, c) == STU_ERROR) {
+		stu_log_error(0, "Failed to insert connection.");
+		goto failed;
+	}
+
+	c->user.channel = ch;
+
+	// finalize request
+	protocol = r->headers_out.sec_websocket_protocol;
+	if (protocol && stu_strncmp("binary", protocol->value.data, protocol->value.len) == 0) {
+		opcode = STU_WEBSOCKET_OPCODE_BINARY;
+	} else {
+		opcode = STU_WEBSOCKET_OPCODE_TEXT;
+	}
+
+	stu_http_finalize_request(r, STU_HTTP_SWITCHING_PROTOCOLS);
+
+	stu_memzero(temp, STU_HTTP_REQUEST_DEFAULT_SIZE);
+	data = stu_sprintf(
+			(u_char *) temp + 10, (const char *) STU_PREVIEW_UPSTREAM_IDENT_RESPONSE.data,
+			c->user.id.data, c->user.name.data, c->user.role,
+			ch->id.data, ch->state, ch->userlist.length
+		);
+
+	size = data - temp - 10;
+	data = stu_websocket_encode_frame(opcode, temp, size, &extened);
+
+	n = send(c->fd, data, size + 2 + extened, 0);
+	if (n == -1) {
+		stu_log_debug(4, "Failed to send \"ident\" frame: fd=%d.", c->fd);
+		goto failed;
+	}
+
+	stu_log_debug(4, "sent: fd=%d, bytes=%d.", c->fd, n);
 
 	return;
 
@@ -387,7 +399,7 @@ stu_http_process_request_headers(stu_http_request_t *r) {
 			h->value.data = r->header_start;
 			h->value.data[h->value.len] = '\0';
 
-			h->lowcase_key = stu_base_pcalloc(r->connection->pool, h->key.len);
+			h->lowcase_key = stu_base_pcalloc(r->connection->pool, h->key.len + 1);
 			if (h->lowcase_key == NULL) {
 				return STU_HTTP_INTERNAL_SERVER_ERROR;
 			}
@@ -397,6 +409,7 @@ stu_http_process_request_headers(stu_http_request_t *r) {
 			} else {
 				stu_strlow(h->lowcase_key, h->key.data, h->key.len);
 			}
+			h->lowcase_key[h->key.len] = '\0';
 
 			if (stu_list_push(&r->headers_in.headers, h, sizeof(stu_table_elt_t)) == STU_ERROR) {
 				return STU_HTTP_INTERNAL_SERVER_ERROR;
