@@ -30,9 +30,11 @@ typedef enum {
 #define stu_max(val1, val2)  ((val1 < val2) ? (val2) : (val1))
 #define stu_min(val1, val2)  ((val1 > val2) ? (val2) : (val1))
 
-#define LF     (u_char) '\n'
 #define CR     (u_char) '\r'
+#define LF     (u_char) '\n'
+#define HT     (u_char) '\t'
 #define CRLF   "\r\n"
+#define LFHT   "\n\t"
 
 #include "stu_string.h"
 #include "stu_buf.h"

@@ -62,8 +62,8 @@ int main(int argc, char **argv) {
 		return EXIT_FAILURE;
 	}
 
-	stu_log_info("GCC %s", __VERSION__);
-	stu_log_info(__NAME "/" __VERSION);
+	stu_log("GCC " __VERSION__);
+	stu_log(__NAME "/" __VERSION " (" __DATE__ " " __TIME__ ")");
 
 	stu_cycle = stu_cycle_create(&cf);
 	if (stu_cycle == NULL) {

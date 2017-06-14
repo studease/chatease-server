@@ -69,7 +69,7 @@ stu_process_master_cycle(stu_cycle_t *cycle) {
 		}
 
 		if (stu_restart) {
-			stu_log_info("Restarting server...");
+			stu_log("Restarting server...");
 			// respawn processes
 		}
 	}
@@ -295,12 +295,12 @@ stu_worker_process_cycle(stu_cycle_t *cycle, void *data) {
 	// main thread of sub process, wait for signal
 	for ( ;; ) {
 		if (stu_quit) {
-			stu_log_info("Closing worker process...");
+			stu_log("Closing worker process...");
 			break;
 		}
 
 		if (stu_restart) {
-			stu_log_info("Restarting worker process...");
+			stu_log("Restarting worker process...");
 		}
 
 		sleep(-1);

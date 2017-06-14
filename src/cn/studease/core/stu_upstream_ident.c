@@ -11,7 +11,6 @@
 stu_str_t  STU_UPSTREAM_NAMES_IDENT = stu_string("ident");
 stu_list_t *stu_upstream_ident_servers;
 
-extern stu_cycle_t *stu_cycle;
 extern stu_hash_t   stu_http_upstream_headers_in_hash;
 
 static const stu_str_t  STU_UPSTREAM_IDENT_PARAMS_TOKEN = stu_string("token");
@@ -232,7 +231,6 @@ stu_upstream_ident_analyze_response(stu_connection_t *c) {
 	stu_http_request_t *r, *pr;
 	stu_table_elt_t    *protocol;
 	stu_int_t           n, size, extened;
-	stu_uint_t          kh;
 	stu_str_t          *cid, *uid, *uname, channel_id;
 	u_char             *data, temp[STU_HTTP_REQUEST_DEFAULT_SIZE], opcode;
 	stu_channel_t      *ch;
@@ -332,53 +330,12 @@ stu_upstream_ident_analyze_response(stu_connection_t *c) {
 	c->user.role = *(stu_double_t *) idurole->value;
 
 	// insert user into channel
-	kh = stu_hash_key_lc(cid->data, cid->len);
-
-	stu_spin_lock(&stu_cycle->channels.lock);
-
-	ch = stu_hash_find_locked(&stu_cycle->channels, kh, cid->data, cid->len);
-	if (ch == NULL) {
-		stu_log_debug(4, "channel \"%s\" not found: kh=%lu, i=%lu, len=%lu.",
-				cid->data, kh, kh % stu_cycle->channels.size, stu_cycle->channels.length);
-
-		ch = stu_slab_calloc(stu_cycle->slab_pool, sizeof(stu_channel_t));
-		if (ch == NULL) {
-			stu_log_error(0, "Failed to alloc new channel.");
-			stu_spin_unlock(&stu_cycle->channels.lock);
-			goto failed;
-		}
-
-		if (stu_channel_init(ch, cid) == STU_ERROR) {
-			stu_log_error(0, "Failed to init channel.");
-			stu_spin_unlock(&stu_cycle->channels.lock);
-			goto failed;
-		}
-
-		if (stu_hash_init(&ch->userlist, NULL, STU_MAX_USER_N, stu_cycle->slab_pool,
-				(stu_hash_palloc_pt) stu_slab_calloc, (stu_hash_free_pt) stu_slab_free) == STU_ERROR) {
-			stu_log_error(0, "Failed to init userlist.");
-			stu_spin_unlock(&stu_cycle->channels.lock);
-			goto failed;
-		}
-
-		if (stu_hash_insert_locked(&stu_cycle->channels, cid, ch, STU_HASH_LOWCASE|STU_HASH_REPLACE) == STU_ERROR) {
-			stu_log_error(0, "Failed to insert channel.");
-			stu_spin_unlock(&stu_cycle->channels.lock);
-			goto failed;
-		}
-
-		stu_log_debug(4, "new channel \"%s\": kh=%lu, total=%lu.",
-				ch->id.data, kh, stu_atomic_read(&stu_cycle->channels.length));
-	}
-
-	stu_spin_unlock(&stu_cycle->channels.lock);
-
-	if (stu_channel_insert(ch, c) == STU_ERROR) {
-		stu_log_error(0, "Failed to insert connection.");
+	if (stu_channel_insert(cid, c) == STU_ERROR) {
+		stu_log_error(0, "Failed to insert connection: fd=%d.", c->fd);
 		goto failed;
 	}
 
-	c->user.channel = ch;
+	ch = c->user.channel;
 
 	// create ident response
 	res = stu_json_create_object(NULL);

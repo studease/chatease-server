@@ -47,12 +47,20 @@ typedef struct {
 #define stu_atomic_fetch_sub(ptr, val)            \
 	__sync_fetch_and_sub(ptr, val)
 
-#define stu_atomic_read(ptr)                      \
+#define stu_atomic_fetch_long(ptr)                \
 	stu_atomic_read_long((const long *) ptr)
+
+#define stu_atomic_fetch_char(ptr)                \
+	stu_atomic_read_char((const char *) ptr)
 
 static inline stu_int_t
 stu_atomic_read_long(const stu_int_t *v) {
 	return (*(volatile stu_int_t *)v);
+}
+
+static inline stu_int_t
+stu_atomic_read_char(const char *v) {
+	return (*(volatile char *)v);
 }
 
 #endif /* STU_ATOMIC_H_ */

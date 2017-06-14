@@ -9,7 +9,7 @@
 #include "stu_core.h"
 #include <stdio.h>
 
-stu_file_t *stu_log = NULL;
+stu_file_t *stu_logger = NULL;
 
 static u_char *stu_log_prefix(u_char *buf, const stu_str_t prefix);
 static u_char *stu_log_errno(u_char *buf, u_char *last, stu_int_t err);
@@ -40,13 +40,13 @@ stu_log_init(stu_file_t *file) {
 		return STU_ERROR;
 	}
 
-	stu_log = file;
+	stu_logger = file;
 
 	return STU_OK;
 }
 
 void
-stu_log_info(const char *fmt, ...) {
+stu_log_c(const char *fmt, ...) {
 	u_char   temp[STU_LOG_RECORD_MAX_LEN];
 	u_char  *p, *last = temp + STU_LOG_RECORD_MAX_LEN;
 	va_list  args;
@@ -63,15 +63,15 @@ stu_log_info(const char *fmt, ...) {
 	*p++ = LF;
 	*p = '\0';
 
-	if (stu_log) {
-		stu_file_write(stu_log, temp, p - temp, stu_atomic_read(&stu_log->offset));
+	if (stu_logger) {
+		stu_file_write(stu_logger, temp, p - temp, stu_atomic_fetch_long(&stu_logger->offset));
 	}
 
 	stu_printf((const char *) temp);
 }
 
 void
-stu_log_debug(stu_int_t level, const char *fmt, ...) {
+stu_log_c_debug(stu_int_t level, const char *fmt, ...) {
 	u_char   temp[STU_LOG_RECORD_MAX_LEN];
 	u_char  *p, *last = temp + STU_LOG_RECORD_MAX_LEN;
 	va_list  args;
@@ -81,7 +81,7 @@ stu_log_debug(stu_int_t level, const char *fmt, ...) {
 	}
 
 	p = stu_log_prefix(temp, STU_DEBUG_PREFIX);
-	p = stu_sprintf(p, "%d: ", level);
+	p = stu_sprintf(p, "[%d]", level);
 
 	va_start(args, fmt);
 	p = stu_vsprintf(p, fmt, args);
@@ -93,15 +93,15 @@ stu_log_debug(stu_int_t level, const char *fmt, ...) {
 	*p++ = LF;
 	*p = '\0';
 
-	if (stu_log) {
-		stu_file_write(stu_log, temp, p - temp, stu_atomic_read(&stu_log->offset));
+	if (stu_logger) {
+		stu_file_write(stu_logger, temp, p - temp, stu_atomic_fetch_long(&stu_logger->offset));
 	}
 
 	stu_printf((const char *) temp);
 }
 
 void
-stu_log_error(stu_int_t err, const char *fmt, ...) {
+stu_log_c_error(stu_int_t err, const char *fmt, ...) {
 	u_char   temp[STU_LOG_RECORD_MAX_LEN];
 	u_char  *p, *last = temp + STU_LOG_RECORD_MAX_LEN;
 	va_list  args;
@@ -122,8 +122,8 @@ stu_log_error(stu_int_t err, const char *fmt, ...) {
 	*p++ = LF;
 	*p = '\0';
 
-	if (stu_log) {
-		stu_file_write(stu_log, temp, p - temp, stu_atomic_read(&stu_log->offset));
+	if (stu_logger) {
+		stu_file_write(stu_logger, temp, p - temp, stu_atomic_fetch_long(&stu_logger->offset));
 	}
 
 	stu_printf((const char *) temp);
@@ -136,12 +136,10 @@ stu_log_prefix(u_char *buf, const stu_str_t prefix) {
 	struct timeval  tv;
 	stu_tm_t        tm;
 
-	p = buf;
-
 	stu_gettimeofday(&tv);
 	stu_localtime(tv.tv_sec, &tm);
 
-	p = stu_sprintf(p, "[%4d-%02d-%02d %02d:%02d:%02d]",
+	p = stu_sprintf(buf, "[%4d-%02d-%02d %02d:%02d:%02d]",
 			tm.stu_tm_year, tm.stu_tm_mon, tm.stu_tm_mday,
 			tm.stu_tm_hour, tm.stu_tm_min, tm.stu_tm_sec
 		);

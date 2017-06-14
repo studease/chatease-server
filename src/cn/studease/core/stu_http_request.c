@@ -179,7 +179,6 @@ stu_http_process_request(stu_http_request_t *r) {
 	stu_connection_t *c;
 	stu_table_elt_t  *protocol;
 	stu_int_t         m, n, size, extened;
-	stu_uint_t        kh;
 	stu_str_t         cid, name, role, state;
 	u_char           *d, *s, *data, buf[STU_USER_ID_MAX_LEN], temp[STU_HTTP_REQUEST_DEFAULT_SIZE], opcode;
 	stu_channel_t    *ch;
@@ -271,46 +270,12 @@ preview:
 	}
 
 	// insert user into channel
-	kh = stu_hash_key_lc(cid.data, cid.len);
-
-	stu_spin_lock(&stu_cycle->channels.lock);
-
-	ch = stu_hash_find_locked(&stu_cycle->channels, kh, cid.data, cid.len);
-	if (ch == NULL) {
-		stu_log_debug(4, "channel \"%s\" not found: kh=%lu, i=%lu, len=%lu.",
-				cid.data, kh, kh % stu_cycle->channels.size, stu_cycle->channels.length);
-
-		ch = stu_slab_calloc(stu_cycle->slab_pool, sizeof(stu_channel_t));
-		if (ch == NULL) {
-			stu_log_error(0, "Failed to alloc new channel.");
-			stu_spin_unlock(&stu_cycle->channels.lock);
-			goto failed;
-		}
-
-		if (stu_channel_init(ch, &cid) == STU_ERROR) {
-			stu_log_error(0, "Failed to init channel.");
-			stu_spin_unlock(&stu_cycle->channels.lock);
-			goto failed;
-		}
-
-		if (stu_hash_init(&ch->userlist, NULL, STU_MAX_USER_N, stu_cycle->slab_pool,
-				(stu_hash_palloc_pt) stu_slab_calloc, (stu_hash_free_pt) stu_slab_free) == STU_ERROR) {
-			stu_log_error(0, "Failed to init userlist.");
-			stu_spin_unlock(&stu_cycle->channels.lock);
-			goto failed;
-		}
-
-		if (stu_hash_insert_locked(&stu_cycle->channels, &cid, ch, STU_HASH_LOWCASE|STU_HASH_REPLACE) == STU_ERROR) {
-			stu_log_error(0, "Failed to insert channel.");
-			stu_spin_unlock(&stu_cycle->channels.lock);
-			goto failed;
-		}
-
-		stu_log_debug(4, "new channel \"%s\": kh=%lu, total=%lu.",
-				ch->id.data, kh, stu_atomic_read(&stu_cycle->channels.length));
+	if (stu_channel_insert(&cid, c) == STU_ERROR) {
+		stu_log_error(0, "Failed to insert connection: fd=%d.", c->fd);
+		goto failed;
 	}
 
-	stu_spin_unlock(&stu_cycle->channels.lock);
+	ch = c->user.channel;
 
 	if (stu_http_arg(r, STU_PROTOCOL_STATE.data, STU_PROTOCOL_STATE.len, &state) == STU_OK) {
 		if (c->user.role | 0xF0) {
@@ -318,13 +283,6 @@ preview:
 			ch->state = m & 0xFF;
 		}
 	}
-
-	if (stu_channel_insert(ch, c) == STU_ERROR) {
-		stu_log_error(0, "Failed to insert connection.");
-		goto failed;
-	}
-
-	c->user.channel = ch;
 
 	// finalize request
 	protocol = r->headers_out.sec_websocket_protocol;

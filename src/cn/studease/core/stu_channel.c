@@ -14,21 +14,57 @@ static void stu_channel_remove_user_locked(stu_channel_t *ch, stu_connection_t *
 
 
 stu_int_t
-stu_channel_init(stu_channel_t *ch, stu_str_t *id) {
-	ch->id.data = stu_slab_calloc(stu_cycle->slab_pool, id->len + 1);
-	memcpy(ch->id.data, id->data, id->len);
-	ch->id.len = id->len;
+stu_channel_insert(stu_str_t *id, stu_connection_t *c) {
+	stu_int_t      rc;
+	stu_uint_t     kh;
+	stu_channel_t *ch;
 
-	return STU_OK;
-}
+	rc = STU_ERROR;
+	kh = stu_hash_key_lc(id->data, id->len);
 
-stu_int_t
-stu_channel_insert(stu_channel_t *ch, stu_connection_t *c) {
-	stu_int_t  rc;
+	stu_spin_lock(&stu_cycle->channels.lock);
+
+	ch = stu_hash_find_locked(&stu_cycle->channels, kh, id->data, id->len);
+	if (ch == NULL) {
+		stu_log_debug(4, "channel \"%s\" not found: kh=%lu, i=%lu, len=%lu.",
+				id->data, kh, kh % stu_cycle->channels.size, stu_cycle->channels.length);
+
+		ch = stu_slab_calloc(stu_cycle->slab_pool, sizeof(stu_channel_t));
+		if (ch == NULL) {
+			stu_log_error(0, "Failed to slab_calloc() new channel.");
+			goto failed;
+		}
+
+		ch->id.data = stu_slab_calloc(stu_cycle->slab_pool, id->len + 1);
+		if (ch->id.data == NULL) {
+			stu_log_error(0, "Failed to slab_calloc() channel id.");
+			goto failed;
+		}
+		ch->id.len = id->len;
+		memcpy(ch->id.data, id->data, id->len);
+
+		if (stu_hash_init(&ch->userlist, NULL, STU_MAX_USER_N, stu_cycle->slab_pool,
+				(stu_hash_palloc_pt) stu_slab_calloc, (stu_hash_free_pt) stu_slab_free) == STU_ERROR) {
+			stu_log_error(0, "Failed to init userlist.");
+			goto failed;
+		}
+
+		if (stu_hash_insert_locked(&stu_cycle->channels, id, ch, STU_HASH_LOWCASE|STU_HASH_REPLACE) == STU_ERROR) {
+			stu_log_error(0, "Failed to insert channel.");
+			goto failed;
+		}
+
+		stu_log_debug(4, "new channel \"%s\": kh=%lu, total=%lu.",
+				ch->id.data, kh, stu_cycle->channels.length);
+	}
 
 	stu_spin_lock(&ch->userlist.lock);
 	rc = stu_channel_insert_locked(ch, c);
 	stu_spin_unlock(&ch->userlist.lock);
+
+failed:
+
+	stu_spin_unlock(&stu_cycle->channels.lock);
 
 	return rc;
 }
@@ -39,6 +75,8 @@ stu_channel_insert_locked(stu_channel_t *ch, stu_connection_t *c) {
 		stu_log_error(0, "Failed to insert user \"%s\" into channel \"%s\", total=%lu.", c->user.id.data, ch->id.data, ch->userlist.length);
 		return STU_ERROR;
 	}
+
+	c->user.channel = ch;
 
 	stu_log_debug(4, "Inserted user \"%s\" into channel \"%s\", total=%lu.", c->user.id.data, ch->id.data, ch->userlist.length);
 

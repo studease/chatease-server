@@ -19,7 +19,7 @@ stu_spin_lock(stu_spinlock_t *lock) {
 	time_t      start, now;
 
 	ticket = stu_atomic_fetch_add(&lock->rlock.counter, STU_SPINLOCK_TICKET_UNIT) >> 16;
-	for (start = time(NULL); ticket != (stu_atomic_read(&lock->rlock.counter) & STU_SPINLOCK_OWNER_MASK); ) {
+	for (start = time(NULL); ticket != (stu_atomic_fetch_long(&lock->rlock.counter) & STU_SPINLOCK_OWNER_MASK); ) {
 		now = time(NULL);
 
 		if (now - start > 5) {

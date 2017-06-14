@@ -36,8 +36,6 @@ typedef struct {
 	stu_hash_t       userlist;
 } stu_channel_t;
 
-stu_int_t stu_channel_init(stu_channel_t *ch, stu_str_t *id);
-
 void  stu_channel_broadcast(stu_str_t *id, void *ch);
 
 #endif /* STU_CHANNEL_H_ */

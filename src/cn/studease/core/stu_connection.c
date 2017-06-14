@@ -51,8 +51,8 @@ start:
 
 	for (q = stu_queue_head(&pages->queue); q != stu_queue_sentinel(&pages->queue); q = stu_queue_next(q)) {
 		p = stu_queue_data(q, stu_connection_page_t, queue);
-		if (stu_atomic_read(&p->length) < STU_CONNECTIONS_PER_PAGE) {
-			lock = stu_atomic_read(&p->lock.rlock.counter);
+		if (stu_atomic_fetch_long(&p->length) < STU_CONNECTIONS_PER_PAGE) {
+			lock = stu_atomic_fetch_long(&p->lock.rlock.counter);
 			if ((lock >> 16) !=  (lock & STU_SPINLOCK_OWNER_MASK)) {
 				continue;
 			}
@@ -152,6 +152,7 @@ stu_connection_init(stu_connection_t *c, stu_socket_t s) {
 	stu_spinlock_init(&c->lock);
 
 	c->fd = s;
+
 	stu_user_init(&c->user, NULL, NULL, c->pool);
 
 	c->buffer.start = c->buffer.last = c->buffer.end = NULL;
