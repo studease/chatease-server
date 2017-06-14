@@ -114,6 +114,8 @@ stu_log_c_error(stu_int_t err, const char *fmt, ...) {
 
 	if (err) {
 		p = stu_log_errno(p, last, err);
+	} else {
+		*p++ = LF;
 	}
 
 	if (p >= last - 1) {
@@ -162,10 +164,10 @@ stu_log_errno(u_char *buf, u_char *last, stu_int_t err) {
 	buf = stu_sprintf(buf, " (%d: ", err);
 
 	buf = stu_strerror(err, buf, last - buf);
-	if (buf < last) {
+	if (buf < last - 1) {
 		*buf++ = ')';
 	}
-
+	*buf++ = LF;
 	*buf = '\0';
 
 	return buf;

@@ -266,7 +266,7 @@ preview:
 	c->user.role = STU_USER_ROLE_NORMAL;
 	if (stu_http_arg(r, STU_PROTOCOL_ROLE.data, STU_PROTOCOL_ROLE.len, &role) == STU_OK) {
 		m = atoi((const char *) role.data);
-		c->user.role = m & 0xFF;
+		stu_user_set_role(&c->user, m & 0xFF);
 	}
 
 	// insert user into channel
@@ -278,7 +278,7 @@ preview:
 	ch = c->user.channel;
 
 	if (stu_http_arg(r, STU_PROTOCOL_STATE.data, STU_PROTOCOL_STATE.len, &state) == STU_OK) {
-		if (c->user.role | 0xF0) {
+		if (c->user.role & 0xF0) {
 			m = atoi((const char *) state.data);
 			ch->state = m & 0xFF;
 		}

@@ -8,6 +8,9 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
+static uint16_t stu_user_get_interval(uint8_t role);
+
+
 stu_int_t
 stu_user_init(stu_user_t *usr, stu_str_t *id, stu_str_t *name, stu_base_pool_t *pool) {
 	if (id && id->len) {
@@ -35,5 +38,31 @@ stu_user_init(stu_user_t *usr, stu_str_t *id, stu_str_t *name, stu_base_pool_t *
 	}
 
 	return STU_OK;
+}
+
+void
+stu_user_set_role(stu_user_t *usr, uint8_t role) {
+	usr->role = role;
+	usr->interval = stu_user_get_interval(role);
+}
+
+
+static uint16_t
+stu_user_get_interval(uint8_t role) {
+	uint16_t  interval, vip;
+
+	interval = 2000;
+
+	if (role & 0xF0) {
+		interval = 0;
+	} else if (role) {
+		interval *= .5;
+		vip = role - 1;
+		if (vip) {
+			interval = interval >= vip * 100 ? interval - vip * 100 : 0;
+		}
+	}
+
+	return interval;
 }
 

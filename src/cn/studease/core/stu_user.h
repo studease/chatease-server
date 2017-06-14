@@ -23,23 +23,28 @@
 #define STU_USER_ROLE_SU_ADMIN  0x80
 #define STU_USER_ROLE_SYSTEM    0xC0
 
-typedef struct {
-	uint8_t     code;
-	stu_uint_t  time;
-} stu_punishment_t;
+typedef struct stu_punishment_s stu_punishment_t;
+
+struct stu_punishment_s {
+	uint8_t           code;
+	stu_uint_t        time;
+
+	stu_punishment_t *next;
+};
 
 typedef struct {
 	stu_str_t         id;
 	stu_str_t         name;
 	uint8_t           role;
 
-	stu_short_t       interval;
+	uint16_t          interval;
 	stu_uint_t        active;
-	stu_punishment_t  punishment;
+	stu_punishment_t *punishment;
 
 	stu_channel_t    *channel;
 } stu_user_t;
 
-stu_int_t stu_user_init(stu_user_t *usr, stu_str_t *id, stu_str_t *name, stu_base_pool_t *pool);
+stu_int_t  stu_user_init(stu_user_t *usr, stu_str_t *id, stu_str_t *name, stu_base_pool_t *pool);
+void       stu_user_set_role(stu_user_t *usr, uint8_t role);
 
 #endif /* STU_USER_H_ */

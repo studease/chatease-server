@@ -154,7 +154,7 @@ stu_upstream_ident_process_response_headers(stu_http_request_t *r) {
 
 		if (rc == STU_OK) {
 			if (r->invalid_header) {
-				stu_log_error(0, "upstream replied invalid header line: \"%s\"", r->header_name_start);
+				stu_log_error(0, "Upstream replied invalid header line: \"%s\"", r->header_name_start);
 				continue;
 			}
 
@@ -204,16 +204,16 @@ stu_upstream_ident_process_response_headers(stu_http_request_t *r) {
 		}
 
 		if (rc == STU_DONE) {
-			stu_log_debug(4, "the whole header has been parsed successfully.");
+			stu_log_debug(4, "The whole header has been parsed successfully.");
 			return STU_OK;
 		}
 
 		if (rc == STU_AGAIN) {
-			stu_log_debug(4, "a header line parsing is still not complete.");
+			stu_log_debug(4, "A header line parsing is still not complete.");
 			continue;
 		}
 
-		stu_log_error(0, "upstream replied invalid header line: \"%s\"", r->header_name_start);
+		stu_log_error(0, "Upstream replied invalid header line: \"%s\"", r->header_name_start);
 
 		return STU_ERROR;
 	}
@@ -230,7 +230,7 @@ stu_upstream_ident_analyze_response(stu_connection_t *c) {
 	stu_connection_t   *pc;
 	stu_http_request_t *r, *pr;
 	stu_table_elt_t    *protocol;
-	stu_int_t           n, size, extened;
+	stu_int_t           m, n, size, extened;
 	stu_str_t          *cid, *uid, *uname, channel_id;
 	u_char             *data, temp[STU_HTTP_REQUEST_DEFAULT_SIZE], opcode;
 	stu_channel_t      *ch;
@@ -327,7 +327,8 @@ stu_upstream_ident_analyze_response(stu_connection_t *c) {
 	stu_strncpy(c->user.name.data, uname->data, uname->len);
 	c->user.name.len = uname->len;
 
-	c->user.role = *(stu_double_t *) idurole->value;
+	m = *(stu_double_t *) idurole->value;
+	stu_user_set_role(&c->user, m & 0xFF);
 
 	// insert user into channel
 	if (stu_channel_insert(cid, c) == STU_ERROR) {
