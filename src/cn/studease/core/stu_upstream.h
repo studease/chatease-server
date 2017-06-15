@@ -30,6 +30,7 @@ typedef struct stu_upstream_server_s stu_upstream_server_t;
 
 struct stu_upstream_server_s {
 	stu_str_t                name;
+	stu_str_t                url;
 	stu_addr_t               addr;
 	in_port_t                port;
 

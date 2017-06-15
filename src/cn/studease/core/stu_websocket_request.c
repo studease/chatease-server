@@ -355,6 +355,7 @@ stu_websocket_request_handler(stu_event_t *wev) {
 	stu_websocket_frame_t   *f;
 	u_char                   temp[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE], *data;
 	stu_int_t                extened, n, cost;
+	stu_socket_t             fd;
 	stu_list_elt_t          *elts;
 	stu_hash_elt_t          *e;
 	stu_queue_t             *q;
@@ -382,10 +383,11 @@ stu_websocket_request_handler(stu_event_t *wev) {
 			for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
 				e = stu_queue_data(q, stu_hash_elt_t, q);
 				t = (stu_connection_t *) e->value;
+				fd = stu_atomic_fetch(&t->fd);
 
-				n = send(t->fd, data, f->extended + 2 + extened, 0);
+				n = send(fd, data, f->extended + 2 + extened, 0);
 				if (n == -1) {
-					stu_log_error(stu_errno, "Failed to send data: from=%d, to=%d.", c->fd, t->fd);
+					//stu_log_error(stu_errno, "Failed to send data: from=%d, to=%d.", c->fd, fd);
 					continue;
 				}
 			}

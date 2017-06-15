@@ -25,6 +25,7 @@ static stu_str_t  STU_CONF_FILE_SERVER_PUSH_USERS = stu_string("push_users");
 static stu_str_t  STU_CONF_FILE_SERVER_PUSH_USERS_INTERVAL = stu_string("push_users_interval");
 
 static stu_str_t  STU_CONF_FILE_UPSTREAM = stu_string("upstream");
+static stu_str_t  STU_CONF_FILE_UPSTREAM_URL = stu_string("url");
 static stu_str_t  STU_CONF_FILE_UPSTREAM_ADDRESS = stu_string("address");
 static stu_str_t  STU_CONF_FILE_UPSTREAM_PORT = stu_string("port");
 static stu_str_t  STU_CONF_FILE_UPSTREAM_WEIGHT = stu_string("weight");
@@ -175,6 +176,14 @@ stu_conf_file_parse(stu_config_t *cf, u_char *name, stu_pool_t *pool) {
 				server->name.data = stu_pcalloc(pool, sub->key.len + 1);
 				server->name.len = sub->key.len;
 				stu_strncpy(server->name.data, sub->key.data, sub->key.len);
+
+				srv_property = stu_json_get_object_item_by(srv, &STU_CONF_FILE_UPSTREAM_URL);
+				if (srv_property && srv_property->type == STU_JSON_TYPE_STRING) {
+					v_string = (stu_str_t *) srv_property->value;
+					server->url.data = stu_pcalloc(pool, v_string->len + 1);
+					server->url.len = v_string->len;
+					stu_strncpy(server->url.data, v_string->data, v_string->len);
+				}
 
 				srv_property = stu_json_get_object_item_by(srv, &STU_CONF_FILE_UPSTREAM_ADDRESS);
 				if (srv_property && srv_property->type == STU_JSON_TYPE_STRING) {

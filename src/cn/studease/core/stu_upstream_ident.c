@@ -8,10 +8,10 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
-stu_str_t  STU_UPSTREAM_NAMES_IDENT = stu_string("ident");
+stu_str_t   STU_UPSTREAM_NAMES_IDENT = stu_string("ident");
 stu_list_t *stu_upstream_ident_servers;
 
-extern stu_hash_t   stu_http_upstream_headers_in_hash;
+extern stu_hash_t  stu_http_upstream_headers_in_hash;
 
 static const stu_str_t  STU_UPSTREAM_IDENT_PARAMS_TOKEN = stu_string("token");
 static const stu_str_t  STU_UPSTREAM_IDENT_REQUEST = stu_string(
@@ -33,7 +33,7 @@ static const stu_str_t  STU_UPSTREAM_IDENT_REQUEST = stu_string(
 		"Content-Length: %ld" CRLF
 		"Connection: keep-alive" CRLF CRLF
 		"{\"channel\":\"%s\",\"token\":\"%s\"}"
-		 */
+		*/
 	);
 
 stu_int_t  stu_preview_auto_id = 1001;

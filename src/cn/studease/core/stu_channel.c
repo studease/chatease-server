@@ -179,6 +179,7 @@ stu_channel_broadcast(stu_str_t *id, void *ch) {
 	stu_connection_t *c;
 	stu_json_t       *res, *raw, *rschannel, *rscid, *rscstate, *rsctotal;
 	u_char           *data, temp[STU_CHANNEL_PUSH_USERS_DEFAULT_SIZE];
+	stu_socket_t      fd;
 	uint64_t          size;
 	stu_int_t         extened, n;
 
@@ -216,17 +217,13 @@ stu_channel_broadcast(stu_str_t *id, void *ch) {
 	for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
 		e = stu_queue_data(q, stu_hash_elt_t, q);
 		c = (stu_connection_t *) e->value;
+		fd = stu_atomic_fetch(&c->fd);
 
-		stu_spin_lock(&c->lock);
-
-		n = send(c->fd, data, size + 2 + extened, 0);
+		n = send(fd, data, size + 2 + extened, 0);
 		if (n == -1) {
-			stu_log_error(stu_errno, "Failed to broadcast in channel \"%s\": , fd=%d.", id->data, c->fd);
-			stu_spin_unlock(&c->lock);
+			stu_log_error(stu_errno, "Failed to broadcast in channel \"%s\": , fd=%d.", id->data, fd);
 			continue;
 		}
-
-		stu_spin_unlock(&c->lock);
 	}
 
 	stu_spin_unlock(&channel->userlist.lock);
