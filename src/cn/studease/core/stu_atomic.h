@@ -19,7 +19,7 @@
 
 
 typedef struct {
-	volatile stu_uint_t  counter;
+	volatile uint32_t  counter;
 } stu_atomic_t;
 
 
@@ -47,18 +47,18 @@ typedef struct {
 #define stu_atomic_fetch_sub(ptr, val)            \
 	__sync_fetch_and_sub(ptr, val)
 
-#define stu_atomic_fetch_long(ptr)                \
-	stu_atomic_read_long((const long *) ptr)
+#define stu_atomic_fetch(ptr)                     \
+	stu_atomic_read((const uint32_t *) ptr)
 
 #define stu_atomic_fetch_char(ptr)                \
 	stu_atomic_read_char((const char *) ptr)
 
-static inline stu_int_t
-stu_atomic_read_long(const stu_int_t *v) {
-	return (*(volatile stu_int_t *)v);
+static inline uint32_t
+stu_atomic_read(const uint32_t *v) {
+	return (*(volatile uint32_t *)v);
 }
 
-static inline stu_int_t
+static inline char
 stu_atomic_read_char(const char *v) {
 	return (*(volatile char *)v);
 }

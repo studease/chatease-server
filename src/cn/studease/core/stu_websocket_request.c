@@ -195,6 +195,8 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 	stu_str_t             *str;
 	stu_websocket_frame_t *out;
 	u_char                *data, temp[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE];
+	struct timeval         tm;
+	stu_uint_t             sec;
 
 	c = r->connection;
 	ch = c->user.channel;
@@ -208,6 +210,19 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 
 	rqreq = stu_json_get_object_item_by(req, &STU_PROTOCOL_REQ);
 
+	if (gettimeofday(&tm, NULL) == -1) {
+		stu_log_error(0, "Failed to gettimeofday().");
+		stu_websocket_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR, rqreq ? *(stu_double_t *) rqreq->value : -1);
+		return;
+	}
+	sec = tm.tv_sec * 1000 + tm.tv_usec / 1000;
+	if (c->user.active + c->user.interval > sec) {
+		stu_log_debug(4, "Refused to analyze websocket request: Frequency denied.");
+		stu_websocket_finalize_request(r, STU_HTTP_CONFLICT, rqreq ? *(stu_double_t *) rqreq->value : -1);
+		return;
+	}
+	c->user.active = sec;
+
 	cmd = stu_json_get_object_item_by(req, &STU_PROTOCOL_CMD);
 	if (cmd == NULL || cmd->type != STU_JSON_TYPE_STRING) {
 		stu_log_error(0, "Failed to analyze websocket request: \"cmd\" not found.");
@@ -219,7 +234,7 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 	str = (stu_str_t *) cmd->value;
 	if (stu_strncmp(str->data, STU_PROTOCOL_CMDS_TEXT.data, STU_PROTOCOL_CMDS_TEXT.len) == 0) {
 		if (c->user.role < ch->state) {
-			stu_log_error(0, "Websocket text request refused!");
+			stu_log_debug(4, "Refused to handle websocket text request: Rights denied.");
 			stu_json_delete(req);
 			stu_websocket_finalize_request(r, STU_HTTP_EXPECTATION_FAILED, rqreq ? *(stu_double_t *) rqreq->value : -1);
 			return;
@@ -339,12 +354,11 @@ stu_websocket_request_handler(stu_event_t *wev) {
 	stu_channel_t           *ch;
 	stu_websocket_frame_t   *f;
 	u_char                   temp[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE], *data;
-	stu_int_t                extened, n;
+	stu_int_t                extened, n, cost;
 	stu_list_elt_t          *elts;
 	stu_hash_elt_t          *e;
 	stu_queue_t             *q;
 	struct timeval           start, end;
-	stu_int_t                cost;
 
 	c = (stu_connection_t *) wev->data;
 	r = (stu_websocket_request_t *) c->data;

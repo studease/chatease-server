@@ -51,8 +51,8 @@ start:
 
 	for (q = stu_queue_head(&pages->queue); q != stu_queue_sentinel(&pages->queue); q = stu_queue_next(q)) {
 		p = stu_queue_data(q, stu_connection_page_t, queue);
-		if (stu_atomic_fetch_long(&p->length) < STU_CONNECTIONS_PER_PAGE) {
-			lock = stu_atomic_fetch_long(&p->lock.rlock.counter);
+		if (stu_atomic_fetch(&p->length) < STU_CONNECTIONS_PER_PAGE) {
+			lock = stu_atomic_fetch(&p->lock.rlock.counter);
 			if ((lock >> 16) !=  (lock & STU_SPINLOCK_OWNER_MASK)) {
 				continue;
 			}

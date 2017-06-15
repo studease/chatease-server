@@ -15,11 +15,11 @@ stu_spinlock_init(stu_spinlock_t *lock) {
 
 void
 stu_spin_lock(stu_spinlock_t *lock) {
-	stu_uint_t  ticket;
-	time_t      start, now;
+	uint32_t  ticket;
+	time_t    start, now;
 
 	ticket = stu_atomic_fetch_add(&lock->rlock.counter, STU_SPINLOCK_TICKET_UNIT) >> 16;
-	for (start = time(NULL); ticket != (stu_atomic_fetch_long(&lock->rlock.counter) & STU_SPINLOCK_OWNER_MASK); ) {
+	for (start = time(NULL); ticket != (stu_atomic_fetch(&lock->rlock.counter) & STU_SPINLOCK_OWNER_MASK); ) {
 		now = time(NULL);
 
 		if (now - start > 5) {
@@ -33,6 +33,6 @@ stu_spin_lock(stu_spinlock_t *lock) {
 
 void
 stu_spin_unlock(stu_spinlock_t *lock) {
-	stu_atomic_fetch_add(&lock->rlock.counter, 1);
+	stu_atomic_fetch_add((volatile uint16_t *) &lock->rlock.counter, 1);
 }
 

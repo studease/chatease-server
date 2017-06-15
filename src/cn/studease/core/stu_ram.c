@@ -74,7 +74,7 @@ start:
 	for (q = stu_queue_head(&pool->queue); q != stu_queue_sentinel(&pool->queue); q = stu_queue_next(q)) {
 		t = stu_queue_data(q, stu_ram_pool_t, queue);
 		if (t->bitmap != STU_RAM_BUSY64) {
-			lock = stu_atomic_fetch_long(&t->lock.rlock.counter);
+			lock = stu_atomic_fetch(&t->lock.rlock.counter);
 			if ((lock >> 16) !=  (lock & STU_SPINLOCK_OWNER_MASK)) {
 				continue;
 			}
