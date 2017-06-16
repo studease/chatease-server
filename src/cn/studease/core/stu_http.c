@@ -27,9 +27,12 @@ static void stu_http_server_handler(stu_event_t *ev);
 
 stu_int_t
 stu_http_add_listen(stu_config_t *cf) {
-	int                 reuseaddr;
+	int                 optval;
+	socklen_t           optlen;
 	stu_connection_t   *c;
 	struct sockaddr_in  sa;
+
+	optlen = sizeof(optval);
 
 	if (stu_http_init_headers_in_hash(cf) == STU_ERROR) {
 		stu_log_error(0, "Failed to init http headers in hash.");
@@ -42,9 +45,25 @@ stu_http_add_listen(stu_config_t *cf) {
 		return STU_ERROR;
 	}
 
-	reuseaddr = 1;
-	if (setsockopt(stu_httpfd, SOL_SOCKET, SO_REUSEADDR, (const void *) &reuseaddr, sizeof(int)) == -1) {
+	optval = 1;
+	if (setsockopt(stu_httpfd, SOL_SOCKET, SO_REUSEADDR, (void *) &optval, optlen) == -1) {
 		stu_log_error(stu_errno, "setsockopt(SO_REUSEADDR) failed while setting http server fd.");
+		return STU_ERROR;
+	}
+
+	if (getsockopt(stu_httpfd, SOL_SOCKET, SO_SNDBUF, (void *) &optval, &optlen) == -1) {
+		stu_log_error(stu_errno, "getsockopt(SO_SNDBUF) failed while setting http server fd.");
+		return STU_ERROR;
+	}
+
+	optval = 32768;
+	if (setsockopt(stu_httpfd, SOL_SOCKET, SO_SNDBUF, (void *) &optval, optlen) == -1) {
+		stu_log_error(stu_errno, "setsockopt(SO_SNDBUF) failed while setting http server fd.");
+		return STU_ERROR;
+	}
+
+	if (getsockopt(stu_httpfd, SOL_SOCKET, SO_SNDBUF, (void *) &optval, &optlen) == -1) {
+		stu_log_error(stu_errno, "getsockopt(SO_SNDBUF) failed while setting http server fd.");
 		return STU_ERROR;
 	}
 

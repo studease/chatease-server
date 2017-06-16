@@ -221,7 +221,7 @@ stu_channel_broadcast(stu_str_t *id, void *ch) {
 
 		n = send(fd, data, size + 2 + extened, 0);
 		if (n == -1) {
-			stu_log_error(stu_errno, "Failed to broadcast in channel \"%s\": , fd=%d.", id->data, fd);
+			//stu_log_error(stu_errno, "Failed to broadcast in channel \"%s\": , fd=%d.", id->data, fd);
 			continue;
 		}
 	}
