@@ -122,7 +122,7 @@ struct stu_http_request_s {
 	stu_str_t               args;
 
 	stu_buf_t              *header_in;
-	stu_buf_t              *request_body;
+	stu_buf_t               request_body;
 
 	stu_http_headers_in_t   headers_in;
 	stu_http_headers_out_t  headers_out;

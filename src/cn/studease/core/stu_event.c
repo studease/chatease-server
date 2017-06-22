@@ -8,111 +8,56 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
-static int  stu_epfd = -1;
+stu_event_actions_t  stu_event_actions;
+
+static stu_uint_t    stu_timer_resolution = 0;
+
 
 stu_int_t
-stu_epoll_init() {
-	if (stu_epfd == -1) {
-		stu_epfd = epoll_create(STU_EPOLL_SIZE);
-		if (stu_epfd == -1) {
-			stu_log_error(stu_errno, "Failed to create epoll.");
-			return STU_ERROR;
-		}
-	}
+stu_event_init() {
+#if (STU_WIN32)
+	stu_event_actions.init = stu_event_iocp_init;
+	stu_event_actions.add = stu_event_iocp_add;
+	stu_event_actions.del = stu_event_iocp_del;
+	stu_event_actions.process_events = stu_event_iocp_process_events;
+#elif (STU_HAVE_KQUEUE)
+	stu_event_actions.init = stu_event_kqueue_init;
+	stu_event_actions.add = stu_event_kqueue_add;
+	stu_event_actions.del = stu_event_kqueue_del;
+	stu_event_actions.process_events = stu_event_kqueue_process_events;
+#else
+	stu_event_actions.init = stu_event_epoll_init;
+	stu_event_actions.add = stu_event_epoll_add;
+	stu_event_actions.del = stu_event_epoll_del;
+	stu_event_actions.process_events = stu_event_epoll_process_events;
+#endif
 
-	return STU_OK;
+	return stu_event_actions.init();
 }
 
-stu_int_t
-stu_epoll_add_event(stu_event_t *ev, uint32_t event) {
-	stu_connection_t   *c;
-	int                 op;
-	struct epoll_event  ee;
+void
+stu_event_process_events_and_timers() {
+	stu_uint_t  flags;
+	stu_msec_t  timer, delta;
 
-	c = (stu_connection_t *) ev->data;
-
-	if ((ev->type & event) == event) {
-		goto done;
-	}
-
-	ev->type |= event;
-	op = ev->active ? EPOLL_CTL_MOD : EPOLL_CTL_ADD;
-
-	ee.events = ev->type;
-	ee.data.ptr = (void *) c;
-
-	stu_log_debug(3, "epoll add event: fd=%d, op=%d, ev=%u.", c->fd, op, ee.events);
-
-	if (epoll_ctl(stu_epfd, op, c->fd, &ee) == -1) {
-		stu_log_error(stu_errno, "epoll_ctl(%d, %d) failed", op, c->fd);
-		return STU_ERROR;
-	}
-
-done:
-
-	ev->active = TRUE;
-
-	return STU_OK;
-}
-
-stu_int_t
-stu_epoll_del_event(stu_event_t *ev, uint32_t event) {
-	stu_connection_t   *c;
-	int                 op;
-	struct epoll_event  ee;
-
-	/*
-	 * when the file descriptor is closed, the epoll automatically deletes
-	 * it from its queue, so we do not need to delete explicitly the event
-	 * before closing the file descriptor
-	 */
-	if (ev->type == STU_CLOSE_EVENT) {
-		ev->active = FALSE;
-		return STU_OK;
-	}
-
-	c = (stu_connection_t *) ev->data;
-
-	if ((ev->type & event) == 0) {
-		goto done;
-	}
-
-	ev->type &= ~event;
-
-	if (ev->active) {
-		op = EPOLL_CTL_MOD;
-		ee.events = ev->type | (event == STU_WRITE_EVENT ? STU_READ_EVENT : 0);
-		ee.data.ptr = (void *) c;
+	if (stu_timer_resolution) {
+		timer = stu_timer_resolution;
 	} else {
-		op = EPOLL_CTL_DEL;
-		ee.events = 0;
-		ee.data.ptr = NULL;
+		timer = stu_timer_find();
+		/*if (timer == STU_TIMER_INFINITE || timer > 500) {
+			timer = 500;
+		}*/
 	}
 
-	stu_log_debug(3, "epoll del event: fd=%d, op=%d, ev=%u.", c->fd, op, ee.events);
+	flags = STU_EVENT_FLAGS_UPDATE_TIME;
 
-	if (epoll_ctl(stu_epfd, op, c->fd, &ee) == -1) {
-		stu_log_error(stu_errno, "epoll_ctl(%d, %d) failed", op, c->fd);
-		return STU_ERROR;
+	delta = stu_current_msec;
+	(void) stu_event_process_events(timer, flags);
+	delta = stu_current_msec - delta;
+
+	stu_log_debug(3, "timer delta: %lu.", delta);
+
+	if (delta) {
+		stu_timer_expire();
 	}
-
-done:
-
-	//ev->active = FALSE;
-
-	return STU_OK;
 }
-
-stu_int_t
-stu_epoll_process_events(struct epoll_event *events, int maxevents, int timeout) {
-	stu_int_t  nev;
-
-	nev = epoll_wait(stu_epfd, events, maxevents, timeout);
-	if (nev <= 0) {
-		stu_log_error(stu_errno, "epoll_wait error: nev=%d.", nev);
-		return 0;
-	}
-
-	return nev;
-}
-

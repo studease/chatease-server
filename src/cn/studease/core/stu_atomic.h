@@ -58,7 +58,7 @@ stu_atomic_read(const uint32_t *v) {
 	return (*(volatile uint32_t *)v);
 }
 
-static inline char
+static stu_inline char
 stu_atomic_read_char(const char *v) {
 	return (*(volatile char *)v);
 }

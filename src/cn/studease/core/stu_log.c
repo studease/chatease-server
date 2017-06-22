@@ -134,20 +134,10 @@ stu_log_c_error(stu_int_t err, const char *fmt, ...) {
 
 static u_char *
 stu_log_prefix(u_char *buf, const stu_str_t prefix) {
-	u_char         *p;
-	struct timeval  tv;
-	stu_tm_t        tm;
+	u_char *p;
 
-	stu_gettimeofday(&tv);
-	stu_localtime(tv.tv_sec, &tm);
-
-	p = stu_sprintf(buf, "[%4d-%02d-%02d %02d:%02d:%02d]",
-			tm.stu_tm_year, tm.stu_tm_mon, tm.stu_tm_mday,
-			tm.stu_tm_hour, tm.stu_tm_min, tm.stu_tm_sec
-		);
-
-	memcpy(p, prefix.data, prefix.len);
-	p += prefix.len;
+	p = stu_memcpy(buf, stu_cached_log_time.data, stu_cached_log_time.len);
+	p = stu_memcpy(p, prefix.data, prefix.len);
 
 	return p;
 }

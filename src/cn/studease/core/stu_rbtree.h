@@ -22,12 +22,12 @@ typedef struct stu_rbtree_node_s  stu_rbtree_node_t;
 typedef void (*stu_rbtree_insert_pt)(stu_rbtree_node_t *root, stu_rbtree_node_t *node, stu_rbtree_node_t *sentinel);
 
 struct stu_rbtree_node_s {
-	stu_rbtree_key_t   key;
-	stu_rbtree_node_t *left;
-	stu_rbtree_node_t *right;
-	stu_rbtree_node_t *parent;
-	u_char             color;
-	u_char             data;
+	stu_rbtree_key_t      key;
+	stu_rbtree_node_t    *left;
+	stu_rbtree_node_t    *right;
+	stu_rbtree_node_t    *parent;
+	u_char                color;
+	u_char                data;
 };
 
 typedef struct {

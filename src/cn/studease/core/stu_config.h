@@ -20,11 +20,15 @@
 #include <unistd.h>
 
 #define __NAME    "chatease-server"
-#define __VERSION "1.0.30"
-#define __LOGGER  5
+#define __VERSION "1.0.32"
+#define __LOGGER  4
 
 #define STU_LINUX 1
 #define STU_WIN32 !STU_LINUX
+
+#define STU_HAVE_EPOLL           1
+#define STU_HAVE_KQUEUE          0
+#define STU_HAVE_IOCP            0
 
 #define STU_HAVE_PREAD           1
 #define STU_HAVE_LOCALTIME_R     1

@@ -52,7 +52,7 @@ stu_config_default(stu_config_t *cf) {
 	stu_str_null(&cf->hostname);
 
 	cf->push_users = TRUE;
-	cf->push_users_interval = STU_CHANNEL_PUSH_USERS_DEFAULT_INTERVAL;
+	cf->push_users_interval = STU_CHANNEL_PUSH_USERS_DEFAULT_INTERVAL * 1000;
 }
 
 stu_cycle_t *
@@ -140,8 +140,8 @@ stu_cycle_create(stu_config_t *cf) {
 
 	cycle->connection_n = 0;
 
-	if (stu_epoll_init() == STU_ERROR) {
-		stu_log_error(0, "Failed to init epoll.");
+	if (stu_event_init() == STU_ERROR) {
+		stu_log_error(0, "Failed to init event.");
 		return NULL;
 	}
 

@@ -24,4 +24,7 @@ void stu_spinlock_init(stu_spinlock_t *lock);
 void stu_spin_lock(stu_spinlock_t *lock);
 void stu_spin_unlock(stu_spinlock_t *lock);
 
+#define stu_trylock(rlock)  ((rlock)->counter == 0 && stu_atomic_cmp_set(&(rlock)->counter, 0, 1))
+#define stu_unlock(rlock)    (rlock)->counter = 0
+
 #endif /* STU_SPINLOCK_H_ */

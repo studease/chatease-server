@@ -27,9 +27,8 @@ sig_atomic_t   stu_restart;
 stu_thread_t   stu_threads[STU_THREADS_MAXIMUM];
 stu_int_t      stu_threads_n;
 
-extern stu_cycle_t *stu_cycle;
+extern stu_connection_t  stu_channel_push_connection;
 
-static void  stu_signal_online_users_handler(int signo);
 static void  stu_signal_worker_processes(stu_cycle_t *cycle, int signo);
 static void  stu_pass_open_filedes(stu_cycle_t *cycle, stu_filedes_t *fds);
 static void  stu_worker_process_cycle(stu_cycle_t *cycle, void *data);
@@ -193,12 +192,6 @@ stu_spawn_process(stu_cycle_t *cycle, stu_spawn_proc_pt proc, void *data, char *
 
 
 static void
-stu_signal_online_users_handler(int signo) {
-	stu_hash_foreach(&stu_cycle->channels, stu_channel_broadcast);
-	alarm(stu_cycle->config.push_users_interval);
-}
-
-static void
 stu_pass_open_filedes(stu_cycle_t *cycle, stu_filedes_t *fds) {
 	stu_int_t  i;
 
@@ -258,9 +251,12 @@ stu_signal_worker_processes(stu_cycle_t *cycle, int signo) {
 
 static void
 stu_worker_process_cycle(stu_cycle_t *cycle, void *data) {
-	stu_int_t  worker = (intptr_t) data;
-	stu_int_t  threads_n = cycle->config.worker_threads;
-	stu_int_t  n, err;
+	stu_int_t         worker;
+	stu_int_t         threads_n;
+	stu_int_t         n, err;
+
+	worker = (intptr_t) data;
+	threads_n = cycle->config.worker_threads;
 
 	stu_worker_process_init(cycle, worker);
 
@@ -287,9 +283,13 @@ stu_worker_process_cycle(stu_cycle_t *cycle, void *data) {
 		}
 	}
 
-	if (stu_cycle->config.push_users) {
-		signal(SIGALRM, stu_signal_online_users_handler);
-		alarm(stu_cycle->config.push_users_interval);
+	if (cycle->config.push_users) {
+		stu_channel_push_connection.fd = STU_SOCKET_INVALID;
+		stu_channel_push_connection.write.data = (void *) &stu_channel_push_connection;
+		stu_channel_push_connection.write.active = 1;
+		stu_channel_push_connection.write.handler = stu_channel_push_online_users;
+
+		stu_timer_add(&stu_channel_push_connection.write, cycle->config.push_users_interval);
 	}
 
 	// main thread of sub process, wait for signal
@@ -360,7 +360,7 @@ stu_filedes_handler(stu_event_t *ev) {
 		if (n == STU_ERROR) {
 			stu_log_error(0, "Failed to read filedes message.");
 
-			stu_epoll_del_event(ev, STU_READ_EVENT);
+			stu_event_del(ev, STU_READ_EVENT, 0);
 			stu_connection_close(c);
 
 			return;
@@ -401,9 +401,6 @@ static stu_thread_value_t
 stu_worker_thread_cycle(void *data) {
 	sigset_t            set;
 	//stu_thread_t     *thr = data;
-	struct epoll_event  events[STU_EPOLL_EVENTS], *ev;
-	stu_int_t           nev, i;
-	stu_connection_t   *c;
 
 	sigemptyset(&set);
 	sigaddset(&set, SIGPIPE);
@@ -413,23 +410,7 @@ stu_worker_thread_cycle(void *data) {
 	}
 
 	for ( ;; ) {
-		nev = stu_epoll_process_events(events, STU_EPOLL_EVENTS, -1);
-
-		for (i = 0; i < nev; i++) {
-			ev = &events[i];
-			c = (stu_connection_t *) events[i].data.ptr;
-			if (c == NULL || c->fd == (stu_socket_t) -1) {
-				continue;
-			}
-
-			if ((ev->events & EPOLLIN) && c->read.active) {
-				c->read.handler(&c->read);
-			}
-
-			if ((ev->events & EPOLLOUT) && c->write.active) {
-				c->write.handler(&c->write);
-			}
-		}
+		stu_event_process_events_and_timers();
 	}
 
 	stu_log_error(0, "worker thread exit.");

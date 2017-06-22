@@ -35,9 +35,10 @@ static const stu_str_t  STU_HTTP_FLASH_POLICY_FILE = stu_string("<?xml version=\
 
 
 extern stu_cycle_t *stu_cycle;
-extern stu_int_t  stu_preview_auto_id;
-extern const stu_str_t  STU_PREVIEW_UPSTREAM_IDENT_RESPONSE;
-extern stu_str_t  STU_UPSTREAM_NAMES_IDENT;
+extern stu_int_t    stu_preview_auto_id;
+
+extern stu_str_t  STU_HTTP_UPSTREAM_IDENT;
+extern stu_str_t  STU_HTTP_UPSTREAM_IDENT_RESPONSE;
 
 stu_hash_t  stu_http_headers_in_hash;
 
@@ -138,8 +139,8 @@ again:
 
 failed:
 
-	c->read.active = FALSE;
-	stu_epoll_del_event(&c->read, STU_READ_EVENT);
+	c->read.active = 0;
+	stu_event_del(&c->read, STU_READ_EVENT, 0);
 
 	stu_http_close_connection(c);
 
@@ -175,13 +176,13 @@ stu_http_create_request(stu_connection_t *c) {
 
 void
 stu_http_process_request(stu_http_request_t *r) {
-	stu_int_t         rc;
-	stu_connection_t *c;
-	stu_table_elt_t  *protocol;
-	stu_int_t         m, n, size, extened;
-	stu_str_t         cid, name, role, state;
-	u_char           *d, *s, *data, buf[STU_USER_ID_MAX_LEN], temp[STU_HTTP_REQUEST_DEFAULT_SIZE], opcode;
-	stu_channel_t    *ch;
+	stu_int_t           rc;
+	stu_connection_t   *c;
+	stu_table_elt_t    *protocol;
+	stu_int_t           m, n, size, extened;
+	stu_str_t           cid, name, role, state;
+	u_char             *d, *s, *temp, *data, opcode, buf[STU_USER_ID_MAX_LEN];
+	stu_channel_t      *ch;
 
 	rc = stu_http_process_request_headers(r);
 	if (rc != STU_OK) {
@@ -202,19 +203,21 @@ stu_http_process_request(stu_http_request_t *r) {
 	}
 
 	// enterprise
-	if (stu_upstream_create(c, STU_UPSTREAM_NAMES_IDENT.data, STU_UPSTREAM_NAMES_IDENT.len) == STU_ERROR) {
+	if (stu_upstream_create(c, STU_HTTP_UPSTREAM_IDENT.data, STU_HTTP_UPSTREAM_IDENT.len) == STU_ERROR) {
 		stu_log_error(0, "Failed to create upstream.");
 		goto failed;
 	}
 
-	c->upstream->read_event_handler = stu_upstream_ident_read_handler;
-	c->upstream->write_event_handler = stu_upstream_ident_write_handler;
+	c->upstream->read_event_handler = stu_http_upstream_read_handler;
+	c->upstream->write_event_handler = stu_http_upstream_write_handler;
 
-	c->upstream->create_request = stu_upstream_create_http_request;
-	c->upstream->reinit_request = stu_upstream_reinit_http_request;
-	c->upstream->process_response = stu_upstream_ident_process_response;
-	c->upstream->analyze_response = stu_upstream_ident_analyze_response;
-	c->upstream->finalize_handler = stu_upstream_ident_finalize_handler;
+	c->upstream->create_request_pt = stu_http_upstream_create_request;
+	c->upstream->reinit_request_pt = stu_http_upstream_reinit_request;
+	c->upstream->generate_request_pt = stu_http_upstream_ident_generate_request;
+	c->upstream->process_response_pt = stu_http_upstream_process_response;
+	c->upstream->analyze_response_pt = stu_http_upstream_ident_analyze_response;
+	c->upstream->finalize_handler_pt = stu_http_upstream_finalize_handler;
+	c->upstream->cleanup_pt = stu_http_upstream_cleanup;
 
 	if (stu_upstream_init(c) == STU_ERROR) {
 		stu_log_error(0, "Failed to init upstream.");
@@ -294,9 +297,13 @@ preview:
 
 	stu_http_finalize_request(r, STU_HTTP_SWITCHING_PROTOCOLS);
 
-	stu_memzero(temp, STU_HTTP_REQUEST_DEFAULT_SIZE);
+	temp = stu_slab_calloc(stu_cycle->slab_pool, STU_HTTP_REQUEST_DEFAULT_SIZE);
+	if (temp == NULL) {
+		stu_log_error(0, "Failed to slab_calloc() response buffer: fd=%d.", c->fd);
+		return;
+	}
 	data = stu_sprintf(
-			(u_char *) temp + 10, (const char *) STU_PREVIEW_UPSTREAM_IDENT_RESPONSE.data,
+			(u_char *) temp + 10, (const char *) STU_HTTP_UPSTREAM_IDENT_RESPONSE.data,
 			c->user.id.data, c->user.name.data, c->user.role,
 			ch->id.data, ch->state, ch->userlist.length
 		);
@@ -621,7 +628,7 @@ stu_http_finalize_request(stu_http_request_t *r, stu_int_t rc) {
 	c = r->connection;
 
 	/*c->write->handler = stu_http_request_handler;
-	if (stu_epoll_add_event(c->write, STU_WRITE_EVENT|EPOLLET) == STU_ERROR) {
+	if (stu_event_add(c->write, STU_WRITE_EVENT, STU_CLEAR_EVENT) == STU_ERROR) {
 		stu_log_error(0, "Failed to add http client write event.");
 		return;
 	}*/
@@ -646,7 +653,7 @@ stu_http_request_handler(stu_event_t *wev) {
 		return;
 	}
 
-	stu_epoll_del_event(&c->write, STU_WRITE_EVENT);
+	stu_event_del(&c->write, STU_WRITE_EVENT, 0);
 
 	buf = &c->buffer;
 	buf->last = buf->start;
@@ -695,8 +702,8 @@ stu_http_request_handler(stu_event_t *wev) {
 
 failed:
 
-	c->read.active = FALSE;
-	stu_epoll_del_event(&c->read, STU_READ_EVENT);
+	c->read.active = 0;
+	stu_event_del(&c->read, STU_READ_EVENT, 0);
 
 	ch = c->user.channel;
 	stu_channel_remove(ch, c);

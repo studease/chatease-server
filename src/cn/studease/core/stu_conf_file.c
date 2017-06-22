@@ -136,7 +136,7 @@ stu_conf_file_parse(stu_config_t *cf, u_char *name, stu_pool_t *pool) {
 		sub = stu_json_get_object_item_by(item, &STU_CONF_FILE_SERVER_PUSH_USERS_INTERVAL);
 		if (sub) {
 			v_double = (stu_double_t *) sub->value;
-			cf->push_users_interval = *v_double;
+			cf->push_users_interval = *v_double * 1000;
 		}
 	}
 

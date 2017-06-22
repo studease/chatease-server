@@ -79,7 +79,7 @@ stu_http_add_listen(stu_config_t *cf) {
 	}
 
 	c->read.handler = stu_http_server_handler;
-	if (stu_epoll_add_event(&c->read, STU_READ_EVENT) == STU_ERROR) {
+	if (stu_event_add(&c->read, STU_READ_EVENT, 0) == STU_ERROR) {
 		stu_log_error(0, "Failed to add http server event.");
 		return STU_ERROR;
 	}
@@ -145,7 +145,7 @@ again:
 	}
 
 	c->read.handler = stu_http_wait_request_handler;
-	if (stu_epoll_add_event(&c->read, STU_READ_EVENT|EPOLLET) == STU_ERROR) {
+	if (stu_event_add(&c->read, STU_READ_EVENT, STU_CLEAR_EVENT) == STU_ERROR) {
 		stu_log_error(0, "Failed to add http client read event.");
 		return;
 	}

@@ -22,6 +22,9 @@ int main(int argc, char **argv) {
 	char          val;
 	stu_config_t  cf;
 
+	stu_time_init();
+	stu_timer_init();
+
 	stu_config_default(&cf);
 
 	while ((arg = getopt(argc, argv, ":m:p:w:t:c:")) != -1) {

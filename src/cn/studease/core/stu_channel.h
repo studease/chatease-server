@@ -23,6 +23,8 @@
 
 #endif
 
+#define STU_CHANNEL_ID_MAX_LEN 16
+
 #define STU_CHANNEL_PUSH_USERS_DEFAULT_SIZE     1024
 #define STU_CHANNEL_PUSH_USERS_DEFAULT_INTERVAL 30
 
@@ -36,6 +38,8 @@ typedef struct {
 	stu_hash_t       userlist;
 } stu_channel_t;
 
+
+void  stu_channel_push_online_users(stu_event_t *ev);
 void  stu_channel_broadcast(stu_str_t *id, void *ch);
 
 #endif /* STU_CHANNEL_H_ */

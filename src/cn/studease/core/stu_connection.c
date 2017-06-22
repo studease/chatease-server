@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include "stu_config.h"
 #include "stu_core.h"
+#include "stu_event.h"
 
 extern stu_cycle_t *stu_cycle;
 
@@ -103,8 +104,8 @@ done:
 	stu_connection_init(c, s);
 
 	c->read.data = c->write.data = (void *) c;
-	c->read.active = FALSE;
-	c->write.active = TRUE;
+	c->read.active = 0;
+	c->write.active = 1;
 
 	stu_log_debug(2, "Got connection: c=%p, fd=%d.", c, c->fd);
 
@@ -119,7 +120,7 @@ stu_connection_free(stu_connection_t *c) {
 
 	fd = c->fd;
 	c->fd = (stu_socket_t) -1;
-	c->read.active = c->write.active = FALSE;
+	c->read.active = c->write.active = 0;
 
 	c->queue.next->prev = c->queue.prev;
 	c->queue.prev->next = c->queue.next;
@@ -157,7 +158,7 @@ stu_connection_init(stu_connection_t *c, stu_socket_t s) {
 
 	c->buffer.start = c->buffer.last = c->buffer.end = NULL;
 	c->data = NULL;
-	c->read.active = c->write.active = FALSE;
+	c->read.active = c->write.active = 0;
 
 	c->upstream = NULL;
 

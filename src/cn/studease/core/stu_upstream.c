@@ -10,28 +10,6 @@
 
 stu_hash_t *stu_upstreams;
 
-static stu_int_t stu_http_upstream_process_content_length(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
-static stu_int_t stu_http_upstream_process_connection(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
-static stu_int_t stu_http_upstream_process_header_line(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
-static stu_int_t stu_http_upstream_process_unique_header_line(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
-
-stu_hash_t  stu_http_upstream_headers_in_hash;
-
-stu_http_header_t  stu_http_upstream_headers_in[] = {
-	{ stu_string("Server"), offsetof(stu_http_headers_out_t, server), stu_http_upstream_process_unique_header_line },
-
-	{ stu_string("Content-Length"), offsetof(stu_http_headers_out_t, content_length), stu_http_upstream_process_content_length },
-	{ stu_string("Content-Type"), offsetof(stu_http_headers_out_t, content_type), stu_http_upstream_process_header_line },
-#if (STU_HTTP_GZIP)
-	{ stu_string("Content-Encoding"), offsetof(stu_http_headers_out_t, content_encoding), stu_http_upstream_process_header_line },
-#endif
-
-	{ stu_string("Connection"), offsetof(stu_http_headers_out_t, connection), stu_http_upstream_process_connection },
-	{ stu_string("Date"), offsetof(stu_http_headers_out_t, date), stu_http_upstream_process_header_line },
-
-	{ stu_null_string, 0, NULL }
-};
-
 static stu_int_t stu_upstream_connect(stu_connection_t *c);
 static stu_int_t stu_upstream_next(stu_connection_t *c);
 
@@ -61,9 +39,10 @@ stu_upstream_create(stu_connection_t *c, u_char *name, size_t len) {
 			return STU_ERROR;
 		}
 
+		u->cleanup_pt = stu_upstream_cleanup;
 		c->upstream = u;
 	} else {
-		stu_upstream_cleanup(c);
+		u->cleanup_pt(c);
 	}
 
 	// get upstream server
@@ -103,12 +82,14 @@ stu_upstream_init(stu_connection_t *c) {
 	u = c->upstream;
 
 	if (u->peer.state) {
-		if (c->upstream->reinit_request(c) == STU_ERROR) {
+		if (c->upstream->reinit_request_pt(c) == STU_ERROR) {
 			stu_log_error(0, "Failed to reinit request of upstream %s.", u->server->name.data);
 			return STU_ERROR;
 		}
 
+		c->upstream->generate_request_pt(c);
 		c->upstream->write_event_handler(&u->peer.connection->write);
+
 		return STU_OK;
 	}
 
@@ -156,7 +137,7 @@ stu_upstream_connect(stu_connection_t *c) {
 
 		u->peer.connection = pc;
 
-		pc->data = u->create_request(c);
+		pc->data = u->create_request_pt(c);
 		if (pc->data == NULL) {
 			stu_log_error(0, "Failed to create request of upstream %s, fd=%d.", u->server->name.data, c->fd);
 			stu_connection_free(pc);
@@ -164,13 +145,15 @@ stu_upstream_connect(stu_connection_t *c) {
 		}
 	}
 
+	c->upstream->generate_request_pt(c);
+
 	pc->read.handler = u->read_event_handler;
-	if (stu_epoll_add_event(&pc->read, STU_READ_EVENT|EPOLLET) == STU_ERROR) {
+	if (stu_event_add(&pc->read, STU_READ_EVENT, STU_CLEAR_EVENT) == STU_ERROR) {
 		stu_log_error(0, "Failed to add read event of upstream %s, fd=%d.", u->server->name.data, c->fd);
 		return STU_ERROR;
 	}
 	pc->write.handler = u->write_event_handler;
-	if (stu_epoll_add_event(&pc->write, STU_WRITE_EVENT) == STU_ERROR) {
+	if (stu_event_add(&pc->write, STU_WRITE_EVENT, STU_CLEAR_EVENT) == STU_ERROR) {
 		stu_log_error(0, "Failed to add write event of upstream %s, fd=%d.", u->server->name.data, c->fd);
 		return STU_ERROR;
 	}
@@ -267,39 +250,6 @@ stu_upstream_next(stu_connection_t *c) {
 	return STU_OK;
 }
 
-
-void *
-stu_upstream_create_http_request(stu_connection_t *c) {
-	stu_http_request_t *r;
-	stu_upstream_t     *u;
-	stu_connection_t   *pc;
-
-	u = c->upstream;
-	pc = u->peer.connection;
-
-	r = stu_http_create_request(pc);
-	if (r == NULL) {
-		stu_log_error(0, "Failed to create http request of upstream %s, fd=%d.", u->server->name.data, c->fd);
-		return NULL;
-	}
-
-	return r;
-}
-
-stu_int_t
-stu_upstream_reinit_http_request(stu_connection_t *c) {
-	stu_http_request_t *r;
-	stu_upstream_t     *u;
-
-	u = c->upstream;
-	r = u->peer.connection->data;
-
-	r->state = 0;
-
-	return STU_OK;
-}
-
-
 void
 stu_upstream_cleanup(stu_connection_t *c) {
 	stu_upstream_t   *u;
@@ -311,13 +261,13 @@ stu_upstream_cleanup(stu_connection_t *c) {
 	if (pc) {
 		stu_log_debug(4, "cleaning up upstream: fd=%d.", pc->fd);
 
-		pc->read.active = FALSE;
+		pc->read.active = 1;
 		pc->read.data = pc;
-		stu_epoll_del_event(&pc->read, STU_READ_EVENT|EPOLLET);
+		stu_event_del(&pc->read, STU_READ_EVENT, 0);
 
-		pc->write.active = FALSE;
+		pc->write.active = 0;
 		pc->write.data = pc;
-		stu_epoll_del_event(&pc->write, STU_WRITE_EVENT);
+		stu_event_del(&pc->write, STU_WRITE_EVENT, 0);
 
 		stu_connection_close(pc);
 	}
@@ -325,52 +275,3 @@ stu_upstream_cleanup(stu_connection_t *c) {
 	stu_memzero(c->upstream, sizeof(stu_upstream_t));
 }
 
-
-static stu_int_t
-stu_http_upstream_process_content_length(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset) {
-	stu_int_t  length;
-
-	length = atol((const char *) h->value.data);
-	r->headers_out.content_length_n = length;
-
-	return stu_http_upstream_process_header_line(r, h, offset);
-}
-
-static stu_int_t
-stu_http_upstream_process_connection(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset) {
-	if (stu_strnstr(h->value.data, "Keep-Alive", h->value.len)) {
-		r->headers_out.connection_type = STU_HTTP_CONNECTION_KEEP_ALIVE;
-	} else {
-		r->headers_out.connection_type = STU_HTTP_CONNECTION_CLOSE;
-	}
-
-	return STU_OK;
-}
-
-static stu_int_t
-stu_http_upstream_process_header_line(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset) {
-	stu_table_elt_t  **ph;
-
-	ph = (stu_table_elt_t **) ((char *) &r->headers_out + offset);
-	if (*ph == NULL) {
-		*ph = h;
-	}
-
-	return STU_OK;
-}
-
-static stu_int_t
-stu_http_upstream_process_unique_header_line(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset) {
-	stu_table_elt_t  **ph;
-
-	ph = (stu_table_elt_t **) ((char *) &r->headers_out + offset);
-	if (*ph == NULL) {
-		*ph = h;
-		return STU_OK;
-	}
-
-	stu_log_error(0, "http upstream sent duplicate header line = > \"%s: %s\", "
-			"previous value => \"%s: %s\"", h->key.data, h->value.data, &(*ph)->key.data, &(*ph)->value.data);
-
-	return STU_HTTP_BAD_GATEWAY;
-}

@@ -26,7 +26,7 @@ typedef struct {
 	stu_str_t      hostname;
 
 	stu_bool_t     push_users;
-	stu_uint_t     push_users_interval; // seconds
+	stu_msec_t     push_users_interval; // seconds
 
 	stu_hash_t     upstreams;           // => stu_list_t => stu_http_upstream_server_t
 } stu_config_t;

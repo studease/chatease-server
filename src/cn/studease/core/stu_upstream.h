@@ -11,18 +11,19 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
-#define STU_UPSTREAM_MAXIMUM        32
+#define STU_UPSTREAM_MAXIMUM         32
+#define STU_UPSTREAM_DEFAULT_TIMEOUT 3
 
-#define STU_UPSTREAM_SERVER_NORMAL  0x00
-#define STU_UPSTREAM_SERVER_BACKUP  0x01
-#define STU_UPSTREAM_SERVER_TIMEOUT 0x02
-#define STU_UPSTREAM_SERVER_DOWN    0x04
+#define STU_UPSTREAM_SERVER_NORMAL   0x00
+#define STU_UPSTREAM_SERVER_BACKUP   0x01
+#define STU_UPSTREAM_SERVER_TIMEOUT  0x02
+#define STU_UPSTREAM_SERVER_DOWN     0x04
 
-#define STU_UPSTREAM_PEER_IDLE      0x00
-#define STU_UPSTREAM_PEER_CONNECTED 0x01
-#define STU_UPSTREAM_PEER_LOADING   0x02
-#define STU_UPSTREAM_PEER_LOADED    0x04
-#define STU_UPSTREAM_PEER_COMPLETED 0x08
+#define STU_UPSTREAM_PEER_IDLE       0x00
+#define STU_UPSTREAM_PEER_CONNECTED  0x01
+#define STU_UPSTREAM_PEER_LOADING    0x02
+#define STU_UPSTREAM_PEER_LOADED     0x04
+#define STU_UPSTREAM_PEER_COMPLETED  0x08
 
 typedef void (*stu_upstream_handler_pt)(stu_event_t *c);
 
@@ -56,19 +57,17 @@ struct stu_upstream_s {
 	stu_upstream_server_t   *server;
 	stu_peer_connection_t    peer;
 
-	void                  *(*create_request)(stu_connection_t *c);
-	stu_int_t              (*reinit_request)(stu_connection_t *c);
-	stu_int_t              (*process_response)(stu_connection_t *c);
-	stu_int_t              (*analyze_response)(stu_connection_t *c);
-	void                   (*finalize_handler)(stu_connection_t *c, stu_int_t rc);
+	void                  *(*create_request_pt)(stu_connection_t *c);
+	stu_int_t              (*reinit_request_pt)(stu_connection_t *c);
+	stu_int_t              (*generate_request_pt)(stu_connection_t *c);
+	stu_int_t              (*process_response_pt)(stu_connection_t *c);
+	stu_int_t              (*analyze_response_pt)(stu_connection_t *c);
+	void                   (*finalize_handler_pt)(stu_connection_t *c, stu_int_t rc);
+	void                   (*cleanup_pt)(stu_connection_t *c);
 };
 
 stu_int_t stu_upstream_create(stu_connection_t *c, u_char *name, size_t len);
 stu_int_t stu_upstream_init(stu_connection_t *c);
-
-void     *stu_upstream_create_http_request(stu_connection_t *c);
-stu_int_t stu_upstream_reinit_http_request(stu_connection_t *c);
-
-void stu_upstream_cleanup(stu_connection_t *c);
+void      stu_upstream_cleanup(stu_connection_t *c);
 
 #endif /* STU_UPSTREAM_H_ */

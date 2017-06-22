@@ -8,6 +8,8 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
+stu_connection_t  stu_channel_push_connection;
+
 extern stu_cycle_t *stu_cycle;
 
 static void stu_channel_remove_user_locked(stu_channel_t *ch, stu_connection_t *c);
@@ -169,6 +171,12 @@ stu_channel_remove_user_locked(stu_channel_t *ch, stu_connection_t *c) {
 	stu_log_debug(4, "removed user \"%s\" from channel \"%s\", total=%lu.", c->user.id.data, ch->id.data, ch->userlist.length);
 }
 
+
+void
+stu_channel_push_online_users(stu_event_t *ev) {
+	stu_hash_foreach(&stu_cycle->channels, stu_channel_broadcast);
+	stu_timer_add_locked(&stu_channel_push_connection.write, stu_cycle->config.push_users_interval);
+}
 
 void
 stu_channel_broadcast(stu_str_t *id, void *ch) {

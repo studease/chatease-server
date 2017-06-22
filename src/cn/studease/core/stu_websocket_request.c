@@ -210,11 +210,7 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 
 	rqreq = stu_json_get_object_item_by(req, &STU_PROTOCOL_REQ);
 
-	if (gettimeofday(&tm, NULL) == -1) {
-		stu_log_error(0, "Failed to gettimeofday().");
-		stu_websocket_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR, rqreq ? *(stu_double_t *) rqreq->value : -1);
-		return;
-	}
+	stu_gettimeofday(&tm);
 	sec = tm.tv_sec * 1000 + tm.tv_usec / 1000;
 	if (c->user.active + c->user.interval > sec) {
 		stu_log_debug(4, "Refused to analyze websocket request: Frequency denied.");
@@ -311,7 +307,7 @@ stu_websocket_finalize_request(stu_websocket_request_t *r, stu_int_t rc, stu_dou
 	c = r->connection;
 
 	/*c->write->handler = stu_websocket_request_handler;
-	if (stu_epoll_add_event(c->write, STU_WRITE_EVENT|EPOLLET) == STU_ERROR) {
+	if (stu_event_add(c->write, STU_WRITE_EVENT, STU_CLEAR_EVENT) == STU_ERROR) {
 		stu_log_error(0, "Failed to add websocket client write event.");
 		return;
 	}*/
@@ -374,7 +370,7 @@ stu_websocket_request_handler(stu_event_t *wev) {
 				temp[0], temp[1], temp[2], temp[3], temp[4],
 				temp[5], temp[6], temp[7], temp[8], temp[9]);
 
-		gettimeofday(&start, NULL);
+		stu_gettimeofday(&start);
 
 		if (r->status == STU_HTTP_OK) {
 			stu_spin_lock(&ch->userlist.lock);
@@ -400,7 +396,7 @@ stu_websocket_request_handler(stu_event_t *wev) {
 			}
 		}
 
-		gettimeofday(&end, NULL);
+		stu_gettimeofday(&end);
 		cost = 1000000 * (end.tv_sec - start.tv_sec) + end.tv_usec - start.tv_usec;
 		stu_log_debug(4, "sent: fd=%d, bytes=%d, cost=%.3fms.", c->fd, n, cost / 1000.0f);
 	}
@@ -457,8 +453,8 @@ void
 stu_websocket_close_connection(stu_connection_t *c) {
 	stu_channel_t *ch;
 
-	c->read.active = FALSE;
-	stu_epoll_del_event(&c->read, STU_READ_EVENT);
+	c->read.active = 0;
+	stu_event_del(&c->read, STU_READ_EVENT, 0);
 
 	ch = c->user.channel;
 	stu_channel_remove(ch, c);
