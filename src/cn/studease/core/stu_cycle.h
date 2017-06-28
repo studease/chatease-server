@@ -26,9 +26,12 @@ typedef struct {
 	stu_str_t      hostname;
 
 	stu_bool_t     push_users;
-	stu_msec_t     push_users_interval; // seconds
+	stu_msec_t     push_users_interval;  // seconds
 
-	stu_hash_t     upstreams;           // => stu_list_t => stu_http_upstream_server_t
+	stu_bool_t     push_status;
+	stu_msec_t     push_status_interval; // seconds
+
+	stu_hash_t     upstreams;            // => stu_list_t => stu_http_upstream_server_t
 } stu_config_t;
 
 struct stu_cycle_s {
@@ -38,10 +41,15 @@ struct stu_cycle_s {
 	stu_ram_pool_t         ram_pool;
 
 	stu_config_t           config;
-	stu_list_t             shared_memory;   // => stu_shm_t
+	stu_list_t             shared_memory; // => stu_shm_t
 
 	stu_hash_t             channels;
 	stu_uint_t             connection_n;
+
+	stu_spinlock_t         timer_lock;
+	stu_rbtree_t           timer_rbtree;
+	stu_rbtree_node_t      timer_sentinel;
+	stu_hash_t             timers;
 };
 
 void stu_config_default(stu_config_t *cf);

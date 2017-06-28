@@ -31,9 +31,12 @@ typedef struct stu_upstream_server_s stu_upstream_server_t;
 
 struct stu_upstream_server_s {
 	stu_str_t                name;
-	stu_str_t                url;
+
+	stu_str_t                protocol;
+	stu_short_t              method;
 	stu_addr_t               addr;
 	in_port_t                port;
+	stu_str_t                target;
 
 	stu_uint_t               weight;
 	stu_uint_t               max_fails;
@@ -66,8 +69,8 @@ struct stu_upstream_s {
 	void                   (*cleanup_pt)(stu_connection_t *c);
 };
 
-stu_int_t stu_upstream_create(stu_connection_t *c, u_char *name, size_t len);
-stu_int_t stu_upstream_init(stu_connection_t *c);
-void      stu_upstream_cleanup(stu_connection_t *c);
+stu_int_t  stu_upstream_create(stu_connection_t *c, u_char *name, size_t len);
+stu_int_t  stu_upstream_init(stu_connection_t *c);
+void       stu_upstream_cleanup(stu_connection_t *c);
 
 #endif /* STU_UPSTREAM_H_ */

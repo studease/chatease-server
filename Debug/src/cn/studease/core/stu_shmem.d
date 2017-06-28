@@ -19,11 +19,11 @@ src/cn/studease/core/stu_shmem.d: ../src/cn/studease/core/stu_shmem.c \
  ../src/cn/studease/core/stu_hash.h ../src/cn/studease/core/stu_inet.h \
  ../src/cn/studease/core/stu_channel.h ../src/cn/studease/core/stu_user.h \
  ../src/cn/studease/core/stu_connection.h \
- ../src/cn/studease/core/stu_timer.h ../src/cn/studease/core/stu_shmem.h \
- ../src/cn/studease/core/stu_thread.h ../src/cn/studease/core/stu_cycle.h \
+ ../src/cn/studease/core/stu_shmem.h ../src/cn/studease/core/stu_thread.h \
+ ../src/cn/studease/core/stu_cycle.h ../src/cn/studease/core/stu_timer.h \
  ../src/cn/studease/core/stu_conf_file.h \
  ../src/cn/studease/core/stu_protocol.h \
- ../src/cn/studease/core/stu_http.h \
+ ../src/cn/studease/core/stu_flash.h ../src/cn/studease/core/stu_http.h \
  ../src/cn/studease/core/stu_http_request.h \
  ../src/cn/studease/core/stu_http_parse.h \
  ../src/cn/studease/core/stu_websocket_request.h \
@@ -101,17 +101,19 @@ src/cn/studease/core/stu_shmem.d: ../src/cn/studease/core/stu_shmem.c \
 
 ../src/cn/studease/core/stu_connection.h:
 
-../src/cn/studease/core/stu_timer.h:
-
 ../src/cn/studease/core/stu_shmem.h:
 
 ../src/cn/studease/core/stu_thread.h:
 
 ../src/cn/studease/core/stu_cycle.h:
 
+../src/cn/studease/core/stu_timer.h:
+
 ../src/cn/studease/core/stu_conf_file.h:
 
 ../src/cn/studease/core/stu_protocol.h:
+
+../src/cn/studease/core/stu_flash.h:
 
 ../src/cn/studease/core/stu_http.h:
 

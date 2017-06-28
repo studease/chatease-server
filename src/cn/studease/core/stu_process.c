@@ -27,55 +27,16 @@ sig_atomic_t   stu_restart;
 stu_thread_t   stu_threads[STU_THREADS_MAXIMUM];
 stu_int_t      stu_threads_n;
 
-extern stu_connection_t  stu_channel_push_connection;
-
-static void  stu_signal_worker_processes(stu_cycle_t *cycle, int signo);
-static void  stu_pass_open_filedes(stu_cycle_t *cycle, stu_filedes_t *fds);
-static void  stu_worker_process_cycle(stu_cycle_t *cycle, void *data);
-static void  stu_worker_process_init(stu_cycle_t *cycle, stu_int_t worker);
-static void  stu_filedes_handler(stu_event_t *ev);
-static stu_thread_value_t stu_worker_thread_cycle(void *data);
+static void  stu_process_signal_worker_processes(stu_cycle_t *cycle, int signo);
+static void  stu_process_pass_open_filedes(stu_cycle_t *cycle, stu_filedes_t *fds);
+static void  stu_process_worker_cycle(stu_cycle_t *cycle, void *data);
+static void  stu_process_worker_init(stu_cycle_t *cycle, stu_int_t worker);
+static void  stu_process_filedes_handler(stu_event_t *ev);
+static stu_thread_value_t stu_process_worker_thread_cycle(void *data);
 
 
 void
-stu_process_master_cycle(stu_cycle_t *cycle) {
-	sigset_t  set;
-
-	if (cycle->config.master_process == FALSE) {
-		return;
-	}
-
-	sigemptyset(&set);
-	sigaddset(&set, SIGCHLD);
-	sigaddset(&set, SIGALRM);
-	sigaddset(&set, SIGIO);
-	sigaddset(&set, SIGINT);
-	sigaddset(&set, stu_signal_value(STU_SHUTDOWN_SIGNAL));
-	sigaddset(&set, stu_signal_value(STU_CHANGEBIN_SIGNAL));
-
-	if (sigprocmask(SIG_BLOCK, &set, NULL) == -1) {
-		stu_log_error(stu_errno, "sigprocmask() failed.");
-	}
-
-	sigemptyset(&set);
-
-	for ( ;; ) {
-		stu_log_debug(3, "sigsuspending...");
-		sigsuspend(&set);
-
-		if (stu_quit) {
-			stu_signal_worker_processes(cycle, stu_signal_value(STU_SHUTDOWN_SIGNAL));
-		}
-
-		if (stu_restart) {
-			stu_log("Restarting server...");
-			// respawn processes
-		}
-	}
-}
-
-void
-stu_start_worker_processes(stu_cycle_t *cycle) {
+stu_process_start_worker_processes(stu_cycle_t *cycle) {
 	stu_filedes_t  fds;
 	stu_config_t  *cf;
 	stu_int_t      i;
@@ -85,18 +46,18 @@ stu_start_worker_processes(stu_cycle_t *cycle) {
 
 	cf = &cycle->config;
 	for (i = 0; i < cf->worker_processes; i++) {
-		stu_spawn_process(cycle, stu_worker_process_cycle, (void *) (intptr_t) i, "worker process");
+		stu_process_spawn(cycle, stu_process_worker_cycle, (void *) (intptr_t) i, "worker process");
 
 		fds.pid = stu_processes[stu_process_slot].pid;
 		fds.slot = stu_process_slot;
 		fds.fd = stu_processes[stu_process_slot].filedes[0];
 
-		stu_pass_open_filedes(cycle, &fds);
+		stu_process_pass_open_filedes(cycle, &fds);
 	}
 }
 
 stu_pid_t
-stu_spawn_process(stu_cycle_t *cycle, stu_spawn_proc_pt proc, void *data, char *name) {
+stu_process_spawn(stu_cycle_t *cycle, stu_process_worker_cycle_pt proc, void *data, char *name) {
 	u_long     on;
 	stu_pid_t  pid;
 	stu_int_t  s;
@@ -192,7 +153,7 @@ stu_spawn_process(stu_cycle_t *cycle, stu_spawn_proc_pt proc, void *data, char *
 
 
 static void
-stu_pass_open_filedes(stu_cycle_t *cycle, stu_filedes_t *fds) {
+stu_process_pass_open_filedes(stu_cycle_t *cycle, stu_filedes_t *fds) {
 	stu_int_t  i;
 
 	for (i = 0; i < stu_process_last; i++) {
@@ -208,7 +169,7 @@ stu_pass_open_filedes(stu_cycle_t *cycle, stu_filedes_t *fds) {
 }
 
 static void
-stu_signal_worker_processes(stu_cycle_t *cycle, int signo) {
+stu_process_signal_worker_processes(stu_cycle_t *cycle, int signo) {
 	stu_filedes_t  fds;
 	stu_int_t      i;
 
@@ -250,7 +211,7 @@ stu_signal_worker_processes(stu_cycle_t *cycle, int signo) {
 }
 
 static void
-stu_worker_process_cycle(stu_cycle_t *cycle, void *data) {
+stu_process_worker_cycle(stu_cycle_t *cycle, void *data) {
 	stu_int_t         worker;
 	stu_int_t         threads_n;
 	stu_int_t         n, err;
@@ -258,7 +219,7 @@ stu_worker_process_cycle(stu_cycle_t *cycle, void *data) {
 	worker = (intptr_t) data;
 	threads_n = cycle->config.worker_threads;
 
-	stu_worker_process_init(cycle, worker);
+	stu_process_worker_init(cycle, worker);
 
 	if (stu_init_threads(threads_n, STU_THREADS_DEFAULT_STACKSIZE) == STU_ERROR) {
 		stu_log_error(0, "Failed to init threads.");
@@ -277,19 +238,15 @@ stu_worker_process_cycle(stu_cycle_t *cycle, void *data) {
 			exit(2);
 		}
 
-		if (stu_create_thread((stu_tid_t *) &stu_threads[n].id, stu_worker_thread_cycle, (void *) &stu_threads[n]) == STU_ERROR) {
+		if (stu_thread_create((stu_tid_t *) &stu_threads[n].id, stu_process_worker_thread_cycle, (void *) &stu_threads[n]) == STU_ERROR) {
 			stu_log_error(0, "Failed to create thread[%d].", n);
 			exit(2);
 		}
 	}
 
-	if (cycle->config.push_users) {
-		stu_channel_push_connection.fd = STU_SOCKET_INVALID;
-		stu_channel_push_connection.write.data = (void *) &stu_channel_push_connection;
-		stu_channel_push_connection.write.active = 1;
-		stu_channel_push_connection.write.handler = stu_channel_push_online_users;
-
-		stu_timer_add(&stu_channel_push_connection.write, cycle->config.push_users_interval);
+	if (stu_channel_add_timers() == STU_ERROR) {
+		stu_log_error(0, "Failed to add channel timers.");
+		exit(2);
 	}
 
 	// main thread of sub process, wait for signal
@@ -308,7 +265,7 @@ stu_worker_process_cycle(stu_cycle_t *cycle, void *data) {
 }
 
 static void
-stu_worker_process_init(stu_cycle_t *cycle, stu_int_t worker) {
+stu_process_worker_init(stu_cycle_t *cycle, stu_int_t worker) {
 	sigset_t   set;
 	stu_int_t  n;
 
@@ -340,14 +297,14 @@ stu_worker_process_init(stu_cycle_t *cycle, stu_int_t worker) {
 		stu_log_error(stu_errno, "close() filedes failed");
 	}
 
-	if (stu_filedes_add_event(stu_filedes, STU_READ_EVENT, stu_filedes_handler) == STU_ERROR) {
+	if (stu_filedes_add_event(stu_filedes, STU_READ_EVENT, stu_process_filedes_handler) == STU_ERROR) {
 		/* fatal */
 		exit(2);
 	}
 }
 
 static void
-stu_filedes_handler(stu_event_t *ev) {
+stu_process_filedes_handler(stu_event_t *ev) {
 	stu_int_t          n;
 	stu_filedes_t      ch;
 	stu_connection_t  *c;
@@ -398,7 +355,7 @@ stu_filedes_handler(stu_event_t *ev) {
 }
 
 static stu_thread_value_t
-stu_worker_thread_cycle(void *data) {
+stu_process_worker_thread_cycle(void *data) {
 	sigset_t            set;
 	//stu_thread_t     *thr = data;
 
@@ -418,3 +375,40 @@ stu_worker_thread_cycle(void *data) {
 	return NULL;
 }
 
+
+void
+stu_process_master_cycle(stu_cycle_t *cycle) {
+	sigset_t  set;
+
+	if (cycle->config.master_process == FALSE) {
+		return;
+	}
+
+	sigemptyset(&set);
+	sigaddset(&set, SIGCHLD);
+	sigaddset(&set, SIGALRM);
+	sigaddset(&set, SIGIO);
+	sigaddset(&set, SIGINT);
+	sigaddset(&set, stu_signal_value(STU_SHUTDOWN_SIGNAL));
+	sigaddset(&set, stu_signal_value(STU_CHANGEBIN_SIGNAL));
+
+	if (sigprocmask(SIG_BLOCK, &set, NULL) == -1) {
+		stu_log_error(stu_errno, "sigprocmask() failed.");
+	}
+
+	sigemptyset(&set);
+
+	for ( ;; ) {
+		stu_log_debug(3, "sigsuspending...");
+		sigsuspend(&set);
+
+		if (stu_quit) {
+			stu_process_signal_worker_processes(cycle, stu_signal_value(STU_SHUTDOWN_SIGNAL));
+		}
+
+		if (stu_restart) {
+			stu_log("Restarting server...");
+			// respawn processes
+		}
+	}
+}

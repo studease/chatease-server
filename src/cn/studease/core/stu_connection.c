@@ -104,6 +104,7 @@ done:
 	stu_connection_init(c, s);
 
 	c->read.data = c->write.data = (void *) c;
+	c->read.type = c->write.type = 0;
 	c->read.active = 0;
 	c->write.active = 1;
 
@@ -122,14 +123,16 @@ stu_connection_free(stu_connection_t *c) {
 	c->fd = (stu_socket_t) -1;
 	c->read.active = c->write.active = 0;
 
+	stu_upstream_cleanup(c);
+
+	stu_ram_free(&stu_cycle->ram_pool, (void *) c->pool);
+
 	c->queue.next->prev = c->queue.prev;
 	c->queue.prev->next = c->queue.next;
 	stu_queue_insert_tail(&c->page->free.queue, &c->queue);
 
 	c->page->length--;
 	stu_atomic_fetch_sub(&stu_cycle->connection_n, 1);
-
-	stu_ram_free(&stu_cycle->ram_pool, (void *) c->pool);
 
 	stu_log_debug(2, "Freed connection: c=%p, fd=%d.", c, fd);
 

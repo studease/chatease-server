@@ -32,7 +32,7 @@ typedef struct {
 typedef void *  stu_thread_value_t;
 
 stu_int_t stu_init_threads(int n, size_t size);
-stu_int_t stu_create_thread(stu_tid_t *tid, stu_thread_value_t (*func)(void *arg), void *arg);
+stu_int_t stu_thread_create(stu_tid_t *tid, stu_thread_value_t (*func)(void *arg), void *arg);
 
 stu_int_t stu_cond_init(stu_cond_t *cond);
 

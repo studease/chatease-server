@@ -23,8 +23,6 @@ int main(int argc, char **argv) {
 	stu_config_t  cf;
 
 	stu_time_init();
-	stu_timer_init();
-
 	stu_config_default(&cf);
 
 	while ((arg = getopt(argc, argv, ":m:p:w:t:c:")) != -1) {
@@ -84,12 +82,17 @@ int main(int argc, char **argv) {
 		return EXIT_FAILURE;
 	}
 
-	if (stu_http_add_listen(&stu_cycle->config) == STU_ERROR) {
-		stu_log_error(0, "Failed to add websocket listen.");
+	if (stu_flash_add_listen(&stu_cycle->config) == STU_ERROR) {
+		stu_log_error(0, "Failed to add flash listen.");
 		return EXIT_FAILURE;
 	}
 
-	stu_start_worker_processes(stu_cycle);
+	if (stu_http_add_listen(&stu_cycle->config) == STU_ERROR) {
+		stu_log_error(0, "Failed to add http listen.");
+		return EXIT_FAILURE;
+	}
+
+	stu_process_start_worker_processes(stu_cycle);
 	stu_process_master_cycle(stu_cycle);
 
 	return EXIT_SUCCESS;

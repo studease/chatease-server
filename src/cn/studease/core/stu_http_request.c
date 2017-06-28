@@ -18,10 +18,8 @@ static stu_int_t stu_http_process_host(stu_http_request_t *r, stu_table_elt_t *h
 static stu_int_t stu_http_process_connection(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 static stu_int_t stu_http_process_content_length(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 static stu_int_t stu_http_process_sec_websocket_key(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
+static stu_int_t stu_http_process_sec_websocket_key_for_safari(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 static stu_int_t stu_http_process_sec_websocket_protocol(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
-
-static stu_int_t stu_http_process_sec_websocket_key_of_safari(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
-static stu_int_t stu_http_process_sec_websocket_key_for_safari(stu_http_request_t *r);
 
 static stu_int_t stu_http_process_header_line(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 static stu_int_t stu_http_process_unique_header_line(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
@@ -31,8 +29,6 @@ static const stu_str_t  STU_HTTP_HEADER_SEC_WEBSOCKET_ACCEPT = stu_string("Sec-W
 static const stu_str_t  STU_HTTP_HEADER_SEC_WEBSOCKET_PROTOCOL = stu_string("Sec-WebSocket-Protocol");
 static const stu_str_t  STU_HTTP_WEBSOCKET_SIGN_KEY = stu_string("258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
 
-static const stu_str_t  STU_HTTP_FLASH_POLICY_FILE = stu_string("<?xml version=\"1.0\" encoding=\"UTF-8\"?><cross-domain-policy><allow-access-from domain=\"*\" /></cross-domain-policy>");
-
 
 extern stu_cycle_t *stu_cycle;
 extern stu_int_t    stu_preview_auto_id;
@@ -40,8 +36,10 @@ extern stu_int_t    stu_preview_auto_id;
 extern stu_str_t  STU_HTTP_UPSTREAM_IDENT;
 extern stu_str_t  STU_HTTP_UPSTREAM_IDENT_RESPONSE;
 
-stu_hash_t  stu_http_headers_in_hash;
+extern stu_str_t  STU_FLASH_POLICY_REQUEST;
+extern stu_str_t  STU_FLASH_POLICY_FILE;
 
+stu_hash_t         stu_http_headers_in_hash;
 stu_http_header_t  stu_http_headers_in[] = {
 	{ stu_string("Host"), offsetof(stu_http_headers_in_t, host), stu_http_process_host },
 	{ stu_string("User-Agent"), offsetof(stu_http_headers_in_t, user_agent),  stu_http_process_header_line },
@@ -56,9 +54,9 @@ stu_http_header_t  stu_http_headers_in[] = {
 	{ stu_string("Content-Type"), offsetof(stu_http_headers_in_t, content_type), stu_http_process_header_line },
 
 	{ stu_string("Sec-Websocket-Key"), offsetof(stu_http_headers_in_t, sec_websocket_key), stu_http_process_sec_websocket_key },
-	{ stu_string("Sec-Websocket-Key1"), offsetof(stu_http_headers_in_t, sec_websocket_key1), stu_http_process_sec_websocket_key_of_safari },
-	{ stu_string("Sec-Websocket-Key2"), offsetof(stu_http_headers_in_t, sec_websocket_key2), stu_http_process_sec_websocket_key_of_safari },
-	{ stu_string("(Key3)"), offsetof(stu_http_headers_in_t, sec_websocket_key3), stu_http_process_sec_websocket_key_of_safari },
+	{ stu_string("Sec-Websocket-Key1"), offsetof(stu_http_headers_in_t, sec_websocket_key1), stu_http_process_sec_websocket_key_for_safari },
+	{ stu_string("Sec-Websocket-Key2"), offsetof(stu_http_headers_in_t, sec_websocket_key2), stu_http_process_sec_websocket_key_for_safari },
+	{ stu_string("(Key3)"), offsetof(stu_http_headers_in_t, sec_websocket_key3), stu_http_process_sec_websocket_key_for_safari },
 	{ stu_string("Sec-Websocket-Protocol"), offsetof(stu_http_headers_in_t, sec_websocket_protocol), stu_http_process_sec_websocket_protocol },
 	{ stu_string("Sec-Websocket-Version"), offsetof(stu_http_headers_in_t, sec_websocket_version), stu_http_process_unique_header_line },
 	{ stu_string("Sec-Websocket-Extensions"), offsetof(stu_http_headers_in_t, sec_websocket_extensions), stu_http_process_unique_header_line },
@@ -113,10 +111,10 @@ again:
 		goto failed;
 	}
 
-	stu_log_debug(4, "recv: fd=%d, bytes=%d.", c->fd, n);//str=\n%s, c->buffer.start
+	stu_log_debug(4, "recv: fd=%d, bytes=%d.", c->fd, n); //str=\n%s, c->buffer.start
 
-	if (stu_strncmp(c->buffer.start, "<policy-file-request/>\0", 23) == 0) {
-		n = send(c->fd, STU_HTTP_FLASH_POLICY_FILE.data, STU_HTTP_FLASH_POLICY_FILE.len, 0);
+	if (stu_strncmp(c->buffer.start, STU_FLASH_POLICY_REQUEST.data, STU_FLASH_POLICY_REQUEST.len) == 0) {
+		n = send(c->fd, STU_FLASH_POLICY_FILE.data, STU_FLASH_POLICY_FILE.len, 0);
 		if (n == -1) {
 			stu_log_debug(4, "Failed to send policy file: fd=%d.", c->fd);
 			goto failed;
@@ -124,7 +122,7 @@ again:
 
 		stu_log_debug(4, "sent policy file: fd=%d, bytes=%d.", c->fd, n);
 
-		goto done;
+		goto done; // Todo: close in 3 sec
 	}
 
 	c->data = (void *) stu_http_create_request(c);
@@ -181,7 +179,7 @@ stu_http_process_request(stu_http_request_t *r) {
 	stu_table_elt_t    *protocol;
 	stu_int_t           m, n, size, extened;
 	stu_str_t           cid, name, role, state;
-	u_char             *d, *s, *temp, *data, opcode, buf[STU_USER_ID_MAX_LEN];
+	u_char             *d, *s, *p, opcode, temp[STU_HTTP_REQUEST_DEFAULT_SIZE], buf[STU_USER_ID_MAX_LEN];
 	stu_channel_t      *ch;
 
 	rc = stu_http_process_request_headers(r);
@@ -204,7 +202,7 @@ stu_http_process_request(stu_http_request_t *r) {
 
 	// enterprise
 	if (stu_upstream_create(c, STU_HTTP_UPSTREAM_IDENT.data, STU_HTTP_UPSTREAM_IDENT.len) == STU_ERROR) {
-		stu_log_error(0, "Failed to create upstream.");
+		stu_log_error(0, "Failed to create http upstream \"ident\".");
 		goto failed;
 	}
 
@@ -297,21 +295,17 @@ preview:
 
 	stu_http_finalize_request(r, STU_HTTP_SWITCHING_PROTOCOLS);
 
-	temp = stu_slab_calloc(stu_cycle->slab_pool, STU_HTTP_REQUEST_DEFAULT_SIZE);
-	if (temp == NULL) {
-		stu_log_error(0, "Failed to slab_calloc() response buffer: fd=%d.", c->fd);
-		return;
-	}
-	data = stu_sprintf(
+	p = stu_sprintf(
 			(u_char *) temp + 10, (const char *) STU_HTTP_UPSTREAM_IDENT_RESPONSE.data,
 			c->user.id.data, c->user.name.data, c->user.role,
 			ch->id.data, ch->state, ch->userlist.length
 		);
+	*p = '\0';
 
-	size = data - temp - 10;
-	data = stu_websocket_encode_frame(opcode, temp, size, &extened);
+	size = p - temp - 10;
+	p = stu_websocket_encode_frame(opcode, temp, size, &extened);
 
-	n = send(c->fd, data, size + 2 + extened, 0);
+	n = send(c->fd, p, size + 2 + extened, 0);
 	if (n == -1) {
 		stu_log_debug(4, "Failed to send \"ident\" frame: fd=%d.", c->fd);
 		goto failed;
@@ -418,6 +412,8 @@ stu_http_process_host(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offs
 
 static stu_int_t
 stu_http_process_connection(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset) {
+	stu_http_process_unique_header_line(r, h, offset);
+
 	if (stu_strnstr(h->value.data, "Keep-Alive", h->value.len)) {
 		r->headers_in.connection_type = STU_HTTP_CONNECTION_KEEP_ALIVE;
 	} else if (stu_strnstr(h->value.data, "Upgrade", h->value.len)) {
@@ -431,7 +427,9 @@ stu_http_process_connection(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_
 
 static stu_int_t
 stu_http_process_content_length(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset) {
-	stu_int_t  length;
+	stu_int_t         length;
+
+	stu_http_process_unique_header_line(r, h, offset);
 
 	length = atol((const char *) h->value.data);
 	r->headers_in.content_length_n = length;
@@ -444,6 +442,8 @@ stu_http_process_sec_websocket_key(stu_http_request_t *r, stu_table_elt_t *h, st
 	stu_table_elt_t *e;
 	stu_sha1_t       sha1;
 	stu_str_t        sha1_signed;
+
+	stu_http_process_unique_header_line(r, h, offset);
 
 	e = stu_base_pcalloc(r->connection->pool, sizeof(stu_table_elt_t));
 	if (e == NULL) {
@@ -480,27 +480,14 @@ stu_http_process_sec_websocket_key(stu_http_request_t *r, stu_table_elt_t *h, st
 }
 
 static stu_int_t
-stu_http_process_sec_websocket_key_of_safari(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset) {
-	stu_table_elt_t  **ph;
-
-	ph = (stu_table_elt_t **) ((char *) &r->headers_in + offset);
-
-	if (*ph == NULL) {
-		*ph = h;
-	}
-
-	stu_http_process_sec_websocket_key_for_safari(r);
-
-	return STU_OK;
-}
-
-static stu_int_t
-stu_http_process_sec_websocket_key_for_safari(stu_http_request_t *r) {
+stu_http_process_sec_websocket_key_for_safari(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset) {
 	stu_table_elt_t *e, *h1, *h2;
 	stu_md5_t        md5;
 	stu_str_t        md5_signed;
 	u_char           s1[16], s2[16], key[16], *c, *s;
 	stu_int_t        index, n, k1, k2;
+
+	stu_http_process_unique_header_line(r, h, offset);
 
 	if (r->headers_in.sec_websocket_key1 == NULL || r->headers_in.sec_websocket_key2 == NULL) {
 		return STU_AGAIN;
@@ -573,6 +560,8 @@ static stu_int_t
 stu_http_process_sec_websocket_protocol(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset) {
 	stu_table_elt_t *e;
 
+	stu_http_process_unique_header_line(r, h, offset);
+
 	e = stu_base_pcalloc(r->connection->pool, sizeof(stu_table_elt_t));
 	if (e == NULL) {
 		return STU_HTTP_INTERNAL_SERVER_ERROR;
@@ -614,7 +603,7 @@ stu_http_process_unique_header_line(stu_http_request_t *r, stu_table_elt_t *h, s
 	}
 
 	stu_log_error(0, "client sent duplicate header line = > \"%s: %s\", "
-			"previous value => \"%s: %s\"", h->key.data, h->value.data, &(*ph)->key.data, &(*ph)->value.data);
+			"previous value => \"%s: %s\"", h->key.data, h->value.data, (*ph)->key.data, (*ph)->value.data);
 
 	return STU_HTTP_BAD_REQUEST;
 }

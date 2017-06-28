@@ -8,33 +8,10 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
-extern stu_cycle_t *stu_cycle;
-stu_int_t           stu_preview_auto_id = 1001;
+stu_int_t  stu_preview_auto_id = 1001;
 
-stu_str_t  STU_HTTP_UPSTREAM_IDENT = stu_string("ident");
+stu_str_t  STU_HTTP_UPSTREAM_IDENT_PARAM_CHANNEL = stu_string("channel");
 stu_str_t  STU_HTTP_UPSTREAM_IDENT_PARAM_TOKEN = stu_string("token");
-
-stu_str_t  STU_HTTP_UPSTREAM_IDENT_REQUEST = stu_string(
-
-		"GET /websocket/data/userinfo.json?channel=%s&token=%s HTTP/1.1" CRLF
-		"Host: localhost" CRLF
-		"User-Agent: " __NAME "/" __VERSION CRLF
-		"Accept: application/json" CRLF
-		"Accept-Charset: utf-8"
-		"Accept-Language: zh-CN,zh;q=0.8,en-US;q=0.5,en;q=0.3" CRLF
-		"Connection: keep-alive" CRLF CRLF
-		/*
-		"POST /live/method=httpChatRoom HTTP/1.1" CRLF
-		"Host: www.qcus.cn" CRLF
-		"User-Agent: " __NAME "/" __VERSION CRLF
-		"Accept: text/html" CRLF
-		"Accept-Language: zh-CN,zh;q=0.8" CRLF
-		"Content-Type: application/json" CRLF
-		"Content-Length: %ld" CRLF
-		"Connection: keep-alive" CRLF CRLF
-		"{\"channel\":\"%s\",\"token\":\"%s\"}"
-		*/
-	);
 
 stu_str_t  STU_HTTP_UPSTREAM_IDENT_RESPONSE = stu_string(
 		"{\"raw\":\"ident\",\"user\":{\"id\":\"%ld\",\"name\":\"%s\",\"role\":%d},\"channel\":{\"id\":\"%s\",\"state\":%d,\"total\":%lu}}"
@@ -47,37 +24,57 @@ stu_http_upstream_ident_generate_request(stu_connection_t *c) {
 	stu_upstream_t     *u;
 	stu_connection_t   *pc;
 	stu_str_t           arg;
-	u_char             *temp, *data, channel[STU_CHANNEL_ID_MAX_LEN], token[STU_HTTP_UPSTREAM_IDENT_TOKEN_MAX_LEN];
+	u_char             *p;
+	stu_json_t         *res, *rschannel, *rstoken;
 
 	r = (stu_http_request_t *) c->data;
 	u = c->upstream;
 	pc = u->peer.connection;
 	pr = (stu_http_request_t *) pc->data;
 
-	stu_strncpy(channel, r->target.data, r->target.len);
-
 	stu_str_null(&arg);
 	if (stu_http_arg(r, STU_HTTP_UPSTREAM_IDENT_PARAM_TOKEN.data, STU_HTTP_UPSTREAM_IDENT_PARAM_TOKEN.len, &arg) != STU_OK) {
-		stu_log_debug(4, "Param \"%s\" not found while sending upstream %s: fd=%d.", STU_HTTP_UPSTREAM_IDENT_PARAM_TOKEN.data, u->server->name.data, pc->fd);
+		stu_log_debug(4, "Param \"%s\" not found while sending upstream %s: c->fd=%d, u->fd=%d.",
+				STU_HTTP_UPSTREAM_IDENT_PARAM_TOKEN.data, u->server->name.data, c->fd, pc->fd);
 	}
-	*token = '\0';
-	stu_strncpy(token, arg.data, arg.len);
 
-	temp = pr->request_body.start;
-	if (temp == NULL) {
-		temp = stu_slab_calloc(stu_cycle->slab_pool, STU_HTTP_REQUEST_DEFAULT_SIZE);
-		if (temp == NULL) {
-			stu_log_error(0, "Failed to slab_calloc() request buffer: fd=%d.", c->fd);
+	if (pr->request_body.start == NULL) {
+		pr->request_body.start = stu_base_palloc(pc->pool, STU_HTTP_REQUEST_DEFAULT_SIZE);
+		if (pr->request_body.start == NULL) {
+			stu_log_error(0, "Failed to palloc() request body: fd=%d.", c->fd);
 			return STU_ERROR;
 		}
+
+		pr->request_body.end = pr->request_body.start + STU_HTTP_REQUEST_DEFAULT_SIZE;
 	}
 
-	data = stu_sprintf(temp, (const char *) STU_HTTP_UPSTREAM_IDENT_REQUEST.data, channel, token);
-	//data = stu_sprintf(temp, (const char *) STU_HTTP_UPSTREAM_IDENT_REQUEST.data, 25 + stu_strlen(channel_id) + stu_strlen(tokenstr), channel, tokenstr);
+	switch (u->server->method) {
+	case STU_HTTP_GET:
+		p = stu_sprintf(pr->request_body.start, "?%s=", STU_HTTP_UPSTREAM_IDENT_PARAM_CHANNEL.data);
+		p = stu_strncpy(p, r->target.data, r->target.len);
+		p = stu_sprintf(p, "&%s=", STU_HTTP_UPSTREAM_IDENT_PARAM_TOKEN.data);
+		p = stu_strncpy(p, arg.data, arg.len);
+		break;
+	case STU_HTTP_POST:
+		res = stu_json_create_object(NULL);
+		rschannel = stu_json_create_string(&STU_HTTP_UPSTREAM_IDENT_PARAM_CHANNEL, r->target.data, r->target.len);
+		rstoken = stu_json_create_string(&STU_HTTP_UPSTREAM_IDENT_PARAM_TOKEN, arg.data, arg.len);
+		stu_json_add_item_to_object(res, rschannel);
+		stu_json_add_item_to_object(res, rstoken);
 
-	pr->request_body.start = temp;
-	pr->request_body.last = data;
-	pr->request_body.end = temp + STU_HTTP_REQUEST_DEFAULT_SIZE;
+		p = stu_json_stringify(res, pr->request_body.start);
+		*p = '\0';
+
+		stu_json_delete(res);
+		break;
+	default:
+		stu_log_error(0, "Http method unknown while generating upstream request: fd=%d, method=%hd.", c->fd, u->server->method);
+		return STU_ERROR;
+	}
+
+	pr->request_body.last = p;
+
+	stu_http_upstream_generate_request(c);
 
 	return STU_OK;
 }
@@ -90,7 +87,7 @@ stu_http_upstream_ident_analyze_response(stu_connection_t *c) {
 	stu_table_elt_t    *protocol;
 	stu_int_t           m, n, size, extened;
 	stu_str_t          *cid, *uid, *uname, channel;
-	u_char             *temp, *data, opcode;
+	u_char             *data, temp[STU_HTTP_REQUEST_DEFAULT_SIZE], opcode;
 	stu_channel_t      *ch;
 	stu_json_t         *idt, *sta, *idchannel, *idcid, *idcstate, *iduser, *iduid, *iduname, *idurole;
 	stu_json_t         *res, *raw, *rschannel, *rsctotal, *rsuser;
@@ -210,13 +207,8 @@ stu_http_upstream_ident_analyze_response(stu_connection_t *c) {
 	stu_json_add_item_to_object(res, rschannel);
 	stu_json_add_item_to_object(res, rsuser);
 
-	temp = stu_slab_calloc(stu_cycle->slab_pool, STU_HTTP_REQUEST_DEFAULT_SIZE);
-	if (temp == NULL) {
-		stu_log_error(0, "Failed to slab_calloc() response buffer: fd=%d.", c->fd);
-		stu_json_delete(res);
-		goto failed;
-	}
 	data = stu_json_stringify(res, (u_char *) temp + 10);
+	*data = '\0';
 
 	stu_json_delete(idt);
 	stu_json_delete(res);
@@ -236,12 +228,10 @@ stu_http_upstream_ident_analyze_response(stu_connection_t *c) {
 	n = send(c->fd, data, size + 2 + extened, 0);
 	if (n == -1) {
 		stu_log_debug(4, "Failed to send \"ident\" frame: fd=%d.", c->fd);
-		stu_slab_free(stu_cycle->slab_pool, temp);
 		return STU_ERROR;
 	}
 
 	stu_log_debug(4, "sent: fd=%d, bytes=%d.", c->fd, n);
-	stu_slab_free(stu_cycle->slab_pool, temp);
 
 	return STU_OK;
 

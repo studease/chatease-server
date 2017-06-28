@@ -89,7 +89,7 @@ stu_http_add_listen(stu_config_t *cf) {
 	sa.sin_addr.s_addr = htons(INADDR_ANY);
 	sa.sin_port = htons(cf->port);
 
-	stu_log("Binding sockaddr...");
+	stu_log("Binding sockaddr(%hu)...", cf->port);
 	if (bind(stu_httpfd, (struct sockaddr*)&sa, sizeof(sa))) {
 		stu_log_error(stu_errno, "Failed to bind http server fd.");
 		return STU_ERROR;
@@ -150,6 +150,7 @@ again:
 		return;
 	}
 }
+
 
 static stu_int_t
 stu_http_init_headers_in_hash(stu_config_t *cf) {

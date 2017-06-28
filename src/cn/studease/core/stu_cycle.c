@@ -53,6 +53,9 @@ stu_config_default(stu_config_t *cf) {
 
 	cf->push_users = TRUE;
 	cf->push_users_interval = STU_CHANNEL_PUSH_USERS_DEFAULT_INTERVAL * 1000;
+
+	cf->push_status = TRUE;
+	cf->push_status_interval = STU_CHANNEL_PUSH_STATUS_DEFAULT_INTERVAL * 1000;
 }
 
 stu_cycle_t *
@@ -111,35 +114,40 @@ stu_cycle_create(stu_config_t *cf) {
 	shm = stu_pcalloc(pool, sizeof(stu_shm_t));
 	shm->addr = (u_char *) pool;
 	shm->size = pool->data.end - (u_char *) pool;
-	/*if (stu_shm_alloc(shm) == STU_ERROR) {
-		return NULL;
-	}*/
 	stu_list_push(&cycle->shared_memory, shm, sizeof(stu_shm_t));
 
 	shm = stu_pcalloc(pool, sizeof(stu_shm_t));
 	shm->addr = (u_char *) slab_pool;
 	shm->size = slab_pool->data.end - (u_char *) slab_pool;
-	/*if (stu_shm_alloc(shm) == STU_ERROR) {
-		return NULL;
-	}*/
 	stu_list_push(&cycle->shared_memory, shm, sizeof(stu_shm_t));
 
 	shm = stu_pcalloc(pool, sizeof(stu_shm_t));
 	shm->addr = (u_char *) ram_pool;
 	shm->size = ram_pool->data.end - (u_char *) ram_pool;
-	/*if (stu_shm_alloc(shm) == STU_ERROR) {
-		return NULL;
-	}*/
 	stu_list_push(&cycle->shared_memory, shm, sizeof(stu_shm_t));
 
-	if (stu_hash_init(&cycle->channels, NULL, STU_MAX_CHANNEL_N, slab_pool,
+	// channels
+	if (stu_hash_init(&cycle->channels, NULL, STU_CHANNEL_MAXIMUM, slab_pool,
 			(stu_hash_palloc_pt) stu_slab_alloc, (stu_hash_free_pt) stu_slab_free) == STU_ERROR) {
-		stu_log_error(0, "Failed to init channels hash.");
+		stu_log_error(0, "Failed to init channel hash.");
 		return NULL;
 	}
 
 	cycle->connection_n = 0;
 
+	// timer
+	if (stu_timer_init(cycle) == STU_ERROR) {
+		stu_log_error(0, "Failed to init timer.");
+		return NULL;
+	}
+
+	if (stu_hash_init(&cycle->timers, NULL, STU_TIMER_MAXIMUM, slab_pool,
+			(stu_hash_palloc_pt) stu_slab_alloc, (stu_hash_free_pt) stu_slab_free) == STU_ERROR) {
+		stu_log_error(0, "Failed to init timer hash.");
+		return NULL;
+	}
+
+	// event
 	if (stu_event_init() == STU_ERROR) {
 		stu_log_error(0, "Failed to init event.");
 		return NULL;
@@ -172,6 +180,9 @@ stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool) {
 
 	dst->push_users = src->push_users;
 	dst->push_users_interval = src->push_users_interval;
+
+	dst->push_status = src->push_status;
+	dst->push_status_interval = src->push_status_interval;
 
 	if (stu_hash_init(&dst->upstreams, NULL, STU_UPSTREAM_MAXIMUM, pool, (stu_hash_palloc_pt) stu_pcalloc, NULL) == STU_ERROR) {
 		stu_log_error(0, "Failed to init upstream hash.");

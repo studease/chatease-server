@@ -8,9 +8,6 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
-extern stu_cycle_t *stu_cycle;
-stu_hash_t          stu_http_upstream_headers_in_hash;
-
 static stu_int_t stu_http_upstream_process_response_headers(stu_http_request_t *r);
 
 static stu_int_t stu_http_upstream_process_content_length(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
@@ -18,6 +15,7 @@ static stu_int_t stu_http_upstream_process_connection(stu_http_request_t *r, stu
 static stu_int_t stu_http_upstream_process_header_line(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 static stu_int_t stu_http_upstream_process_unique_header_line(stu_http_request_t *r, stu_table_elt_t *h, stu_uint_t offset);
 
+stu_hash_t         stu_http_upstream_headers_in_hash;
 stu_http_header_t  stu_http_upstream_headers_in[] = {
 	{ stu_string("Server"), offsetof(stu_http_headers_out_t, server), stu_http_upstream_process_unique_header_line },
 
@@ -33,40 +31,103 @@ stu_http_header_t  stu_http_upstream_headers_in[] = {
 	{ stu_null_string, 0, NULL }
 };
 
+stu_conf_bitmask_t  stu_http_upstream_method_mask[] = {
+	{ stu_string("GET"),  STU_HTTP_GET},
+	{ stu_string("POST"), STU_HTTP_POST },
+	{ stu_null_string, 0 }
+};
+
 
 void *
 stu_http_upstream_create_request(stu_connection_t *c) {
-	stu_http_request_t *r;
 	stu_upstream_t     *u;
 	stu_connection_t   *pc;
+	stu_http_request_t *pr;
 
 	u = c->upstream;
 	pc = u->peer.connection;
 
-	r = stu_http_create_request(pc);
-	if (r == NULL) {
+	pr = stu_http_create_request(pc);
+	if (pr == NULL) {
 		stu_log_error(0, "Failed to create http request for upstream %s, fd=%d.", u->server->name.data, c->fd);
 		return NULL;
 	}
 
-	return r;
+	return pr;
 }
 
 stu_int_t
 stu_http_upstream_reinit_request(stu_connection_t *c) {
-	stu_http_request_t *r;
 	stu_upstream_t     *u;
+	stu_connection_t   *pc;
+	stu_http_request_t *pr;
 
 	u = c->upstream;
-	r = u->peer.connection->data;
+	pc = u->peer.connection;
+	pr = (stu_http_request_t *) pc->data;
 
-	r->state = 0;
+	stu_base_pool_reset(pc->pool);
+	pr->state = 0;
 
 	return STU_OK;
 }
 
 stu_int_t
 stu_http_upstream_generate_request(stu_connection_t *c) {
+	stu_upstream_t     *u;
+	stu_connection_t   *pc;
+	stu_http_request_t *r, *pr;
+	stu_conf_bitmask_t *method;
+	stu_str_t          *method_name;
+	u_char             *p;
+	size_t              size;
+
+	r = (stu_http_request_t *) c->data;
+	u = c->upstream;
+	pc = u->peer.connection;
+	pr = (stu_http_request_t *) pc->data;
+
+	method_name = NULL;
+	for (method = stu_http_upstream_method_mask; method->name.len; method++) {
+		if (u->server->method == method->mask) {
+			method_name = &method->name;
+			break;
+		}
+	}
+
+	if (method_name == NULL) {
+		stu_log_error(0, "Http method unknown while generating upstream request: fd=%d, method=%hd.", c->fd, u->server->method);
+		return STU_ERROR;
+	}
+
+	if (pc->buffer.start == NULL) {
+		pc->buffer.start = (u_char *) stu_base_palloc(pc->pool, STU_HTTP_REQUEST_DEFAULT_SIZE);
+		pc->buffer.end = pc->buffer.start + STU_HTTP_REQUEST_DEFAULT_SIZE;
+	}
+
+	p = stu_sprintf(pc->buffer.start, "%s %s%s HTTP/1.1" CRLF,
+			method_name->data,
+			u->server->target.data,
+			u->server->method == STU_HTTP_GET ? (const char *) pr->request_body.start : "");
+	p = stu_sprintf(p, "Host: ");
+	p = stu_strncpy(p, r->headers_in.host->value.data, r->headers_in.host->value.len);
+	p = stu_sprintf(p, CRLF);
+	p = stu_sprintf(p, "User-Agent: " __NAME "/" __VERSION CRLF);
+	p = stu_sprintf(p, "Accept: application/json" CRLF);
+	p = stu_sprintf(p, "Accept-Charset: utf-8" CRLF);
+	p = stu_sprintf(p, "Accept-Language: zh-CN,zh;q=0.8" CRLF);
+	p = stu_sprintf(p, "Connection: keep-alive" CRLF);
+	if (u->server->method == STU_HTTP_POST && pr->request_body.start && (size = pr->request_body.last - pr->request_body.start)) {
+		p = stu_sprintf(p, "Content-Type: application/json" CRLF);
+		p = stu_sprintf(p, "Content-Length: %ld" CRLF CRLF, size);
+		p = stu_strncpy(p, pr->request_body.start, size);
+	} else {
+		p = stu_sprintf(p, CRLF);
+	}
+	*p = '\0';
+
+	pc->buffer.last = p;
+
 	return STU_OK;
 }
 
@@ -131,9 +192,6 @@ failed:
 
 	u->cleanup_pt(c);
 
-	u->peer.connection = NULL;
-	u->peer.state = STU_UPSTREAM_PEER_IDLE;
-
 done:
 
 	stu_spin_unlock(&c->lock);
@@ -141,14 +199,14 @@ done:
 
 stu_int_t
 stu_http_upstream_process_response(stu_connection_t *c) {
-	stu_http_request_t *r;
+	stu_http_request_t *pr;
 	stu_upstream_t     *u;
 	stu_int_t           rc;
 
 	u = c->upstream;
-	r = (stu_http_request_t *) u->peer.connection->data;
+	pr = (stu_http_request_t *) u->peer.connection->data;
 
-	rc = stu_http_upstream_process_response_headers(r);
+	rc = stu_http_upstream_process_response_headers(pr);
 	if (rc != STU_OK) {
 		stu_log_error(0, "Failed to process upstream ident response headers.");
 		u->finalize_handler_pt(c, STU_HTTP_BAD_GATEWAY);
@@ -275,16 +333,12 @@ stu_http_upstream_finalize_handler(stu_connection_t *c, stu_int_t rc) {
 
 	u->cleanup_pt(c);
 
-	u->peer.connection = NULL;
-	u->peer.state = STU_UPSTREAM_PEER_IDLE;
-
 	stu_http_finalize_request(r, rc);
 }
 
 void
 stu_http_upstream_write_handler(stu_event_t *ev) {
 	stu_connection_t   *c, *pc;
-	stu_http_request_t *pr;
 	stu_upstream_t     *u;
 	stu_int_t           n;
 
@@ -295,7 +349,6 @@ stu_http_upstream_write_handler(stu_event_t *ev) {
 
 	u = c->upstream;
 	pc = u->peer.connection;
-	pr = (stu_http_request_t *) pc->data;
 
 	// Lock pc rather than c
 	stu_spin_lock(&c->lock);
@@ -309,18 +362,18 @@ stu_http_upstream_write_handler(stu_event_t *ev) {
 		goto done;
 	}
 
-	n = send(pc->fd, pr->request_body.start, pr->request_body.last - pr->request_body.start, 0);
+	n = send(pc->fd, pc->buffer.start, pc->buffer.last - pc->buffer.start, 0);
 	if (n == -1) {
 		stu_log_error(stu_errno, "Failed to send ident request, c->fd=%d, u->fd=%d.", c->fd, pc->fd);
 		goto failed;
 	}
 
-	stu_log_debug(4, "sent to upstream %s: fd=%d, bytes=%d.", u->server->name.data, pc->fd, n);
+	stu_log_debug(4, "sent to upstream %s: c->fd=%d, u->fd=%d, bytes=%d.", u->server->name.data, c->fd, pc->fd, n);
 
 	u->peer.state = STU_UPSTREAM_PEER_LOADING;
 
 	ev->data = pc;
-	stu_event_del(&pc->write, STU_WRITE_EVENT, 0);
+	stu_event_del(&pc->write, STU_WRITE_EVENT, STU_READ_EVENT);
 	ev->active = 0;
 
 	goto done;
@@ -329,25 +382,14 @@ failed:
 
 	u->cleanup_pt(c);
 
-	u->peer.connection = NULL;
-	u->peer.state = STU_UPSTREAM_PEER_IDLE;
-
 done:
 
 	stu_spin_unlock(&c->lock);
 }
 
 
-void
+void stu_inline
 stu_http_upstream_cleanup(stu_connection_t *c) {
-	stu_http_request_t *pr;
-
-	pr = (stu_http_request_t *) c->upstream->peer.connection->data;
-	if (pr->request_body.start) {
-		stu_slab_free(stu_cycle->slab_pool, pr->request_body.start);
-		pr->request_body.start = NULL;
-	}
-
 	stu_upstream_cleanup(c);
 }
 
@@ -396,7 +438,7 @@ stu_http_upstream_process_unique_header_line(stu_http_request_t *r, stu_table_el
 	}
 
 	stu_log_error(0, "http upstream sent duplicate header line = > \"%s: %s\", "
-			"previous value => \"%s: %s\"", h->key.data, h->value.data, &(*ph)->key.data, &(*ph)->value.data);
+			"previous value => \"%s: %s\"", h->key.data, h->value.data, (*ph)->key.data, (*ph)->value.data);
 
 	return STU_HTTP_BAD_GATEWAY;
 }

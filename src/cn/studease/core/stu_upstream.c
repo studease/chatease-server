@@ -10,6 +10,9 @@
 
 stu_hash_t *stu_upstreams;
 
+stu_str_t  STU_HTTP_UPSTREAM_IDENT = stu_string("ident");
+stu_str_t  STU_HTTP_UPSTREAM_STATUS = stu_string("status");
+
 static stu_int_t stu_upstream_connect(stu_connection_t *c);
 static stu_int_t stu_upstream_next(stu_connection_t *c);
 
@@ -52,7 +55,7 @@ stu_upstream_create(stu_connection_t *c, u_char *name, size_t len) {
 		e = stu_queue_data(q, stu_list_elt_t, queue);
 
 		upstream->elts.obj = e;  // current server
-		upstream->elts.size = 0; // current count
+		upstream->elts.size = 0; // lost weight
 	}
 
 	s = (stu_upstream_server_t *) e->obj;
@@ -87,7 +90,11 @@ stu_upstream_init(stu_connection_t *c) {
 			return STU_ERROR;
 		}
 
-		c->upstream->generate_request_pt(c);
+		if (c->upstream->generate_request_pt(c) == STU_ERROR) {
+			stu_log_error(0, "Failed to generate request of upstream %s, fd=%d.", u->server->name.data, c->fd);
+			return STU_ERROR;
+		}
+
 		c->upstream->write_event_handler(&u->peer.connection->write);
 
 		return STU_OK;
@@ -140,12 +147,14 @@ stu_upstream_connect(stu_connection_t *c) {
 		pc->data = u->create_request_pt(c);
 		if (pc->data == NULL) {
 			stu_log_error(0, "Failed to create request of upstream %s, fd=%d.", u->server->name.data, c->fd);
-			stu_connection_free(pc);
 			return STU_ERROR;
 		}
 	}
 
-	c->upstream->generate_request_pt(c);
+	if (c->upstream->generate_request_pt(c) == STU_ERROR) {
+		stu_log_error(0, "Failed to generate request of upstream %s, fd=%d.", u->server->name.data, c->fd);
+		return STU_ERROR;
+	}
 
 	pc->read.handler = u->read_event_handler;
 	if (stu_event_add(&pc->read, STU_READ_EVENT, STU_CLEAR_EVENT) == STU_ERROR) {
@@ -186,9 +195,6 @@ stu_upstream_connect(stu_connection_t *c) {
 
 			}
 			stu_log_error(err, "Failed to connect to upstream %s, fd=%d.", u->server->name.data, c->fd);
-
-			stu_connection_free(u->peer.connection);
-			u->peer.connection = NULL;
 
 			return STU_DECLINED;
 		}
@@ -245,9 +251,7 @@ stu_upstream_next(stu_connection_t *c) {
 
 	u->server = s;
 
-	stu_upstream_init(c);
-
-	return STU_OK;
+	return stu_upstream_init(c);
 }
 
 void
@@ -255,16 +259,20 @@ stu_upstream_cleanup(stu_connection_t *c) {
 	stu_upstream_t   *u;
 	stu_connection_t *pc;
 
+	if (c->upstream == NULL) {
+		return;
+	}
+
 	u = c->upstream;
 	pc = u->peer.connection;
 
 	if (pc) {
 		stu_log_debug(4, "cleaning up upstream: fd=%d.", pc->fd);
-
+/*
 		pc->read.active = 1;
 		pc->read.data = pc;
 		stu_event_del(&pc->read, STU_READ_EVENT, 0);
-
+*/
 		pc->write.active = 0;
 		pc->write.data = pc;
 		stu_event_del(&pc->write, STU_WRITE_EVENT, 0);
@@ -272,6 +280,6 @@ stu_upstream_cleanup(stu_connection_t *c) {
 		stu_connection_close(pc);
 	}
 
-	stu_memzero(c->upstream, sizeof(stu_upstream_t));
+	u->peer.connection = NULL;
+	u->peer.state = STU_UPSTREAM_PEER_IDLE;
 }
-

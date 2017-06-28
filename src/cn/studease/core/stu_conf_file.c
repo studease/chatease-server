@@ -10,6 +10,8 @@
 
 stu_str_t  STU_CONF_FILE_DEFAULT_PATH = stu_string("conf/chatd.conf");
 
+extern stu_conf_bitmask_t  stu_http_upstream_method_mask[];
+
 static stu_str_t  STU_CONF_FILE_LOG = stu_string("log");
 static stu_str_t  STU_CONF_FILE_PID = stu_string("pid");
 
@@ -23,11 +25,15 @@ static stu_str_t  STU_CONF_FILE_SERVER_LISTEN = stu_string("listen");
 static stu_str_t  STU_CONF_FILE_SERVER_HOSTNAME = stu_string("hostname");
 static stu_str_t  STU_CONF_FILE_SERVER_PUSH_USERS = stu_string("push_users");
 static stu_str_t  STU_CONF_FILE_SERVER_PUSH_USERS_INTERVAL = stu_string("push_users_interval");
+static stu_str_t  STU_CONF_FILE_SERVER_PUSH_STATUS = stu_string("push_status");
+static stu_str_t  STU_CONF_FILE_SERVER_PUSH_STATUS_INTERVAL = stu_string("push_status_interval");
 
 static stu_str_t  STU_CONF_FILE_UPSTREAM = stu_string("upstream");
-static stu_str_t  STU_CONF_FILE_UPSTREAM_URL = stu_string("url");
+static stu_str_t  STU_CONF_FILE_UPSTREAM_PROTOCOL = stu_string("protocol");
+static stu_str_t  STU_CONF_FILE_UPSTREAM_METHOD = stu_string("method");
 static stu_str_t  STU_CONF_FILE_UPSTREAM_ADDRESS = stu_string("address");
 static stu_str_t  STU_CONF_FILE_UPSTREAM_PORT = stu_string("port");
+static stu_str_t  STU_CONF_FILE_UPSTREAM_TARGET = stu_string("target");
 static stu_str_t  STU_CONF_FILE_UPSTREAM_WEIGHT = stu_string("weight");
 static stu_str_t  STU_CONF_FILE_UPSTREAM_MAX_FAILS = stu_string("max_fails");
 static stu_str_t  STU_CONF_FILE_UPSTREAM_TIMEOUT = stu_string("timeout");
@@ -43,6 +49,7 @@ stu_conf_file_parse(stu_config_t *cf, u_char *name, stu_pool_t *pool) {
 	stu_uint_t             hk;
 	stu_list_t            *upstream;
 	stu_upstream_server_t *server;
+	stu_conf_bitmask_t    *method;
 
 	file.fd = stu_file_open(name, STU_FILE_RDONLY, STU_FILE_CREATE_OR_OPEN, STU_FILE_DEFAULT_ACCESS);
 	if (file.fd == STU_FILE_INVALID) {
@@ -138,6 +145,17 @@ stu_conf_file_parse(stu_config_t *cf, u_char *name, stu_pool_t *pool) {
 			v_double = (stu_double_t *) sub->value;
 			cf->push_users_interval = *v_double * 1000;
 		}
+
+		sub = stu_json_get_object_item_by(item, &STU_CONF_FILE_SERVER_PUSH_STATUS);
+		if (sub) {
+			cf->push_status = TRUE & sub->value;
+		}
+
+		sub = stu_json_get_object_item_by(item, &STU_CONF_FILE_SERVER_PUSH_STATUS_INTERVAL);
+		if (sub) {
+			v_double = (stu_double_t *) sub->value;
+			cf->push_status_interval = *v_double * 1000;
+		}
 	}
 
 	// upstream
@@ -177,12 +195,25 @@ stu_conf_file_parse(stu_config_t *cf, u_char *name, stu_pool_t *pool) {
 				server->name.len = sub->key.len;
 				stu_strncpy(server->name.data, sub->key.data, sub->key.len);
 
-				srv_property = stu_json_get_object_item_by(srv, &STU_CONF_FILE_UPSTREAM_URL);
+				srv_property = stu_json_get_object_item_by(srv, &STU_CONF_FILE_UPSTREAM_PROTOCOL);
 				if (srv_property && srv_property->type == STU_JSON_TYPE_STRING) {
 					v_string = (stu_str_t *) srv_property->value;
-					server->url.data = stu_pcalloc(pool, v_string->len + 1);
-					server->url.len = v_string->len;
-					stu_strncpy(server->url.data, v_string->data, v_string->len);
+					server->protocol.data = stu_pcalloc(pool, v_string->len + 1);
+					server->protocol.len = v_string->len;
+					stu_strncpy(server->protocol.data, v_string->data, v_string->len);
+				}
+
+				srv_property = stu_json_get_object_item_by(srv, &STU_CONF_FILE_UPSTREAM_METHOD);
+				if (srv_property && srv_property->type == STU_JSON_TYPE_STRING) {
+					v_string = (stu_str_t *) srv_property->value;
+					for (method = stu_http_upstream_method_mask; method->name.len; method++) {
+						if (stu_strncasecmp(v_string->data, method->name.data, method->name.len) == 0) {
+							server->method = method->mask;
+							break;
+						}
+
+						server->method = STU_HTTP_UNKNOWN;
+					}
 				}
 
 				srv_property = stu_json_get_object_item_by(srv, &STU_CONF_FILE_UPSTREAM_ADDRESS);
@@ -197,6 +228,14 @@ stu_conf_file_parse(stu_config_t *cf, u_char *name, stu_pool_t *pool) {
 				if (srv_property && srv_property->type == STU_JSON_TYPE_NUMBER) {
 					v_double = (stu_double_t *) srv_property->value;
 					server->port = 0xFFFF & (stu_uint_t) *v_double;
+				}
+
+				srv_property = stu_json_get_object_item_by(srv, &STU_CONF_FILE_UPSTREAM_TARGET);
+				if (srv_property && srv_property->type == STU_JSON_TYPE_STRING) {
+					v_string = (stu_str_t *) srv_property->value;
+					server->target.data = stu_pcalloc(pool, v_string->len + 1);
+					server->target.len = v_string->len;
+					stu_strncpy(server->target.data, v_string->data, v_string->len);
 				}
 
 				srv_property = stu_json_get_object_item_by(srv, &STU_CONF_FILE_UPSTREAM_WEIGHT);

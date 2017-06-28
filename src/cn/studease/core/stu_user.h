@@ -11,6 +11,12 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
+#if (__WORDSIZE == 64)
+#define STU_USER_MAXIMUM     512
+#else
+#define STU_USER_MAXIMUM     1024
+#endif
+
 #define STU_USER_ID_MAX_LEN     16
 
 #define STU_USER_ROLE_VISITOR   0x00

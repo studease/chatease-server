@@ -12,21 +12,15 @@
 #include "stu_core.h"
 
 #if (__WORDSIZE == 64)
-
-#define STU_MAX_CHANNEL_N  512
-#define STU_MAX_USER_N     512
-
+#define STU_CHANNEL_MAXIMUM  512
 #else
-
-#define STU_MAX_CHANNEL_N  1024
-#define STU_MAX_USER_N     1024
-
+#define STU_CHANNEL_MAXIMUM  1024
 #endif
 
 #define STU_CHANNEL_ID_MAX_LEN 16
 
-#define STU_CHANNEL_PUSH_USERS_DEFAULT_SIZE     1024
-#define STU_CHANNEL_PUSH_USERS_DEFAULT_INTERVAL 30
+#define STU_CHANNEL_PUSH_USERS_DEFAULT_INTERVAL  30
+#define STU_CHANNEL_PUSH_STATUS_DEFAULT_INTERVAL 300
 
 typedef struct {
 	stu_base_pool_t *pool; // not used currently.
@@ -39,7 +33,8 @@ typedef struct {
 } stu_channel_t;
 
 
-void  stu_channel_push_online_users(stu_event_t *ev);
-void  stu_channel_broadcast(stu_str_t *id, void *ch);
+stu_int_t  stu_channel_add_timers();
+void       stu_channel_push_users_handler(stu_event_t *ev);
+void       stu_channel_push_status_handler(stu_event_t *ev);
 
 #endif /* STU_CHANNEL_H_ */

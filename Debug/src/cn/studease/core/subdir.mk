@@ -15,6 +15,7 @@ C_SRCS += \
 ../src/cn/studease/core/stu_event_epoll.c \
 ../src/cn/studease/core/stu_file.c \
 ../src/cn/studease/core/stu_filedes.c \
+../src/cn/studease/core/stu_flash.c \
 ../src/cn/studease/core/stu_hash.c \
 ../src/cn/studease/core/stu_http.c \
 ../src/cn/studease/core/stu_http_parse.c \
@@ -55,6 +56,7 @@ OBJS += \
 ./src/cn/studease/core/stu_event_epoll.o \
 ./src/cn/studease/core/stu_file.o \
 ./src/cn/studease/core/stu_filedes.o \
+./src/cn/studease/core/stu_flash.o \
 ./src/cn/studease/core/stu_hash.o \
 ./src/cn/studease/core/stu_http.o \
 ./src/cn/studease/core/stu_http_parse.o \
@@ -95,6 +97,7 @@ C_DEPS += \
 ./src/cn/studease/core/stu_event_epoll.d \
 ./src/cn/studease/core/stu_file.d \
 ./src/cn/studease/core/stu_filedes.d \
+./src/cn/studease/core/stu_flash.d \
 ./src/cn/studease/core/stu_hash.d \
 ./src/cn/studease/core/stu_http.d \
 ./src/cn/studease/core/stu_http_parse.d \
