@@ -84,7 +84,6 @@ int main(int argc, char **argv) {
 
 	if (stu_flash_add_listen(&stu_cycle->config) == STU_ERROR) {
 		stu_log_error(0, "Failed to add flash listen.");
-		return EXIT_FAILURE;
 	}
 
 	if (stu_http_add_listen(&stu_cycle->config) == STU_ERROR) {

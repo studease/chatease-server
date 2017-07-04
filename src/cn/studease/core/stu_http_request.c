@@ -653,23 +653,27 @@ stu_http_request_handler(stu_event_t *wev) {
 	protocol = r->headers_out.sec_websocket_protocol;
 
 	if (r->headers_out.status == STU_HTTP_SWITCHING_PROTOCOLS) {
-		buf->last = stu_memcpy(buf->last, "HTTP/1.1 101 Switching Protocols" CRLF, 34);
-		buf->last = stu_memcpy(buf->last, "Server: " __NAME "/" __VERSION CRLF, 32);
-		buf->last = stu_memcpy(buf->last, "Upgrade: websocket" CRLF, 20);
-		buf->last = stu_memcpy(buf->last, "Connection: upgrade" CRLF, 21);
-		buf->last = stu_memcpy(buf->last, accept->key.data, accept->key.len);
-		buf->last = stu_memcpy(buf->last, ": ", 2);
-		buf->last = stu_memcpy(buf->last, accept->value.data, accept->value.len);
-		buf->last = stu_memcpy(buf->last, CRLF, 2);
+		buf->last = stu_sprintf(buf->last, "HTTP/1.1 101 Switching Protocols" CRLF);
+		buf->last = stu_sprintf(buf->last, "Server: " __NAME "/" __VERSION CRLF);
+		buf->last = stu_sprintf(buf->last, "Upgrade: websocket" CRLF);
+		buf->last = stu_sprintf(buf->last, "Connection: upgrade" CRLF);
+		buf->last = stu_strncpy(buf->last, accept->key.data, accept->key.len);
+		buf->last = stu_sprintf(buf->last, ": ");
+		buf->last = stu_strncpy(buf->last, accept->value.data, accept->value.len);
+		buf->last = stu_sprintf(buf->last, CRLF);
 		if (protocol) {
-			buf->last = stu_memcpy(buf->last, protocol->key.data, protocol->key.len);
-			buf->last = stu_memcpy(buf->last, ": ", 2);
-			buf->last = stu_memcpy(buf->last, protocol->value.data, protocol->value.len);
-			buf->last = stu_memcpy(buf->last, CRLF, 2);
+			buf->last = stu_strncpy(buf->last, protocol->key.data, protocol->key.len);
+			buf->last = stu_sprintf(buf->last, ": ");
+			buf->last = stu_strncpy(buf->last, protocol->value.data, protocol->value.len);
+			buf->last = stu_sprintf(buf->last, CRLF);
 		}
-		buf->last = stu_memcpy(buf->last, CRLF, 2);
+		buf->last = stu_sprintf(buf->last, CRLF);
 	} else {
-		buf->last = stu_memcpy(buf->last, "HTTP/1.1 400 Bad Request\r\nServer: " __NAME "/" __VERSION "\r\nContent-type: text/html\r\nContent-length: 23\r\n\r\n" __NAME "/" __VERSION "\n", 124);
+		buf->last = stu_sprintf(buf->last, "HTTP/1.1 400 Bad Request" CRLF);
+		buf->last = stu_sprintf(buf->last, "Server: " __NAME "/" __VERSION CRLF);
+		buf->last = stu_sprintf(buf->last, "Content-type: text/html" CRLF);
+		buf->last = stu_sprintf(buf->last, "Content-length: %d" CRLF CRLF, stu_strlen(__NAME "/" __VERSION "\n"));
+		buf->last = stu_sprintf(buf->last, __NAME "/" __VERSION "\n");
 	}
 
 	n = send(c->fd, buf->start, buf->last - buf->start, 0);
