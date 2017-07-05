@@ -42,7 +42,7 @@ stu_event_epoll_add(stu_event_t *ev, uint32_t event, stu_uint_t flags) {
 	ee.events = ev->type;
 	ee.data.ptr = (void *) c;
 
-	stu_log_debug(3, "epoll add event: fd=%d, op=%d, ev=%u.", c->fd, op, ee.events);
+	stu_log_debug(3, "epoll add event: fd=%d, op=%d, ev=%X.", c->fd, op, ee.events);
 
 	if (epoll_ctl(stu_epfd, op, c->fd, &ee) == -1) {
 		stu_log_error(stu_errno, "epoll_ctl(%d, %d) failed", op, c->fd);
@@ -90,7 +90,7 @@ stu_event_epoll_del(stu_event_t *ev, uint32_t event, stu_uint_t flags) {
 		ee.data.ptr = NULL;
 	}
 
-	stu_log_debug(3, "epoll del event: fd=%d, op=%d, ev=%u.", c->fd, op, ee.events);
+	stu_log_debug(3, "epoll del event: fd=%d, op=%d, ev=%X.", c->fd, op, ee.events);
 
 	if (epoll_ctl(stu_epfd, op, c->fd, &ee) == -1) {
 		stu_log_error(stu_errno, "epoll_ctl(%d, %d) failed", op, c->fd);

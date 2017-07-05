@@ -55,7 +55,7 @@ stu_event_process_events_and_timers() {
 	(void) stu_event_process_events(timer, flags);
 	delta = stu_current_msec - delta;
 
-	stu_log_debug(3, "timer delta: %lu.", delta);
+	stu_log_debug(2, "timer delta: %lu.", delta);
 
 	if (delta) {
 		stu_timer_expire();

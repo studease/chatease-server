@@ -168,7 +168,7 @@ stu_timer_add_locked(stu_event_t *ev, stu_msec_t timer) {
 	}
 
 	ev->timer.key = key;
-	stu_log_debug(3, "timer add: fd=%d, %lu:%lu.", stu_timer_ident(ev->data), timer, ev->timer.key);
+	stu_log_debug(3, "timer add: fd=%d, delay=%lu, key=%lu.", stu_timer_ident(ev->data), timer, ev->timer.key);
 
 	stu_rbtree_insert(&stu_cycle->timer_rbtree, &ev->timer);
 
