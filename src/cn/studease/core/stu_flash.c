@@ -17,8 +17,8 @@ stu_str_t  STU_FLASH_POLICY_REQUEST = stu_string(
 stu_str_t  STU_FLASH_POLICY_FILE = stu_string(
 		"<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
 		"<cross-domain-policy>"
-			"<allow-access-from domain=\"*\" />"
-		"</cross-domain-policy>"
+			"<allow-access-from domain=\"*\" to-ports=\"*\" />"
+		"</cross-domain-policy>\0"
 	);
 
 static void stu_flash_server_handler(stu_event_t *ev);
@@ -176,7 +176,7 @@ again:
 
 		stu_log_debug(4, "sent policy file: fd=%d, bytes=%d.", c->fd, n);
 
-		goto done; // Todo: close in 3 sec
+		goto done;
 	}
 
 failed:

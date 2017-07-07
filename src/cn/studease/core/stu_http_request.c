@@ -122,7 +122,7 @@ again:
 
 		stu_log_debug(4, "sent policy file: fd=%d, bytes=%d.", c->fd, n);
 
-		goto done; // Todo: close in 3 sec
+		goto done;
 	}
 
 	c->data = (void *) stu_http_create_request(c);

@@ -26,18 +26,8 @@ stu_file_read(stu_file_t *file, u_char *buf, size_t size, off_t offset) {
 ssize_t
 stu_file_write(stu_file_t *file, u_char *buf, size_t size, off_t offset) {
 	ssize_t  n, written;
-	u_char   temp[STU_LOG_RECORD_MAX_LEN];
 
 	written = 0;
-
-	if (size > STU_LOG_RECORD_MAX_LEN || offset > 1048576) {
-		stu_log_error(0, "Something might went wrong: size=%ld, offset=%ld.", size, offset);
-
-		stu_strncpy(temp, buf, 512);
-		stu_log_debug(3, "%s", temp);
-
-		return STU_ERROR;
-	}
 
 	for ( ;; ) {
 		n = pwrite(file->fd, buf + written, size, offset);
