@@ -112,6 +112,9 @@ again:
 	}
 
 	stu_log_debug(4, "recv: fd=%d, bytes=%d.", c->fd, n); //str=\n%s, c->buffer.start
+	if (n == 1024) {
+		stu_log_debug(4, "recv: fd=%d, data=%s.", c->fd, c->buffer.start);
+	}
 
 	if (stu_strncmp(c->buffer.start, STU_FLASH_POLICY_REQUEST.data, STU_FLASH_POLICY_REQUEST.len) == 0) {
 		n = send(c->fd, STU_FLASH_POLICY_FILE.data, STU_FLASH_POLICY_FILE.len, 0);
@@ -329,7 +332,7 @@ stu_http_process_request_headers(stu_http_request_t *r) {
 	stu_http_header_t *hh;
 
 	if (stu_http_parse_request_line(r, r->header_in) == STU_ERROR) {
-		stu_log_error(0, "Failed to parse http request line.");
+		stu_log_error(0, "Failed to parse http request line: %s.", r->header_in->start);
 		return STU_ERROR;
 	}
 
@@ -672,13 +675,14 @@ stu_http_request_handler(stu_event_t *wev) {
 		buf->last = stu_sprintf(buf->last, "HTTP/1.1 400 Bad Request" CRLF);
 		buf->last = stu_sprintf(buf->last, "Server: " __NAME "/" __VERSION CRLF);
 		buf->last = stu_sprintf(buf->last, "Content-type: text/html" CRLF);
-		buf->last = stu_sprintf(buf->last, "Content-length: %d" CRLF CRLF, stu_strlen(__NAME "/" __VERSION "\n"));
+		buf->last = stu_sprintf(buf->last, "Content-length: %d" CRLF, stu_strlen(__NAME "/" __VERSION "\n"));
+		buf->last = stu_sprintf(buf->last, "Connection: close" CRLF CRLF);
 		buf->last = stu_sprintf(buf->last, __NAME "/" __VERSION "\n");
 	}
 
 	n = send(c->fd, buf->start, buf->last - buf->start, 0);
 	if (n == -1) {
-		stu_log_debug(4, "Failed to send data: fd=%d.", c->fd);
+		stu_log_error(stu_errno, "Failed to send data: fd=%d.", c->fd);
 		goto failed;
 	}
 
@@ -699,7 +703,10 @@ failed:
 	stu_event_del(&c->read, STU_READ_EVENT, 0);
 
 	ch = c->user.channel;
-	stu_channel_remove(ch, c);
+	if (ch) {
+		stu_channel_remove(ch, c);
+	}
+
 	stu_http_close_connection(c);
 
 //done:
