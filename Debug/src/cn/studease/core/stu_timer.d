@@ -1,4 +1,4 @@
-src/cn/studease/core/stu_timer.d: ../src/cn/studease/core/stu_timer.c \
+src/cn/studease/core/stu_timer.o: ../src/cn/studease/core/stu_timer.c \
  ../src/cn/studease/core/stu_config.h ../src/cn/studease/core/stu_core.h \
  ../src/cn/studease/core/stu_string.h ../src/cn/studease/core/stu_buf.h \
  ../src/cn/studease/core/stu_queue.h ../src/cn/studease/core/stu_errno.h \

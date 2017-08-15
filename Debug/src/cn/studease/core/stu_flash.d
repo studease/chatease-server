@@ -1,4 +1,4 @@
-src/cn/studease/core/stu_flash.d: ../src/cn/studease/core/stu_flash.c \
+src/cn/studease/core/stu_flash.o: ../src/cn/studease/core/stu_flash.c \
  ../src/cn/studease/core/stu_config.h ../src/cn/studease/core/stu_core.h \
  ../src/cn/studease/core/stu_string.h ../src/cn/studease/core/stu_buf.h \
  ../src/cn/studease/core/stu_queue.h ../src/cn/studease/core/stu_errno.h \

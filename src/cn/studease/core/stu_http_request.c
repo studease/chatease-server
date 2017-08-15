@@ -89,7 +89,7 @@ stu_http_wait_request_handler(stu_event_t *rev) {
 
 again:
 
-	n = recv(c->fd, c->buffer.start, STU_HTTP_REQUEST_DEFAULT_SIZE, 0);
+	n = recv(c->fd, c->buffer.last, STU_HTTP_REQUEST_DEFAULT_SIZE, 0);
 	if (n == -1) {
 		err = stu_errno;
 		if (err == EAGAIN) {
@@ -111,9 +111,12 @@ again:
 		goto failed;
 	}
 
-	stu_log_debug(4, "recv: fd=%d, bytes=%d.", c->fd, n); //str=\n%s, c->buffer.start
-	if (n == 1024) {
+	stu_log_debug(4, "recv: fd=%d, bytes=%d.", c->fd, n); // str=\n%s, c->buffer.start
+
+	if (n == 1024) { // It seems to be a bad request.
 		stu_log_debug(4, "recv: fd=%d, data=%s.", c->fd, c->buffer.start);
+		stu_memzero(c->buffer.start, STU_HTTP_REQUEST_DEFAULT_SIZE);
+		goto again;
 	}
 
 	if (stu_strncmp(c->buffer.start, STU_FLASH_POLICY_REQUEST.data, STU_FLASH_POLICY_REQUEST.len) == 0) {
@@ -185,18 +188,24 @@ stu_http_process_request(stu_http_request_t *r) {
 	u_char             *d, *s, *p, opcode, temp[STU_HTTP_REQUEST_DEFAULT_SIZE], buf[STU_USER_ID_MAX_LEN];
 	stu_channel_t      *ch;
 
+	c = r->connection;
+
 	rc = stu_http_process_request_headers(r);
-	if (rc != STU_OK) {
-		stu_log_error(0, "Failed to process request headers.");
-		stu_http_finalize_request(r, STU_HTTP_BAD_REQUEST);
+	if (rc == STU_AGAIN) {
+		stu_log_debug(4, "Wait to receive.");
 		return;
 	}
 
-	c = r->connection;
+	if (rc != STU_OK) {
+		stu_log_error(0, "Failed to process request headers.");
+		stu_http_finalize_request(r, STU_HTTP_BAD_REQUEST);
+		goto failed;
+	}
 
 	if (r->headers_in.upgrade == NULL) {
+		stu_log_error(0, "Not an upgrade request.");
 		stu_http_finalize_request(r, STU_HTTP_NOT_IMPLEMENTED);
-		return;
+		goto failed;
 	}
 
 	if (stu_cycle->config.edition == PREVIEW) {
@@ -206,6 +215,7 @@ stu_http_process_request(stu_http_request_t *r) {
 	// enterprise
 	if (stu_upstream_create(c, STU_HTTP_UPSTREAM_IDENT.data, STU_HTTP_UPSTREAM_IDENT.len) == STU_ERROR) {
 		stu_log_error(0, "Failed to create http upstream \"ident\".");
+		stu_http_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
 		goto failed;
 	}
 
@@ -222,6 +232,7 @@ stu_http_process_request(stu_http_request_t *r) {
 
 	if (stu_upstream_init(c) == STU_ERROR) {
 		stu_log_error(0, "Failed to init upstream.");
+		stu_http_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
 		goto failed;
 	}
 
@@ -233,6 +244,7 @@ preview:
 	cid.data = stu_base_pcalloc(c->pool, r->target.len + 1);
 	if (cid.data == NULL) {
 		stu_log_error(0, "Failed to pcalloc memory for channel id, fd=%d.", c->fd);
+		stu_http_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
 		goto failed;
 	}
 	stu_strncpy(cid.data, r->target.data, r->target.len);
@@ -246,12 +258,14 @@ preview:
 	c->user.id.data = stu_base_pcalloc(c->pool, c->user.id.len + 1);
 	if (c->user.id.data == NULL) {
 		stu_log_error(0, "Failed to pcalloc memory for user id, fd=%d.", c->fd);
+		stu_http_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
 		goto failed;
 	}
 	stu_strncpy(c->user.id.data, buf, c->user.id.len);
 
 	if (stu_http_arg(r, STU_PROTOCOL_NAME.data, STU_PROTOCOL_NAME.len, &name) != STU_OK) {
 		stu_log_error(0, "User name not specified, fd=%d.", c->fd);
+		stu_http_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
 		goto failed;
 	}
 
@@ -262,6 +276,7 @@ preview:
 	c->user.name.data = stu_base_pcalloc(c->pool, name.len + 1);
 	if (c->user.name.data == NULL) {
 		stu_log_error(0, "Failed to pcalloc memory for user name, fd=%d.", c->fd);
+		stu_http_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
 		goto failed;
 	}
 	stu_strncpy(c->user.name.data, name.data, name.len);
@@ -276,6 +291,7 @@ preview:
 	// insert user into channel
 	if (stu_channel_insert(&cid, c) == STU_ERROR) {
 		stu_log_error(0, "Failed to insert connection: fd=%d.", c->fd);
+		stu_http_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
 		goto failed;
 	}
 
@@ -320,7 +336,10 @@ preview:
 
 failed:
 
-	stu_http_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
+	c->read.active = 0;
+	stu_event_del(&c->read, STU_READ_EVENT, 0);
+
+	stu_http_close_connection(c);
 }
 
 
@@ -333,7 +352,7 @@ stu_http_process_request_headers(stu_http_request_t *r) {
 
 	if (stu_http_parse_request_line(r, r->header_in) == STU_ERROR) {
 		stu_log_error(0, "Failed to parse http request line: %s.", r->header_in->start);
-		return STU_ERROR;
+		return STU_HTTP_BAD_REQUEST;
 	}
 
 	for ( ;; ) {
@@ -342,7 +361,7 @@ stu_http_process_request_headers(stu_http_request_t *r) {
 		if (rc == STU_OK) {
 			if (r->invalid_header) {
 				stu_log_error(0, "client sent invalid header line: \"%s\"", r->header_name_start);
-				continue;
+				return STU_HTTP_BAD_REQUEST;
 			}
 
 			/* a header line has been parsed successfully */
@@ -397,14 +416,14 @@ stu_http_process_request_headers(stu_http_request_t *r) {
 
 		if (rc == STU_AGAIN) {
 			stu_log_debug(4, "A header line parsing is still not complete.");
-			continue;
+			return STU_AGAIN;
 		}
 
 		stu_log_error(0, "Unexpected error while processing request headers.");
 		break;
 	}
 
-	return STU_ERROR;
+	return STU_HTTP_BAD_REQUEST;
 }
 
 
@@ -686,7 +705,7 @@ stu_http_request_handler(stu_event_t *wev) {
 		goto failed;
 	}
 
-	stu_log_debug(4, "sent: fd=%d, bytes=%d.", c->fd, n);//str=\n%s, buf->start
+	stu_log_debug(4, "sent: fd=%d, bytes=%d.", c->fd, n); // str=\n%s, buf->start
 
 	if (r->headers_out.status == STU_HTTP_SWITCHING_PROTOCOLS) {
 		if (stu_http_switch_protocol(r) == STU_ERROR) {

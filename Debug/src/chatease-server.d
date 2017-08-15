@@ -1,4 +1,4 @@
-src/chatease-server.d: ../src/chatease-server.c \
+src/chatease-server.o: ../src/chatease-server.c \
  ../src/cn/studease/core/stu_config.h ../src/cn/studease/core/stu_core.h \
  ../src/cn/studease/core/stu_string.h ../src/cn/studease/core/stu_buf.h \
  ../src/cn/studease/core/stu_config.h ../src/cn/studease/core/stu_core.h \

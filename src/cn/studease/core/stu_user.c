@@ -37,6 +37,13 @@ stu_user_init(stu_user_t *usr, stu_str_t *id, stu_str_t *name, stu_base_pool_t *
 		memcpy(usr->name.data, name->data, name->len);
 	}
 
+	usr->role = STU_USER_ROLE_VISITOR;
+	usr->interval = stu_user_get_interval(usr->role);
+	usr->active = 0;
+
+	usr->punishment = NULL;
+	usr->channel = NULL;
+
 	return STU_OK;
 }
 

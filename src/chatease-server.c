@@ -2,9 +2,9 @@
  ============================================================================
  Name        : chatease-server.c
  Author      : Tony Lau
- Version     :
+ Version     : 1.x.xx
  Copyright   : studease.cn
- Description : Hello World in C, Ansi-style
+ Description : Websocket chat server.
  ============================================================================
  */
 

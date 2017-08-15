@@ -1,4 +1,4 @@
-src/cn/studease/core/stu_palloc.d: ../src/cn/studease/core/stu_palloc.c \
+src/cn/studease/core/stu_palloc.o: ../src/cn/studease/core/stu_palloc.c \
  ../src/cn/studease/core/stu_config.h ../src/cn/studease/core/stu_core.h \
  ../src/cn/studease/core/stu_string.h ../src/cn/studease/core/stu_buf.h \
  ../src/cn/studease/core/stu_queue.h ../src/cn/studease/core/stu_errno.h \

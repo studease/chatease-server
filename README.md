@@ -35,7 +35,7 @@ cmake ..
 ------
 
 ```
-sudo ./chatease-server
+sudo ./start.sh
 ```
 
 

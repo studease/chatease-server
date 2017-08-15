@@ -1,4 +1,4 @@
-src/cn/studease/core/stu_connection.d: \
+src/cn/studease/core/stu_connection.o: \
  ../src/cn/studease/core/stu_connection.c \
  ../src/cn/studease/core/stu_config.h ../src/cn/studease/core/stu_core.h \
  ../src/cn/studease/core/stu_string.h ../src/cn/studease/core/stu_buf.h \

@@ -153,7 +153,7 @@ stu_connection_close(stu_connection_t *c) {
 
 static void
 stu_connection_init(stu_connection_t *c, stu_socket_t s) {
-	stu_spinlock_init(&c->lock);
+	//stu_spinlock_init(&c->lock);
 
 	c->fd = s;
 
@@ -194,6 +194,7 @@ stu_connection_page_create(stu_connection_pool_t *pool) {
 	stu_list_push(&stu_cycle->shared_memory, shm, sizeof(stu_shm_t));
 
 	page = (stu_connection_page_t *) shm->addr;
+	stu_memzero(page, size);
 
 	stu_connection_page_init(page);
 	page->data.start = page->data.last = (u_char *) page + sizeof(stu_connection_page_t);
