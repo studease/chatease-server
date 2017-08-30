@@ -235,61 +235,72 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 			stu_websocket_finalize_request(r, STU_HTTP_EXPECTATION_FAILED, rqreq ? *(stu_double_t *) rqreq->value : -1);
 			return;
 		}
-
-		rqdata = stu_json_get_object_item_by(req, &STU_PROTOCOL_DATA);
-		rqtype = stu_json_get_object_item_by(req, &STU_PROTOCOL_TYPE);
-		rqchannel = stu_json_get_object_item_by(req, &STU_PROTOCOL_CHANNEL);
-		if (rqdata == NULL || rqdata->type != STU_JSON_TYPE_STRING
-				|| rqtype == NULL || rqtype->type != STU_JSON_TYPE_STRING
-				|| rqchannel == NULL || rqchannel->type != STU_JSON_TYPE_OBJECT) {
-			stu_log_error(0, "Failed to analyze websocket request: necessary item[s] not found.");
+	} else if (stu_strncmp(str->data, STU_PROTOCOL_CMDS_EXTERN.data, STU_PROTOCOL_CMDS_EXTERN.len) == 0) {
+		if (c->user.role < STU_USER_ROLE_ASSISTANT) {
+			stu_log_debug(4, "Refused to handle websocket extern request: Rights denied.");
 			stu_json_delete(req);
-			stu_websocket_finalize_request(r, STU_HTTP_BAD_REQUEST, rqreq ? *(stu_double_t *) rqreq->value : -1);
+			stu_websocket_finalize_request(r, STU_HTTP_EXPECTATION_FAILED, rqreq ? *(stu_double_t *) rqreq->value : -1);
 			return;
 		}
+	} else {
+		goto unknown;
+	}
 
-		res = stu_json_create_object(NULL);
-		raw = stu_json_create_string(&STU_PROTOCOL_RAW, STU_PROTOCOL_RAWS_TEXT.data, STU_PROTOCOL_RAWS_TEXT.len);
-		rsdata = stu_json_duplicate(rqdata, FALSE);
-		rstype = stu_json_duplicate(rqtype, FALSE);
-		rschannel = stu_json_duplicate(rqchannel, TRUE);
-		rsuser = stu_json_create_object(&STU_PROTOCOL_USER);
-
-		rsuid = stu_json_create_string(&STU_PROTOCOL_ID, c->user.id.data, c->user.id.len);
-		rsuname = stu_json_create_string(&STU_PROTOCOL_NAME, c->user.name.data, c->user.name.len);
-		rsurole = stu_json_create_number(&STU_PROTOCOL_ROLE, (stu_double_t) c->user.role);
-
-		stu_json_add_item_to_object(rsuser, rsuid);
-		stu_json_add_item_to_object(rsuser, rsuname);
-		stu_json_add_item_to_object(rsuser, rsurole);
-
-		stu_json_add_item_to_object(res, raw);
-		if (rqreq) {
-			rsreq = stu_json_duplicate(rqreq, FALSE);
-			stu_json_add_item_to_object(res, rsreq);
-		}
-		stu_json_add_item_to_object(res, rsdata);
-		stu_json_add_item_to_object(res, rstype);
-		stu_json_add_item_to_object(res, rschannel);
-		stu_json_add_item_to_object(res, rsuser);
-
-		stu_memzero(temp, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
-		data = stu_json_stringify(res, (u_char *) temp);
-
+	rqdata = stu_json_get_object_item_by(req, &STU_PROTOCOL_DATA);
+	rqtype = stu_json_get_object_item_by(req, &STU_PROTOCOL_TYPE);
+	rqchannel = stu_json_get_object_item_by(req, &STU_PROTOCOL_CHANNEL);
+	if (rqdata == NULL || rqdata->type != STU_JSON_TYPE_STRING
+			|| rqtype == NULL || rqtype->type != STU_JSON_TYPE_STRING
+			|| rqchannel == NULL || rqchannel->type != STU_JSON_TYPE_OBJECT) {
+		stu_log_error(0, "Failed to analyze websocket request: necessary item[s] not found.");
 		stu_json_delete(req);
-		stu_json_delete(res);
-
-		// setup out frame.
-		out = &r->frames_out;
-		out->opcode = r->frames_in.opcode;
-		out->extended = data - temp;
-		out->payload_data.start = temp;
-		out->payload_data.end = out->payload_data.last = data;
-
-		stu_websocket_finalize_request(r, STU_HTTP_OK, rqreq ? *(stu_double_t *) rqreq->value : -1);
-
+		stu_websocket_finalize_request(r, STU_HTTP_BAD_REQUEST, rqreq ? *(stu_double_t *) rqreq->value : -1);
 		return;
 	}
+
+	res = stu_json_create_object(NULL);
+	raw = stu_json_create_string(&STU_PROTOCOL_RAW, str->data, str->len);
+	rsdata = stu_json_duplicate(rqdata, FALSE);
+	rstype = stu_json_duplicate(rqtype, FALSE);
+	rschannel = stu_json_duplicate(rqchannel, TRUE);
+	rsuser = stu_json_create_object(&STU_PROTOCOL_USER);
+
+	rsuid = stu_json_create_string(&STU_PROTOCOL_ID, c->user.id.data, c->user.id.len);
+	rsuname = stu_json_create_string(&STU_PROTOCOL_NAME, c->user.name.data, c->user.name.len);
+	rsurole = stu_json_create_number(&STU_PROTOCOL_ROLE, (stu_double_t) c->user.role);
+
+	stu_json_add_item_to_object(rsuser, rsuid);
+	stu_json_add_item_to_object(rsuser, rsuname);
+	stu_json_add_item_to_object(rsuser, rsurole);
+
+	stu_json_add_item_to_object(res, raw);
+	if (rqreq) {
+		rsreq = stu_json_duplicate(rqreq, FALSE);
+		stu_json_add_item_to_object(res, rsreq);
+	}
+	stu_json_add_item_to_object(res, rsdata);
+	stu_json_add_item_to_object(res, rstype);
+	stu_json_add_item_to_object(res, rschannel);
+	stu_json_add_item_to_object(res, rsuser);
+
+	stu_memzero(temp, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
+	data = stu_json_stringify(res, (u_char *) temp);
+
+	stu_json_delete(req);
+	stu_json_delete(res);
+
+	// setup out frame.
+	out = &r->frames_out;
+	out->opcode = r->frames_in.opcode;
+	out->extended = data - temp;
+	out->payload_data.start = temp;
+	out->payload_data.end = out->payload_data.last = data;
+
+	stu_websocket_finalize_request(r, STU_HTTP_OK, rqreq ? *(stu_double_t *) rqreq->value : -1);
+
+	return;
+
+unknown:
 
 	stu_json_delete(req);
 

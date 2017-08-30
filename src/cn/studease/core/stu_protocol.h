@@ -30,6 +30,7 @@ extern stu_str_t  STU_PROTOCOL_CODE;
 extern stu_str_t  STU_PROTOCOL_CMDS_TEXT;
 extern stu_str_t  STU_PROTOCOL_CMDS_MUTE;
 extern stu_str_t  STU_PROTOCOL_CMDS_KICKOUT;
+extern stu_str_t  STU_PROTOCOL_CMDS_EXTERN;
 extern stu_str_t  STU_PROTOCOL_CMDS_PING;
 
 extern stu_str_t  STU_PROTOCOL_RAWS_IDENT;

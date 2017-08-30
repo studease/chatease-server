@@ -27,6 +27,7 @@ stu_str_t  STU_PROTOCOL_CODE = stu_string("code");
 stu_str_t  STU_PROTOCOL_CMDS_TEXT = stu_string("text");
 stu_str_t  STU_PROTOCOL_CMDS_MUTE = stu_string("mute");
 stu_str_t  STU_PROTOCOL_CMDS_KICKOUT = stu_string("kickout");
+stu_str_t  STU_PROTOCOL_CMDS_EXTERN = stu_string("extern");
 stu_str_t  STU_PROTOCOL_CMDS_PING = stu_string("ping");
 
 stu_str_t  STU_PROTOCOL_RAWS_IDENT = stu_string("ident");
