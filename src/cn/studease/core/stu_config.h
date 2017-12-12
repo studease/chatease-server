@@ -21,7 +21,7 @@
 
 #define __NAME    "chatease-server"
 #define __VERSION "1.0.39"
-#define __LOGGER  4
+#define __LOGGER  0
 
 #define STU_LINUX 1
 #define STU_WIN32 !STU_LINUX

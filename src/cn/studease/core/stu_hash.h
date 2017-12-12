@@ -16,8 +16,8 @@
 
 typedef void (*stu_hash_foreach_pt) (stu_str_t *key, void *value);
 
-typedef void *(*stu_hash_palloc_pt)(void *pool, size_t size);
-typedef void (*stu_hash_free_pt)(void *pool, void *p);
+typedef void *(*stu_hash_palloc_pt)(size_t size);
+typedef void (*stu_hash_free_pt)(void *p);
 
 
 typedef struct stu_hash_elt_s stu_hash_elt_t;
@@ -32,14 +32,13 @@ struct stu_hash_elt_s {
 };
 
 typedef struct {
-	stu_spinlock_t      lock;
+	stu_mutex_t      lock;
 
 	stu_list_t          keys;    // type: stu_hash_elt_t *
 	stu_hash_elt_t    **buckets;
 	stu_uint_t          size;
 	stu_uint_t          length;
 
-	void               *pool;
 	stu_hash_palloc_pt  palloc;
 	stu_hash_free_pt    free;
 } stu_hash_t;
@@ -60,7 +59,7 @@ typedef struct {
 stu_uint_t stu_hash_key(u_char *data, size_t len);
 stu_uint_t stu_hash_key_lc(u_char *data, size_t len);
 
-stu_int_t stu_hash_init(stu_hash_t *hash, stu_hash_elt_t **buckets, stu_uint_t size, void *pool, stu_hash_palloc_pt palloc, stu_hash_free_pt free);
+stu_int_t stu_hash_init(stu_hash_t *hash, stu_hash_elt_t **buckets, stu_uint_t size, stu_hash_palloc_pt palloc, stu_hash_free_pt free);
 stu_int_t stu_hash_insert(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t flags);
 stu_int_t stu_hash_insert_locked(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t flags);
 
@@ -72,7 +71,7 @@ void  stu_hash_remove_locked(stu_hash_t *hash, stu_uint_t key, u_char *name, siz
 void  stu_hash_foreach(stu_hash_t *hash, stu_hash_foreach_pt cb);
 void  stu_hash_foreach_locked(stu_hash_t *hash, stu_hash_foreach_pt cb);
 
-void  stu_hash_free_empty_pt(void *pool, void *p);
+void  stu_hash_free_empty_pt(void *p);
 
 void  stu_hash_test(stu_hash_t *hash);
 

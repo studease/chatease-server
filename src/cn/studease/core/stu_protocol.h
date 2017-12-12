@@ -20,6 +20,7 @@ extern stu_str_t  STU_PROTOCOL_CHANNEL;
 extern stu_str_t  STU_PROTOCOL_USER;
 extern stu_str_t  STU_PROTOCOL_ID;
 extern stu_str_t  STU_PROTOCOL_NAME;
+extern stu_str_t  STU_PROTOCOL_ICON;
 extern stu_str_t  STU_PROTOCOL_ROLE;
 extern stu_str_t  STU_PROTOCOL_STATE;
 extern stu_str_t  STU_PROTOCOL_STATUS;

@@ -23,8 +23,6 @@
 #define STU_CHANNEL_PUSH_STATUS_DEFAULT_INTERVAL 300
 
 typedef struct {
-	stu_base_pool_t *pool; // not used currently.
-
 	stu_str_t        id;
 	stu_int_t        message_n;
 	uint8_t          state;

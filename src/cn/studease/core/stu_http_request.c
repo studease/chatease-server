@@ -75,13 +75,13 @@ stu_http_wait_request_handler(stu_event_t *rev) {
 
 	c = (stu_connection_t *) rev->data;
 
-	stu_spin_lock(&c->lock);
+	stu_mutex_lock(&c->lock);
 	if (c->fd == (stu_socket_t) STU_SOCKET_INVALID) {
 		goto done;
 	}
 
 	if (c->buffer.start == NULL) {
-		c->buffer.start = (u_char *) stu_base_palloc(c->pool, STU_HTTP_REQUEST_DEFAULT_SIZE);
+		c->buffer.start = (u_char *) stu_calloc(STU_HTTP_REQUEST_DEFAULT_SIZE);
 		c->buffer.end = c->buffer.start + STU_HTTP_REQUEST_DEFAULT_SIZE;
 	}
 	c->buffer.last = c->buffer.start;
@@ -150,7 +150,7 @@ failed:
 
 done:
 
-	stu_spin_unlock(&c->lock);
+	stu_mutex_unlock(&c->lock);
 }
 
 stu_http_request_t *
@@ -158,9 +158,7 @@ stu_http_create_request(stu_connection_t *c) {
 	stu_http_request_t *r;
 
 	if (c->data == NULL) {
-		stu_spin_lock(&c->pool->lock);
-		r = stu_base_pcalloc(c->pool, sizeof(stu_http_request_t));
-		stu_spin_unlock(&c->pool->lock);
+		r = stu_calloc(sizeof(stu_http_request_t));
 	} else {
 		r = c->data;
 	}
@@ -172,8 +170,8 @@ stu_http_create_request(stu_connection_t *c) {
 
 	r->connection = c;
 	r->header_in = &c->buffer;
-	stu_list_init(&r->headers_in.headers, c->pool, (stu_list_palloc_pt) stu_base_pcalloc, NULL);
-	stu_list_init(&r->headers_out.headers, c->pool, (stu_list_palloc_pt) stu_base_pcalloc, NULL);
+	stu_list_init(&r->headers_in.headers, (stu_list_palloc_pt) stu_calloc, stu_free);
+	stu_list_init(&r->headers_out.headers, (stu_list_palloc_pt) stu_calloc, stu_free);
 
 	return r;
 }
@@ -184,7 +182,7 @@ stu_http_process_request(stu_http_request_t *r) {
 	stu_connection_t   *c;
 	stu_table_elt_t    *protocol;
 	stu_int_t           m, n, size, extened;
-	stu_str_t           cid, name, role, state;
+	stu_str_t           cid, name, icon, role, state;
 	u_char             *d, *s, *p, opcode, temp[STU_HTTP_REQUEST_DEFAULT_SIZE], buf[STU_USER_ID_MAX_LEN];
 	stu_channel_t      *ch;
 
@@ -241,7 +239,7 @@ stu_http_process_request(stu_http_request_t *r) {
 preview:
 
 	// get channel ID
-	cid.data = stu_base_pcalloc(c->pool, r->target.len + 1);
+	cid.data = stu_calloc(r->target.len + 1);
 	if (cid.data == NULL) {
 		stu_log_error(0, "Failed to pcalloc memory for channel id, fd=%d.", c->fd);
 		stu_http_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
@@ -250,12 +248,12 @@ preview:
 	stu_strncpy(cid.data, r->target.data, r->target.len);
 	cid.len = r->target.len;
 
-	// reset user info
+	// reset user ID
 	s = stu_sprintf(buf, "%ld", stu_preview_auto_id++);
 	*s = '\0';
 
 	c->user.id.len = s - buf;
-	c->user.id.data = stu_base_pcalloc(c->pool, c->user.id.len + 1);
+	c->user.id.data = stu_calloc(c->user.id.len + 1);
 	if (c->user.id.data == NULL) {
 		stu_log_error(0, "Failed to pcalloc memory for user id, fd=%d.", c->fd);
 		stu_http_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
@@ -263,6 +261,7 @@ preview:
 	}
 	stu_strncpy(c->user.id.data, buf, c->user.id.len);
 
+	// reset user name
 	if (stu_http_arg(r, STU_PROTOCOL_NAME.data, STU_PROTOCOL_NAME.len, &name) != STU_OK) {
 		stu_log_error(0, "User name not specified, fd=%d.", c->fd);
 		stu_http_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
@@ -273,7 +272,7 @@ preview:
 	stu_unescape_uri(&d, &s, name.len, 0);
 	name.len = d - name.data;
 
-	c->user.name.data = stu_base_pcalloc(c->pool, name.len + 1);
+	c->user.name.data = stu_calloc(name.len + 1);
 	if (c->user.name.data == NULL) {
 		stu_log_error(0, "Failed to pcalloc memory for user name, fd=%d.", c->fd);
 		stu_http_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
@@ -282,6 +281,19 @@ preview:
 	stu_strncpy(c->user.name.data, name.data, name.len);
 	c->user.name.len = name.len;
 
+	// reset user icon
+	if (stu_http_arg(r, STU_PROTOCOL_ICON.data, STU_PROTOCOL_ICON.len, &icon) == STU_OK) {
+		c->user.icon.data = stu_calloc(icon.len + 1);
+		if (c->user.icon.data == NULL) {
+			stu_log_error(0, "Failed to pcalloc memory for user icon, fd=%d.", c->fd);
+			stu_http_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR);
+			goto failed;
+		}
+		stu_strncpy(c->user.icon.data, icon.data, icon.len);
+		c->user.icon.len = icon.len;
+	}
+
+	// reset user role
 	c->user.role = STU_USER_ROLE_NORMAL;
 	if (stu_http_arg(r, STU_PROTOCOL_ROLE.data, STU_PROTOCOL_ROLE.len, &role) == STU_OK) {
 		m = atoi((const char *) role.data);
@@ -316,7 +328,7 @@ preview:
 
 	p = stu_sprintf(
 			(u_char *) temp + 10, (const char *) STU_HTTP_UPSTREAM_IDENT_RESPONSE.data,
-			c->user.id.data, c->user.name.data, c->user.role,
+			c->user.id.data, c->user.name.data, c->user.icon.data, c->user.role,
 			ch->id.data, ch->state, ch->userlist.length
 		);
 	*p = '\0';
@@ -365,7 +377,7 @@ stu_http_process_request_headers(stu_http_request_t *r) {
 			}
 
 			/* a header line has been parsed successfully */
-			h = stu_base_pcalloc(r->connection->pool, sizeof(stu_table_elt_t));
+			h = stu_calloc(sizeof(stu_table_elt_t));
 			if (h == NULL) {
 				return STU_HTTP_INTERNAL_SERVER_ERROR;
 			}
@@ -380,7 +392,7 @@ stu_http_process_request_headers(stu_http_request_t *r) {
 			h->value.data = r->header_start;
 			h->value.data[h->value.len] = '\0';
 
-			h->lowcase_key = stu_base_pcalloc(r->connection->pool, h->key.len + 1);
+			h->lowcase_key = stu_calloc(h->key.len + 1);
 			if (h->lowcase_key == NULL) {
 				return STU_HTTP_INTERNAL_SERVER_ERROR;
 			}
@@ -467,7 +479,7 @@ stu_http_process_sec_websocket_key(stu_http_request_t *r, stu_table_elt_t *h, st
 
 	stu_http_process_unique_header_line(r, h, offset);
 
-	e = stu_base_pcalloc(r->connection->pool, sizeof(stu_table_elt_t));
+	e = stu_calloc(sizeof(stu_table_elt_t));
 	if (e == NULL) {
 		return STU_HTTP_INTERNAL_SERVER_ERROR;
 	}
@@ -476,10 +488,10 @@ stu_http_process_sec_websocket_key(stu_http_request_t *r, stu_table_elt_t *h, st
 	e->key.len = STU_HTTP_HEADER_SEC_WEBSOCKET_ACCEPT.len;
 
 	sha1_signed.len = SHA_DIGEST_LENGTH;
-	sha1_signed.data = stu_base_pcalloc(r->connection->pool, sha1_signed.len + 1);
+	sha1_signed.data = stu_calloc(sha1_signed.len + 1);
 
 	e->value.len = stu_base64_encoded_length(SHA_DIGEST_LENGTH);
-	e->value.data = stu_base_pcalloc(r->connection->pool, e->value.len + 1);
+	e->value.data = stu_calloc(e->value.len + 1);
 
 	if (sha1_signed.data == NULL || e->value.data == NULL) {
 		return STU_HTTP_INTERNAL_SERVER_ERROR;
@@ -515,7 +527,7 @@ stu_http_process_sec_websocket_key_for_safari(stu_http_request_t *r, stu_table_e
 		return STU_AGAIN;
 	}
 
-	e = stu_base_pcalloc(r->connection->pool, sizeof(stu_table_elt_t));
+	e = stu_calloc(sizeof(stu_table_elt_t));
 	if (e == NULL) {
 		return STU_HTTP_INTERNAL_SERVER_ERROR;
 	}
@@ -556,10 +568,10 @@ stu_http_process_sec_websocket_key_for_safari(stu_http_request_t *r, stu_table_e
 	e->key.len = STU_HTTP_HEADER_SEC_WEBSOCKET_ACCEPT.len;
 
 	md5_signed.len = 16;
-	md5_signed.data = stu_base_pcalloc(r->connection->pool, md5_signed.len + 1);
+	md5_signed.data = stu_calloc(md5_signed.len + 1);
 
 	e->value.len = 16;
-	e->value.data = stu_base_pcalloc(r->connection->pool, e->value.len + 1);
+	e->value.data = stu_calloc(e->value.len + 1);
 
 	if (md5_signed.data == NULL || e->value.data == NULL) {
 		return STU_HTTP_INTERNAL_SERVER_ERROR;
@@ -584,7 +596,7 @@ stu_http_process_sec_websocket_protocol(stu_http_request_t *r, stu_table_elt_t *
 
 	stu_http_process_unique_header_line(r, h, offset);
 
-	e = stu_base_pcalloc(r->connection->pool, sizeof(stu_table_elt_t));
+	e = stu_calloc(sizeof(stu_table_elt_t));
 	if (e == NULL) {
 		return STU_HTTP_INTERNAL_SERVER_ERROR;
 	}
@@ -592,7 +604,7 @@ stu_http_process_sec_websocket_protocol(stu_http_request_t *r, stu_table_elt_t *
 	e->key.data = STU_HTTP_HEADER_SEC_WEBSOCKET_PROTOCOL.data;
 	e->key.len = STU_HTTP_HEADER_SEC_WEBSOCKET_PROTOCOL.len;
 
-	e->value.data = stu_base_pcalloc(r->connection->pool, h->value.len + 1);
+	e->value.data = stu_calloc(h->value.len + 1);
 	e->value.len = h->value.len;
 
 	memcpy(e->value.data, h->value.data, h->value.len);
@@ -659,7 +671,7 @@ stu_http_request_handler(stu_event_t *wev) {
 
 	c = (stu_connection_t *) wev->data;
 
-	//stu_spin_lock(&c->lock);
+	//stu_mutex_lock(&c->lock);
 	if (c->fd == (stu_socket_t) -1) {
 		return;
 	}
@@ -730,7 +742,7 @@ failed:
 
 //done:
 
-	//stu_spin_unlock(&c->lock);
+	//stu_mutex_unlock(&c->lock);
 }
 
 static stu_int_t
@@ -738,8 +750,6 @@ stu_http_switch_protocol(stu_http_request_t *r) {
 	stu_connection_t *c;
 
 	c = r->connection;
-
-	stu_base_pool_reset(c->pool);
 
 	c->buffer.start = c->buffer.last =c->buffer.end = NULL;
 	c->data = NULL;

@@ -17,6 +17,7 @@ stu_str_t  STU_PROTOCOL_CHANNEL = stu_string("channel");
 stu_str_t  STU_PROTOCOL_USER = stu_string("user");
 stu_str_t  STU_PROTOCOL_ID = stu_string("id");
 stu_str_t  STU_PROTOCOL_NAME = stu_string("name");
+stu_str_t  STU_PROTOCOL_ICON = stu_string("icon");
 stu_str_t  STU_PROTOCOL_ROLE = stu_string("role");
 stu_str_t  STU_PROTOCOL_STATE = stu_string("state");
 stu_str_t  STU_PROTOCOL_STATUS = stu_string("status");

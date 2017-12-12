@@ -35,18 +35,10 @@ typedef struct {
 } stu_config_t;
 
 struct stu_cycle_s {
-	stu_pool_t            *pool;
-	stu_slab_pool_t       *slab_pool;
-	stu_connection_pool_t *connection_pool;
-	stu_ram_pool_t         ram_pool;
-
 	stu_config_t           config;
-	stu_list_t             shared_memory; // => stu_shm_t
-
 	stu_hash_t             channels;
-	stu_uint_t             connection_n;
 
-	stu_spinlock_t         timer_lock;
+	stu_mutex_t            timer_lock;
 	stu_rbtree_t           timer_rbtree;
 	stu_rbtree_node_t      timer_sentinel;
 	stu_hash_t             timers;

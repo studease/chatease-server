@@ -25,9 +25,8 @@ Preview Edition won't send the identify upstream request.
 To build chatease-server, you need CMake 3.5 and or above. Then run:
 
 ```
-mkdir build 
-cd build
-cmake ..
+cmake .
+make
 ```
 
 

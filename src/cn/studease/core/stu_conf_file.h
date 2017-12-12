@@ -23,6 +23,6 @@ typedef struct {
 	stu_short_t  mask;
 } stu_conf_bitmask_t;
 
-stu_int_t stu_conf_file_parse(stu_config_t *cf, u_char *name, stu_pool_t *pool);
+stu_int_t stu_conf_file_parse(stu_config_t *cf, u_char *name);
 
 #endif /* STU_CONF_FILE_H_ */

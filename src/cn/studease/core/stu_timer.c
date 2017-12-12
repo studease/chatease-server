@@ -18,7 +18,7 @@ extern stu_cycle_t *stu_cycle;
 
 stu_int_t
 stu_timer_init(stu_cycle_t *cycle) {
-	stu_spinlock_init(&cycle->timer_lock);
+	stu_mutex_init(&cycle->timer_lock, NULL);
 	stu_rbtree_init(&cycle->timer_rbtree, &cycle->timer_sentinel, stu_rbtree_insert_timer_value);
 
 	return STU_OK;
@@ -29,7 +29,7 @@ stu_timer_find(void) {
 	stu_msec_int_t     timer;
 	stu_rbtree_node_t *node, *root, *sentinel;
 
-	stu_spin_lock(&stu_cycle->timer_lock);
+	stu_mutex_lock(&stu_cycle->timer_lock);
 
 	if (stu_cycle->timer_rbtree.root == &stu_cycle->timer_sentinel) {
 		timer = STU_TIMER_INFINITE;
@@ -45,7 +45,7 @@ stu_timer_find(void) {
 
 done:
 
-	stu_spin_unlock(&stu_cycle->timer_lock);
+	stu_mutex_unlock(&stu_cycle->timer_lock);
 
 	return (stu_msec_t) timer;
 }
@@ -55,7 +55,7 @@ stu_timer_expire(void) {
 	stu_event_t       *ev;
 	stu_rbtree_node_t *node, *root, *sentinel;
 
-	stu_spin_lock(&stu_cycle->timer_lock);
+	stu_mutex_lock(&stu_cycle->timer_lock);
 
 	sentinel = stu_cycle->timer_rbtree.sentinel;
 
@@ -91,7 +91,7 @@ stu_timer_expire(void) {
 
 done:
 
-	stu_spin_unlock(&stu_cycle->timer_lock);
+	stu_mutex_unlock(&stu_cycle->timer_lock);
 }
 
 void
@@ -99,7 +99,7 @@ stu_timer_cancel(void) {
 	stu_event_t        *ev;
 	stu_rbtree_node_t  *node, *root, *sentinel;
 
-	stu_spin_lock(&stu_cycle->timer_lock);
+	stu_mutex_lock(&stu_cycle->timer_lock);
 
 	sentinel = stu_cycle->timer_rbtree.sentinel;
 
@@ -133,15 +133,15 @@ stu_timer_cancel(void) {
 
 done:
 
-	stu_spin_unlock(&stu_cycle->timer_lock);
+	stu_mutex_unlock(&stu_cycle->timer_lock);
 }
 
 
 stu_inline void
 stu_timer_add(stu_event_t *ev, stu_msec_t timer) {
-	stu_spin_lock(&stu_cycle->timer_lock);
+	stu_mutex_lock(&stu_cycle->timer_lock);
 	stu_timer_add_locked(ev, timer);
-	stu_spin_unlock(&stu_cycle->timer_lock);
+	stu_mutex_unlock(&stu_cycle->timer_lock);
 }
 
 void
@@ -177,9 +177,9 @@ stu_timer_add_locked(stu_event_t *ev, stu_msec_t timer) {
 
 stu_inline void
 stu_timer_del(stu_event_t *ev) {
-	stu_spin_lock(&stu_cycle->timer_lock);
+	stu_mutex_lock(&stu_cycle->timer_lock);
 	stu_timer_del_locked(ev);
-	stu_spin_unlock(&stu_cycle->timer_lock);
+	stu_mutex_unlock(&stu_cycle->timer_lock);
 }
 
 void

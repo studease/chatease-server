@@ -35,27 +35,26 @@ stu_hash_key_lc(u_char *data, size_t len) {
 }
 
 stu_int_t
-stu_hash_init(stu_hash_t *hash, stu_hash_elt_t **buckets, stu_uint_t size, void *pool, stu_hash_palloc_pt palloc, stu_hash_free_pt free) {
+stu_hash_init(stu_hash_t *hash, stu_hash_elt_t **buckets, stu_uint_t size, stu_hash_palloc_pt palloc, stu_hash_free_pt free) {
 	stu_hash_elt_t **b;
 
 	b = buckets;
 	if (b == NULL) {
-		b = palloc(pool, size * sizeof(stu_hash_elt_t *));
+		b = palloc(size * sizeof(stu_hash_elt_t *));
 		if (b == NULL) {
 			stu_log_error(0, "Failed to alloc buckets of hash.");
 			return STU_ERROR;
 		}
 	}
 
-	stu_spinlock_init(&hash->lock);
+	stu_mutex_init(&hash->lock, NULL);
 
-	stu_list_init(&hash->keys, pool, palloc, free);
+	stu_list_init(&hash->keys, palloc, free);
 
 	hash->buckets = b;
 	hash->size = size;
 	hash->length = 0;
 
-	hash->pool = pool;
 	hash->palloc = palloc;
 	hash->free = free;
 
@@ -66,9 +65,9 @@ stu_int_t
 stu_hash_insert(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t flags) {
 	stu_int_t  rc;
 
-	stu_spin_lock(&hash->lock);
+	stu_mutex_lock(&hash->lock);
 	rc = stu_hash_insert_locked(hash, key, value, flags);
-	stu_spin_unlock(&hash->lock);
+	stu_mutex_unlock(&hash->lock);
 
 	return rc;
 }
@@ -88,7 +87,7 @@ stu_hash_insert_locked(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t
 
 	elts = hash->buckets[i];
 	if (elts == NULL) {
-		elts = hash->palloc(hash->pool, sizeof(stu_hash_elt_t));
+		elts = hash->palloc(sizeof(stu_hash_elt_t));
 		if (elts == NULL) {
 			goto failed;
 		}
@@ -110,12 +109,12 @@ stu_hash_insert_locked(stu_hash_t *hash, stu_str_t *key, void *value, stu_uint_t
 		}
 	}
 
-	elt = hash->palloc(hash->pool, sizeof(stu_hash_elt_t));
+	elt = hash->palloc(sizeof(stu_hash_elt_t));
 	if (elt == NULL) {
 		goto failed;
 	}
 
-	elt->key.data = hash->palloc(hash->pool, key->len + 1);
+	elt->key.data = hash->palloc(key->len + 1);
 	if (elt->key.data == NULL) {
 		goto failed;
 	}
@@ -147,9 +146,9 @@ void *
 stu_hash_find(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t len) {
 	void *v;
 
-	stu_spin_lock(&hash->lock);
+	stu_mutex_lock(&hash->lock);
 	v = stu_hash_find_locked(hash, key, name, len);
-	stu_spin_unlock(&hash->lock);
+	stu_mutex_unlock(&hash->lock);
 
 	return v;
 }
@@ -187,9 +186,9 @@ failed:
 
 void
 stu_hash_remove(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t len) {
-	stu_spin_lock(&hash->lock);
+	stu_mutex_lock(&hash->lock);
 	stu_hash_remove_locked(hash, key, name, len);
-	stu_spin_unlock(&hash->lock);
+	stu_mutex_unlock(&hash->lock);
 }
 
 void
@@ -221,8 +220,8 @@ stu_hash_remove_locked(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t le
 			stu_queue_remove(&e->q);
 
 			if (hash->free) {
-				hash->free(hash->pool, e->key.data);
-				hash->free(hash->pool, e);
+				hash->free(e->key.data);
+				hash->free(e);
 			}
 
 			hash->length--;
@@ -235,7 +234,7 @@ stu_hash_remove_locked(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t le
 
 	if (elts->queue.next == stu_queue_sentinel(&elts->queue)) {
 		if (hash->free) {
-			hash->free(hash->pool, elts);
+			hash->free(elts);
 		}
 
 		hash->buckets[i] = NULL;
@@ -246,9 +245,9 @@ stu_hash_remove_locked(stu_hash_t *hash, stu_uint_t key, u_char *name, size_t le
 
 void
 stu_hash_foreach(stu_hash_t *hash, stu_hash_foreach_pt cb) {
-	stu_spin_lock(&hash->lock);
+	stu_mutex_lock(&hash->lock);
 	stu_hash_foreach_locked(hash, cb);
-	stu_spin_unlock(&hash->lock);
+	stu_mutex_unlock(&hash->lock);
 }
 
 void
@@ -258,14 +257,14 @@ stu_hash_foreach_locked(stu_hash_t *hash, stu_hash_foreach_pt cb) {
 	stu_queue_t    *q;
 
 	elts = &hash->keys.elts;
-	for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
+	for (q = stu_queue_head(&elts->queue); q != NULL && q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
 		e = stu_queue_data(q, stu_hash_elt_t, q);
 		cb(&e->key, e->value);
 	}
 }
 
 void
-stu_hash_free_empty_pt(void *pool, void *p) {
+stu_hash_free_empty_pt(void *p) {
 
 }
 

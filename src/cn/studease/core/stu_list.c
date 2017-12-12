@@ -9,8 +9,8 @@
 #include "stu_core.h"
 
 void
-stu_list_init(stu_list_t *list, void *pool, stu_list_palloc_pt palloc, stu_list_free_pt free) {
-	stu_spinlock_init(&list->lock);
+stu_list_init(stu_list_t *list, stu_list_palloc_pt palloc, stu_list_free_pt free) {
+	stu_mutex_init(&list->lock, NULL);
 
 	stu_queue_init(&list->elts.queue);
 	list->elts.obj = NULL;
@@ -18,7 +18,6 @@ stu_list_init(stu_list_t *list, void *pool, stu_list_palloc_pt palloc, stu_list_
 
 	list->length = 0;
 
-	list->pool = pool;
 	list->palloc = palloc;
 	list->free = free;
 }
@@ -33,7 +32,7 @@ stu_int_t
 stu_list_push(stu_list_t *list, void *obj, size_t size) {
 	stu_list_elt_t *elt;
 
-	elt = list->palloc(list->pool, sizeof(stu_list_elt_t));
+	elt = list->palloc(sizeof(stu_list_elt_t));
 	if (elt == NULL) {
 		stu_log_error(0, "Failed to palloc stu_list_elt_t.");
 		return STU_ERROR;
@@ -54,7 +53,7 @@ stu_list_remove(stu_list_t *list, stu_list_elt_t *elt) {
 	list->length--;
 
 	if (list->free) {
-		list->free(list->pool, elt);
+		list->free(elt);
 	}
 }
 

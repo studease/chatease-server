@@ -129,13 +129,13 @@ stu_flash_wait_request_handler(stu_event_t *rev) {
 
 	c = (stu_connection_t *) rev->data;
 
-	stu_spin_lock(&c->lock);
+	stu_mutex_lock(&c->lock);
 	if (c->fd == (stu_socket_t) STU_SOCKET_INVALID) {
 		goto done;
 	}
 
 	if (c->buffer.start == NULL) {
-		c->buffer.start = (u_char *) stu_base_palloc(c->pool, STU_HTTP_REQUEST_DEFAULT_SIZE);
+		c->buffer.start = (u_char *) stu_calloc(STU_HTTP_REQUEST_DEFAULT_SIZE);
 		c->buffer.end = c->buffer.start + STU_HTTP_REQUEST_DEFAULT_SIZE;
 	}
 	c->buffer.last = c->buffer.start;
@@ -188,5 +188,5 @@ failed:
 
 done:
 
-	stu_spin_unlock(&c->lock);
+	stu_mutex_unlock(&c->lock);
 }

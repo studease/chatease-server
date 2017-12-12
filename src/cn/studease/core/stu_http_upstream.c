@@ -65,8 +65,6 @@ stu_http_upstream_reinit_request(stu_connection_t *c) {
 	u = c->upstream;
 	pc = u->peer.connection;
 	pr = (stu_http_request_t *) pc->data;
-
-	stu_base_pool_reset(pc->pool);
 	pr->state = 0;
 
 	return STU_OK;
@@ -101,7 +99,7 @@ stu_http_upstream_generate_request(stu_connection_t *c) {
 	}
 
 	if (pc->buffer.start == NULL) {
-		pc->buffer.start = (u_char *) stu_base_palloc(pc->pool, STU_HTTP_REQUEST_DEFAULT_SIZE);
+		pc->buffer.start = (u_char *) stu_calloc(STU_HTTP_REQUEST_DEFAULT_SIZE);
 		pc->buffer.end = pc->buffer.start + STU_HTTP_REQUEST_DEFAULT_SIZE;
 	}
 
@@ -142,14 +140,14 @@ stu_http_upstream_read_handler(stu_event_t *ev) {
 	u = c->upstream;
 	pc = u->peer.connection;
 
-	stu_spin_lock(&c->lock);
+	stu_mutex_lock(&c->lock);
 
 	if (pc == NULL || pc->fd == (stu_socket_t) STU_SOCKET_INVALID) {
 		goto done;
 	}
 
 	if (pc->buffer.start == NULL) {
-		pc->buffer.start = (u_char *) stu_base_palloc(pc->pool, STU_HTTP_REQUEST_DEFAULT_SIZE);
+		pc->buffer.start = (u_char *) stu_calloc(STU_HTTP_REQUEST_DEFAULT_SIZE);
 		pc->buffer.end = pc->buffer.start + STU_HTTP_REQUEST_DEFAULT_SIZE;
 	}
 	pc->buffer.last = pc->buffer.start;
@@ -194,7 +192,7 @@ failed:
 
 done:
 
-	stu_spin_unlock(&c->lock);
+	stu_mutex_unlock(&c->lock);
 }
 
 stu_int_t
@@ -244,7 +242,7 @@ stu_http_upstream_process_response_headers(stu_http_request_t *r) {
 			}
 
 			/* a header line has been parsed successfully */
-			h = stu_base_pcalloc(r->connection->pool, sizeof(stu_table_elt_t));
+			h = stu_calloc(sizeof(stu_table_elt_t));
 			if (h == NULL) {
 				return STU_HTTP_INTERNAL_SERVER_ERROR;
 			}
@@ -259,7 +257,7 @@ stu_http_upstream_process_response_headers(stu_http_request_t *r) {
 			h->value.data = r->header_start;
 			h->value.data[h->value.len] = '\0';
 
-			h->lowcase_key = stu_base_pcalloc(r->connection->pool, h->key.len);
+			h->lowcase_key = stu_calloc(h->key.len);
 			if (h->lowcase_key == NULL) {
 				return STU_HTTP_INTERNAL_SERVER_ERROR;
 			}
@@ -351,7 +349,7 @@ stu_http_upstream_write_handler(stu_event_t *ev) {
 	pc = u->peer.connection;
 
 	// Lock pc rather than c
-	stu_spin_lock(&c->lock);
+	stu_mutex_lock(&c->lock);
 
 	if (pc == NULL || pc->fd == (stu_socket_t) STU_SOCKET_INVALID) {
 		goto done;
@@ -384,7 +382,7 @@ failed:
 
 done:
 
-	stu_spin_unlock(&c->lock);
+	stu_mutex_unlock(&c->lock);
 }
 
 

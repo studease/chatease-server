@@ -1,23 +1,23 @@
 # CMake version 
 cmake_minimum_required (VERSION 3.5)
 
-#project info
-project (Chatease)
+#project name
+PROJECT(chatease-server)
 
-#src file
-aux_source_directory(src DIR_SRC)
+#head file path
+INCLUDE_DIRECTORIES(src/cn/studease/core)
 
-#header file
-include_directories(src/cn/studease/core)
+#source directory
+AUX_SOURCE_DIRECTORY(src DIR_SRC)
 
 #core src
-add_subdirectory(src/cn/studease/core)
+ADD_SUBDIRECTORY(src/cn/studease/core)
 
-#build
-add_executable(chatease-server ${DIR_SRC})
+#add executable file
+ADD_EXECUTABLE(chatease-server ${DIR_SRC})
 
-#link
-target_link_libraries(chatease-server core)
-target_link_libraries(chatease-server pthread)
-target_link_libraries(chatease-server m)
-target_link_libraries(chatease-server crypto)
+#add link library
+TARGET_LINK_LIBRARIES(chatease-server core)
+TARGET_LINK_LIBRARIES(chatease-server pthread)
+TARGET_LINK_LIBRARIES(chatease-server m)
+TARGET_LINK_LIBRARIES(chatease-server crypto)

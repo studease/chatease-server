@@ -18,14 +18,14 @@ stu_websocket_wait_request_handler(stu_event_t *rev) {
 
 	c = (stu_connection_t *) rev->data;
 
-	stu_spin_lock(&c->lock);
+	stu_mutex_lock(&c->lock);
 	if (c->fd == (stu_socket_t) -1) {
 		stu_log_error(0, "websocket waited a invalid fd=%d.", c->fd);
 		goto done;
 	}
 
 	if (c->buffer.start == NULL) {
-		c->buffer.start = (u_char *) stu_base_palloc(c->pool, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
+		c->buffer.start = (u_char *) stu_calloc(STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
 		c->buffer.last = c->buffer.end = c->buffer.start;
 		stu_memzero(c->buffer.start, STU_WEBSOCKET_REQUEST_DEFAULT_SIZE);
 	}
@@ -73,7 +73,7 @@ failed:
 
 done:
 
-	stu_spin_unlock(&c->lock);
+	stu_mutex_unlock(&c->lock);
 }
 
 stu_websocket_request_t *
@@ -81,9 +81,7 @@ stu_websocket_create_request(stu_connection_t *c) {
 	stu_websocket_request_t *r;
 
 	if (c->data == NULL) {
-		stu_spin_lock(&c->pool->lock);
-		r = stu_base_pcalloc(c->pool, sizeof(stu_websocket_request_t));
-		stu_spin_unlock(&c->pool->lock);
+		r = stu_calloc(sizeof(stu_websocket_request_t));
 	} else {
 		r = c->data;
 	}
@@ -159,7 +157,7 @@ stu_websocket_process_request(stu_websocket_request_t *r) {
 
 		if (rc == STU_OK) {
 			if (r->frame->next == NULL) {
-				new = stu_base_pcalloc(r->connection->pool, sizeof(stu_websocket_frame_t));
+				new = stu_calloc(sizeof(stu_websocket_frame_t));
 				if (new == NULL) {
 					stu_log_error(0, "Failed to alloc new websocket frame.");
 					stu_websocket_finalize_request(r, STU_HTTP_INTERNAL_SERVER_ERROR, -1);
@@ -191,7 +189,7 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 	stu_connection_t      *c;
 	stu_channel_t         *ch;
 	stu_json_t            *req, *cmd, *rqreq, *rqdata, *rqtype, *rqchannel;
-	stu_json_t            *res, *raw, *rsreq, *rsdata, *rstype, *rschannel, *rsuser, *rsuid, *rsuname, *rsurole;
+	stu_json_t            *res, *raw, *rsreq, *rsdata, *rstype, *rschannel, *rsuser, *rsuid, *rsuname, *rsuicon, *rsurole;
 	stu_str_t             *str;
 	stu_websocket_frame_t *out;
 	u_char                *data, temp[STU_WEBSOCKET_REQUEST_DEFAULT_SIZE];
@@ -267,10 +265,12 @@ stu_websocket_analyze_request(stu_websocket_request_t *r, u_char *text, size_t s
 
 	rsuid = stu_json_create_string(&STU_PROTOCOL_ID, c->user.id.data, c->user.id.len);
 	rsuname = stu_json_create_string(&STU_PROTOCOL_NAME, c->user.name.data, c->user.name.len);
+	rsuicon = stu_json_create_string(&STU_PROTOCOL_ICON, c->user.icon.data, c->user.icon.len);
 	rsurole = stu_json_create_number(&STU_PROTOCOL_ROLE, (stu_double_t) c->user.role);
 
 	stu_json_add_item_to_object(rsuser, rsuid);
 	stu_json_add_item_to_object(rsuser, rsuname);
+	stu_json_add_item_to_object(rsuser, rsuicon);
 	stu_json_add_item_to_object(rsuser, rsurole);
 
 	stu_json_add_item_to_object(res, raw);
@@ -384,10 +384,10 @@ stu_websocket_request_handler(stu_event_t *wev) {
 		stu_gettimeofday(&start);
 
 		if (r->status == STU_HTTP_OK) {
-			stu_spin_lock(&ch->userlist.lock);
+			stu_mutex_lock(&ch->userlist.lock);
 
 			elts = &ch->userlist.keys.elts;
-			for (q = stu_queue_head(&elts->queue); q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
+			for (q = stu_queue_head(&elts->queue); q != NULL && q != stu_queue_sentinel(&elts->queue); q = stu_queue_next(q)) {
 				e = stu_queue_data(q, stu_hash_elt_t, q);
 				t = (stu_connection_t *) e->value;
 				fd = stu_atomic_fetch(&t->fd);
@@ -399,7 +399,7 @@ stu_websocket_request_handler(stu_event_t *wev) {
 				}
 			}
 
-			stu_spin_unlock(&ch->userlist.lock);
+			stu_mutex_unlock(&ch->userlist.lock);
 		} else {
 			n = send(c->fd, data, f->extended + 2 + extened, 0);
 			if (n == -1) {

@@ -14,7 +14,7 @@ volatile stu_cycle_t *stu_cycle;
 
 extern stu_hash_t *stu_upstreams;
 
-static void stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool);
+static void stu_config_copy(stu_config_t *dst, stu_config_t *src);
 
 
 void
@@ -60,80 +60,24 @@ stu_config_default(stu_config_t *cf) {
 
 stu_cycle_t *
 stu_cycle_create(stu_config_t *cf) {
-	stu_pool_t            *pool;
-	stu_slab_pool_t       *slab_pool;
-	stu_connection_pool_t *connection_pool;
-	stu_ram_pool_t        *ram_pool;
-	stu_cycle_t           *cycle;
-	stu_shm_t             *shm;
+	stu_cycle_t *cycle;
 
 	stu_ncpu = sysconf(_SC_NPROCESSORS_ONLN);
 
-	pool = stu_pool_create(STU_CYCLE_POOL_SIZE);
-	if (pool == NULL) {
-		stu_log_error(stu_errno, "Failed to create cycle pool.");
-		return NULL;
-	}
-
-	cycle = stu_pcalloc(pool, sizeof(stu_cycle_t));
+	cycle = stu_calloc(sizeof(stu_cycle_t));
 	if (cycle == NULL) {
 		stu_log_error(0, "Failed to pcalloc cycle.");
 		return NULL;
 	}
-	cycle->pool = pool;
 
-	slab_pool = stu_slab_pool_create(STU_SLAB_POOL_DEFAULT_SIZE);
-	if (slab_pool == NULL) {
-		stu_log_error(stu_errno, "Failed to create slab pool.");
-		return NULL;
-	}
-	cycle->slab_pool = slab_pool;
-
-	connection_pool = stu_connection_pool_create(pool);
-	if (connection_pool == NULL) {
-		stu_log_error(0, "Failed to pcalloc connection pool.");
-		return NULL;
-	}
-	cycle->connection_pool = connection_pool;
-
-	ram_pool = stu_ram_pool_create();
-	if (ram_pool == NULL) {
-		stu_log_error(0, "Failed to create ram pool.");
-		return NULL;
-	}
-	stu_queue_init(&cycle->ram_pool.queue);
-	stu_queue_insert_tail(&cycle->ram_pool.queue, &ram_pool->queue);
-
-	//stu_ram_test(&cycle->ram_pool);
-
-	stu_config_copy(&cycle->config, cf, pool);
-
-	// shared memory
-	stu_list_init(&cycle->shared_memory, slab_pool, (stu_list_palloc_pt) stu_slab_alloc, (stu_list_free_pt) stu_slab_free);
-
-	shm = stu_pcalloc(pool, sizeof(stu_shm_t));
-	shm->addr = (u_char *) pool;
-	shm->size = pool->data.end - (u_char *) pool;
-	stu_list_push(&cycle->shared_memory, shm, sizeof(stu_shm_t));
-
-	shm = stu_pcalloc(pool, sizeof(stu_shm_t));
-	shm->addr = (u_char *) slab_pool;
-	shm->size = slab_pool->data.end - (u_char *) slab_pool;
-	stu_list_push(&cycle->shared_memory, shm, sizeof(stu_shm_t));
-
-	shm = stu_pcalloc(pool, sizeof(stu_shm_t));
-	shm->addr = (u_char *) ram_pool;
-	shm->size = ram_pool->data.end - (u_char *) ram_pool;
-	stu_list_push(&cycle->shared_memory, shm, sizeof(stu_shm_t));
+	stu_config_copy(&cycle->config, cf);
 
 	// channels
-	if (stu_hash_init(&cycle->channels, NULL, STU_CHANNEL_MAXIMUM, slab_pool,
-			(stu_hash_palloc_pt) stu_slab_alloc, (stu_hash_free_pt) stu_slab_free) == STU_ERROR) {
+	if (stu_hash_init(&cycle->channels, NULL, STU_CHANNEL_MAXIMUM,
+			(stu_hash_palloc_pt) stu_calloc, (stu_hash_free_pt) stu_free) == STU_ERROR) {
 		stu_log_error(0, "Failed to init channel hash.");
 		return NULL;
 	}
-
-	cycle->connection_n = 0;
 
 	// timer
 	if (stu_timer_init(cycle) == STU_ERROR) {
@@ -141,8 +85,8 @@ stu_cycle_create(stu_config_t *cf) {
 		return NULL;
 	}
 
-	if (stu_hash_init(&cycle->timers, NULL, STU_TIMER_MAXIMUM, slab_pool,
-			(stu_hash_palloc_pt) stu_slab_alloc, (stu_hash_free_pt) stu_slab_free) == STU_ERROR) {
+	if (stu_hash_init(&cycle->timers, NULL, STU_TIMER_MAXIMUM,
+			(stu_hash_palloc_pt) stu_calloc, (stu_hash_free_pt) stu_free) == STU_ERROR) {
 		stu_log_error(0, "Failed to init timer hash.");
 		return NULL;
 	}
@@ -157,12 +101,12 @@ stu_cycle_create(stu_config_t *cf) {
 }
 
 static void
-stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool) {
-	dst->log.name.data = stu_pcalloc(pool, src->log.name.len + 1);
+stu_config_copy(stu_config_t *dst, stu_config_t *src) {
+	dst->log.name.data = stu_calloc(src->log.name.len + 1);
 	dst->log.name.len = src->log.name.len;
 	memcpy(dst->log.name.data, src->log.name.data, src->log.name.len);
 
-	dst->pid.name.data = stu_pcalloc(pool, src->pid.name.len + 1);
+	dst->pid.name.data = stu_calloc(src->pid.name.len + 1);
 	dst->pid.name.len = src->pid.name.len;
 	memcpy(dst->pid.name.data, src->pid.name.data, src->pid.name.len);
 
@@ -173,7 +117,7 @@ stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool) {
 
 	dst->port = src->port;
 	if (src->hostname.len > 0) {
-		dst->hostname.data = stu_pcalloc(pool, src->hostname.len + 1);
+		dst->hostname.data = stu_calloc(src->hostname.len + 1);
 		dst->hostname.len = src->hostname.len;
 		memcpy(dst->hostname.data, src->hostname.data, src->hostname.len);
 	}
@@ -184,7 +128,7 @@ stu_config_copy(stu_config_t *dst, stu_config_t *src, stu_pool_t *pool) {
 	dst->push_status = src->push_status;
 	dst->push_status_interval = src->push_status_interval;
 
-	if (stu_hash_init(&dst->upstreams, NULL, STU_UPSTREAM_MAXIMUM, pool, (stu_hash_palloc_pt) stu_pcalloc, NULL) == STU_ERROR) {
+	if (stu_hash_init(&dst->upstreams, NULL, STU_UPSTREAM_MAXIMUM, (stu_hash_palloc_pt) stu_calloc, stu_free) == STU_ERROR) {
 		stu_log_error(0, "Failed to init upstream hash.");
 		return;
 	}

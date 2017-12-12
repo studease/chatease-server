@@ -23,7 +23,7 @@ typedef struct {
 } stu_pool_data_t;
 
 struct stu_base_pool_s {
-	stu_spinlock_t   lock;
+	stu_mutex_t   lock;
 	stu_pool_data_t  data;
 
 	stu_base_pool_t *prev;
@@ -31,7 +31,7 @@ struct stu_base_pool_s {
 };
 
 struct stu_pool_s {
-	stu_spinlock_t   lock;
+	stu_mutex_t   lock;
 	stu_pool_data_t  data;
 
 	stu_pool_t      *prev;

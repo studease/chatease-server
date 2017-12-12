@@ -11,8 +11,6 @@
 #include "stu_config.h"
 #include "stu_core.h"
 
-extern stu_cycle_t       *stu_cycle;
-
 extern stu_hash_t         stu_http_headers_in_hash;
 extern stu_http_header_t  stu_http_headers_in[];
 
@@ -159,8 +157,8 @@ stu_http_init_headers_in_hash(stu_config_t *cf) {
 	u_char             data[STU_HTTP_LC_HEADER_LEN];
 
 	//
-	if (stu_hash_init(&stu_http_headers_in_hash, NULL, STU_HTTP_HEADERS_MAX_SIZE, stu_cycle->pool,
-			(stu_hash_palloc_pt) stu_pcalloc, NULL) == STU_ERROR) {
+	if (stu_hash_init(&stu_http_headers_in_hash, NULL, STU_HTTP_HEADERS_MAX_SIZE,
+			(stu_hash_palloc_pt) stu_calloc, stu_free) == STU_ERROR) {
 		return STU_ERROR;
 	}
 
@@ -177,8 +175,8 @@ stu_http_init_headers_in_hash(stu_config_t *cf) {
 		}
 	}
 
-	if (stu_hash_init(&stu_http_upstream_headers_in_hash, NULL, STU_HTTP_HEADERS_MAX_SIZE, stu_cycle->pool,
-			(stu_hash_palloc_pt) stu_pcalloc, NULL) == STU_ERROR) {
+	if (stu_hash_init(&stu_http_upstream_headers_in_hash, NULL, STU_HTTP_HEADERS_MAX_SIZE,
+			(stu_hash_palloc_pt) stu_calloc, stu_free) == STU_ERROR) {
 		return STU_ERROR;
 	}
 

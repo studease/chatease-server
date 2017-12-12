@@ -20,7 +20,7 @@
 #define STU_TIME_SLOTS   64
 
 static stu_uint_t        slot;
-static stu_atomic_t      stu_time_lock;
+static stu_mutex_t       stu_time_lock;
 
 volatile stu_msec_t      stu_current_msec;
 volatile stu_time_t     *stu_cached_time;
@@ -58,6 +58,7 @@ stu_time_init(void) {
 
 	stu_cached_time = &cached_time[0];
 
+	stu_mutex_init(&stu_time_lock, NULL);
 	stu_time_update();
 }
 
@@ -70,7 +71,7 @@ stu_time_update(void) {
 	stu_time_t      *tp;
 	struct timeval   tv;
 
-	if (!stu_trylock(&stu_time_lock)) {
+	if (stu_mutex_trylock(&stu_time_lock)) {
 		return;
 	}
 
@@ -84,7 +85,7 @@ stu_time_update(void) {
 	tp = &cached_time[slot];
 	if (tp->sec == sec) {
 		tp->msec = msec;
-		stu_unlock(&stu_time_lock);
+		stu_mutex_unlock(&stu_time_lock);
 		return;
 	}
 
@@ -142,7 +143,7 @@ stu_time_update(void) {
 	stu_cached_http_time.data = p0;
 	stu_cached_http_log_time.data = p2;
 
-	stu_unlock(&stu_time_lock);
+	stu_mutex_unlock(&stu_time_lock);
 }
 
 u_char *

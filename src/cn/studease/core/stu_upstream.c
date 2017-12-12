@@ -36,7 +36,7 @@ stu_upstream_create(stu_connection_t *c, u_char *name, size_t len) {
 	// get upstream
 	u = c->upstream;
 	if (u == NULL) {
-		u = stu_base_pcalloc(c->pool, sizeof(stu_upstream_t));
+		u = stu_calloc(sizeof(stu_upstream_t));
 		if (u == NULL) {
 			stu_log_error(0, "Failed to pcalloc upstream for fd=%d.", c->fd);
 			return STU_ERROR;

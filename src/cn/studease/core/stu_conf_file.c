@@ -40,7 +40,7 @@ static stu_str_t  STU_CONF_FILE_UPSTREAM_TIMEOUT = stu_string("timeout");
 
 
 stu_int_t
-stu_conf_file_parse(stu_config_t *cf, u_char *name, stu_pool_t *pool) {
+stu_conf_file_parse(stu_config_t *cf, u_char *name) {
 	u_char                 temp[STU_CONF_FILE_MAX_SIZE];
 	stu_file_t             file;
 	stu_json_t            *conf, *item, *sub, *srv, *srv_property;
@@ -79,7 +79,7 @@ stu_conf_file_parse(stu_config_t *cf, u_char *name, stu_pool_t *pool) {
 	item = stu_json_get_object_item_by(conf, &STU_CONF_FILE_PID);
 	if (item && item->type == STU_JSON_TYPE_STRING) {
 		v_string = (stu_str_t *) item->value;
-		cf->pid.name.data = stu_pcalloc(pool, v_string->len + 1);
+		cf->pid.name.data = stu_calloc(v_string->len + 1);
 		cf->pid.name.len = v_string->len;
 		stu_strncpy(cf->pid.name.data, v_string->data, v_string->len);
 	}
@@ -130,7 +130,7 @@ stu_conf_file_parse(stu_config_t *cf, u_char *name, stu_pool_t *pool) {
 		sub = stu_json_get_object_item_by(item, &STU_CONF_FILE_SERVER_HOSTNAME);
 		if (sub) {
 			v_string = (stu_str_t *) sub->value;
-			cf->hostname.data = stu_pcalloc(pool, v_string->len + 1);
+			cf->hostname.data = stu_calloc(v_string->len + 1);
 			cf->hostname.len = v_string->len;
 			stu_strncpy(cf->hostname.data, v_string->data, v_string->len);
 		}
@@ -165,13 +165,13 @@ stu_conf_file_parse(stu_config_t *cf, u_char *name, stu_pool_t *pool) {
 			hk = stu_hash_key(sub->key.data, sub->key.len);
 			upstream = stu_hash_find(&cf->upstreams, hk, sub->key.data, sub->key.len);
 			if (upstream == NULL) {
-				upstream = stu_pcalloc(pool, sizeof(stu_list_t));
+				upstream = stu_calloc(sizeof(stu_list_t));
 				if (upstream == NULL) {
 					stu_log_error(0, "Failed to pcalloc upstream list.");
 					goto failed;
 				}
 
-				stu_list_init(upstream, pool, (stu_list_palloc_pt) stu_pcalloc, NULL);
+				stu_list_init(upstream, (stu_list_palloc_pt) stu_calloc, stu_free);
 
 				if (stu_hash_insert(&cf->upstreams, &sub->key, upstream, STU_HASH_LOWCASE|STU_HASH_REPLACE) == STU_ERROR) {
 					stu_log_error(0, "Failed to insert upstream %s into hash.", sub->key.data);
@@ -185,20 +185,20 @@ stu_conf_file_parse(stu_config_t *cf, u_char *name, stu_pool_t *pool) {
 					goto failed;
 				}
 
-				server = stu_pcalloc(pool, sizeof(stu_upstream_server_t));
+				server = stu_calloc(sizeof(stu_upstream_server_t));
 				if (server == NULL) {
 					stu_log_error(0, "Failed to pcalloc upstream server.");
 					goto failed;
 				}
 
-				server->name.data = stu_pcalloc(pool, sub->key.len + 1);
+				server->name.data = stu_calloc(sub->key.len + 1);
 				server->name.len = sub->key.len;
 				stu_strncpy(server->name.data, sub->key.data, sub->key.len);
 
 				srv_property = stu_json_get_object_item_by(srv, &STU_CONF_FILE_UPSTREAM_PROTOCOL);
 				if (srv_property && srv_property->type == STU_JSON_TYPE_STRING) {
 					v_string = (stu_str_t *) srv_property->value;
-					server->protocol.data = stu_pcalloc(pool, v_string->len + 1);
+					server->protocol.data = stu_calloc(v_string->len + 1);
 					server->protocol.len = v_string->len;
 					stu_strncpy(server->protocol.data, v_string->data, v_string->len);
 				}
@@ -219,7 +219,7 @@ stu_conf_file_parse(stu_config_t *cf, u_char *name, stu_pool_t *pool) {
 				srv_property = stu_json_get_object_item_by(srv, &STU_CONF_FILE_UPSTREAM_ADDRESS);
 				if (srv_property && srv_property->type == STU_JSON_TYPE_STRING) {
 					v_string = (stu_str_t *) srv_property->value;
-					server->addr.name.data = stu_pcalloc(pool, v_string->len + 1);
+					server->addr.name.data = stu_calloc(v_string->len + 1);
 					server->addr.name.len = v_string->len;
 					stu_strncpy(server->addr.name.data, v_string->data, v_string->len);
 				}
@@ -233,7 +233,7 @@ stu_conf_file_parse(stu_config_t *cf, u_char *name, stu_pool_t *pool) {
 				srv_property = stu_json_get_object_item_by(srv, &STU_CONF_FILE_UPSTREAM_TARGET);
 				if (srv_property && srv_property->type == STU_JSON_TYPE_STRING) {
 					v_string = (stu_str_t *) srv_property->value;
-					server->target.data = stu_pcalloc(pool, v_string->len + 1);
+					server->target.data = stu_calloc(v_string->len + 1);
 					server->target.len = v_string->len;
 					stu_strncpy(server->target.data, v_string->data, v_string->len);
 				}

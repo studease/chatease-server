@@ -41,6 +41,7 @@ struct stu_punishment_s {
 typedef struct {
 	stu_str_t         id;
 	stu_str_t         name;
+	stu_str_t         icon;
 	uint8_t           role;
 
 	uint16_t          interval;
@@ -50,7 +51,7 @@ typedef struct {
 	stu_channel_t    *channel;
 } stu_user_t;
 
-stu_int_t  stu_user_init(stu_user_t *usr, stu_str_t *id, stu_str_t *name, stu_base_pool_t *pool);
+stu_int_t  stu_user_init(stu_user_t *usr, stu_str_t *id, stu_str_t *name);
 void       stu_user_set_role(stu_user_t *usr, uint8_t role);
 
 #endif /* STU_USER_H_ */

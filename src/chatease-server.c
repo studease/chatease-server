@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
 		return EXIT_FAILURE;
 	}
 
-	if (stu_conf_file_parse(&stu_cycle->config, STU_CONF_FILE_DEFAULT_PATH.data, stu_cycle->pool) == STU_ERROR) {
+	if (stu_conf_file_parse(&stu_cycle->config, STU_CONF_FILE_DEFAULT_PATH.data) == STU_ERROR) {
 		stu_log_error(0, "Failed to parse configure file.");
 		return EXIT_FAILURE;
 	}

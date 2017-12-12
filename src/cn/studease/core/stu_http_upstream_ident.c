@@ -14,7 +14,7 @@ stu_str_t  STU_HTTP_UPSTREAM_IDENT_PARAM_CHANNEL = stu_string("channel");
 stu_str_t  STU_HTTP_UPSTREAM_IDENT_PARAM_TOKEN = stu_string("token");
 
 stu_str_t  STU_HTTP_UPSTREAM_IDENT_RESPONSE = stu_string(
-		"{\"raw\":\"ident\",\"user\":{\"id\":\"%ld\",\"name\":\"%s\",\"role\":%d},\"channel\":{\"id\":\"%s\",\"state\":%d,\"total\":%lu}}"
+		"{\"raw\":\"ident\",\"user\":{\"id\":\"%ld\",\"name\":\"%s\",\"icon\":\"%s\",\"role\":%d},\"channel\":{\"id\":\"%s\",\"state\":%d,\"total\":%lu}}"
 	);
 
 
@@ -39,7 +39,7 @@ stu_http_upstream_ident_generate_request(stu_connection_t *c) {
 	}
 
 	if (pr->request_body.start == NULL) {
-		pr->request_body.start = stu_base_palloc(pc->pool, STU_HTTP_REQUEST_DEFAULT_SIZE);
+		pr->request_body.start = stu_calloc(STU_HTTP_REQUEST_DEFAULT_SIZE);
 		if (pr->request_body.start == NULL) {
 			stu_log_error(0, "Failed to palloc() request body: fd=%d.", c->fd);
 			return STU_ERROR;
@@ -147,7 +147,7 @@ stu_http_upstream_ident_analyze_response(stu_connection_t *c) {
 	}
 
 	// get channel ID
-	channel.data = stu_base_pcalloc(c->pool, r->target.len + 1);
+	channel.data = stu_calloc(r->target.len + 1);
 	if (channel.data == NULL) {
 		stu_log_error(0, "Failed to pcalloc memory for channel id, fd=%d.", c->fd);
 		goto failed;
@@ -164,7 +164,7 @@ stu_http_upstream_ident_analyze_response(stu_connection_t *c) {
 	// reset user info
 	uid = (stu_str_t *) iduid->value;
 
-	c->user.id.data = stu_base_pcalloc(c->pool, uid->len + 1);
+	c->user.id.data = stu_calloc(uid->len + 1);
 	if (c->user.id.data == NULL) {
 		stu_log_error(0, "Failed to pcalloc memory for user id, fd=%d.", c->fd);
 		goto failed;
@@ -174,7 +174,7 @@ stu_http_upstream_ident_analyze_response(stu_connection_t *c) {
 	stu_strncpy(c->user.id.data, uid->data, uid->len);
 
 	uname = (stu_str_t *) iduname->value;
-	c->user.name.data = stu_base_pcalloc(c->pool, uname->len + 1);
+	c->user.name.data = stu_calloc(uname->len + 1);
 	if (c->user.name.data == NULL) {
 		stu_log_error(0, "Failed to pcalloc memory for user name, fd=%d.", c->fd);
 		goto failed;
