@@ -2,11 +2,12 @@
 	"status": true,
 	"user": {
 		"id": "1",
-		"name": "tony",
+		"name": "Tony",
+		"icon": "/images/icon/tony.png",
 		"role": 1
 	},
 	"channel": {
-		"id": "ch1",
+		"id": "001",
 		"state": 0
 	}
 }

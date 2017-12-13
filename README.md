@@ -7,20 +7,26 @@
 This is a websocket chat server.
 
 
+## Note
+-------
+
+The version 2.0 is renamed to [kiwichatd](http://studease.cn/kiwichatd.html).
+
+
 ## Prepare
 ----------
 
-For Enterprise Edition, supply an interface to return a JSON object formatted as /data/userinfo.json.
+For the Enterprise Edition, supply an interface to return a JSON object formatted as /data/userinfo.json.
 
-While the client is connecting to upgrade protocol, we send an identify upstream request to get the user info,
-which decides whether the operation will be satisfied.
+While a client is connecting to upgrade protocol, it sends an identify upstream request, carrying channel and token params, 
+to get the user info, which will decide whether the operation will be satisfied.
 
-Preview Edition won't send the identify upstream request.
+The Preview Edition is more like a stand-alone server. The user info, includes name, icon, role, and channel state could be
+present in params. However, this is not safe.
+
 
 ## Build
 --------
-
-### CMake
 
 To build chatease-server, you need CMake 3.5 and or above. Then run:
 
