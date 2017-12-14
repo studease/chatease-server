@@ -10,7 +10,7 @@ This is a websocket chat server.
 ## Note
 -------
 
-The version 2.0 is renamed to [kiwichatd](http://studease.cn/kiwichatd.html).
+The version 2.0 was renamed as [kiwichatd](http://studease.cn/kiwichatd.html).
 
 
 ## Prepare
