@@ -10,7 +10,7 @@ This is a websocket chat server.
 ## Note
 -------
 
-The version 2.0 was renamed as [kiwichatd](http://studease.cn/kiwichatd.html).
+This server was renamed as [kiwichatd](http://studease.cn/kiwichatd.html) at version 2.0, and closed source.
 
 
 ## Prepare
@@ -28,7 +28,7 @@ present in params. However, this is not safe.
 ## Build
 --------
 
-To build chatease-server, you need CMake 3.5 and or above. Then run:
+To build chatease-server, you need CMake 3.5 and or above, and OpenSSL installed. Then run:
 
 ```
 cmake .
